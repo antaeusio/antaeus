@@ -62,6 +62,30 @@ func TestContractExamplesAgainstSchemas(t *testing.T) {
 			valid:    true,
 		},
 		{
+			name:     "quickstart fixture set",
+			schema:   "fixture-set.schema.json",
+			instance: filepath.Join("examples", "v0alpha1", "fixture-set", "quickstart.json"),
+			valid:    true,
+		},
+		{
+			name:     "fixture set unknown property",
+			schema:   "fixture-set.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "fixture-set", "invalid-unknown-property.json"),
+			valid:    false,
+		},
+		{
+			name:     "fixture set bad digest",
+			schema:   "fixture-set.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "fixture-set", "invalid-bad-digest.json"),
+			valid:    false,
+		},
+		{
+			name:     "fixture set empty rule results",
+			schema:   "fixture-set.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "fixture-set", "invalid-empty-rule-results.json"),
+			valid:    false,
+		},
+		{
 			name:     "unknown policy property",
 			schema:   "policy.schema.json",
 			instance: filepath.Join("conformance", "v0alpha1", "policy", "invalid-unknown-property.json"),
@@ -114,6 +138,7 @@ func newCompiler(t *testing.T) *jsonschema.Compiler {
 		"policy.schema.json",
 		"decision-request.schema.json",
 		"decision.schema.json",
+		"fixture-set.schema.json",
 		"problem.schema.json",
 	} {
 		path := contractsPath(filepath.Join("schemas", "v0alpha1", name))

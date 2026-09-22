@@ -60,6 +60,27 @@ An accepted evaluation produces one rule result per policy rule even when a conf
 
 The language-neutral cases in `conformance/v0alpha1/reduction/cases.json` are normative input-to-output fixtures for this behavior.
 
+## Evaluator fixtures
+
+The provider-neutral evaluator boundary receives verified policy identity,
+exact canonical JSON input, ordered rule IDs and conditions, deadline,
+correlation ID, and profile digest. It never receives a rule's configured
+policy outcome. A normalized evaluator result returns every requested rule
+exactly once in request order with `matched`, `not_matched`, `indeterminate`, or
+`failed`, optional finite confidence, stable reason codes, and bounded safe
+diagnostics.
+
+`fixture-set.schema.json` defines the credential-free deterministic fixture
+format. Each named case binds an exact policy name and digest plus the SHA-256
+digest of exact canonical input bytes to exact normalized rule results. Missing
+cases, identity mismatches, and incomplete rule mappings are errors. Fixture
+results are always labeled `deterministic-fixture` and synthetic; they are test
+evidence, not semantic inference or an enforcement fallback.
+
+Case names are unique within a fixture set, and rule IDs are unique within each
+case. JSON property names are case-sensitive and exact; unknown, case-variant,
+and duplicate properties are rejected before typed decoding.
+
 Requests rejected before evaluation use a non-2xx status with RFC 9457 Problem Details (`application/problem+json`). Policy `deny` and `review` outcomes are not transport errors.
 
 ## Layout

@@ -1,0 +1,24 @@
+{
+  "apiVersion": "fixture.antaeus.io/v0alpha1",
+  "kind": "FixtureSet",
+  "metadata": {
+    "name": "invalid",
+    "version": "v1"
+  },
+  "cases": [
+    {
+      "name": "unknown-property",
+      "policyName": "example",
+      "policyDigest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "inputDigest": "sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+      "ruleResults": [
+        {
+          "ruleId": "check",
+          "status": "not_matched",
+          "reasonCodes": ["fixture.exact_result"],
+          "unexpected": true
+        }
+      ]
+    }
+  ]
+}
