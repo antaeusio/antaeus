@@ -1,0 +1,22 @@
+{
+  "apiVersion": "policy.antaeus.io/v0alpha1",
+  "kind": "Policy",
+  "metadata": {
+    "name": "duplicate-rules"
+  },
+  "spec": {
+    "defaultOutcome": "review",
+    "rules": [
+      {
+        "id": "same-rule",
+        "when": "The first condition applies.",
+        "outcome": "deny"
+      },
+      {
+        "id": "same-rule",
+        "when": "The second condition applies.",
+        "outcome": "allow"
+      }
+    ]
+  }
+}

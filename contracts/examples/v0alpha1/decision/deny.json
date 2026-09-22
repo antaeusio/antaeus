@@ -1,0 +1,24 @@
+{
+  "apiVersion": "decision.antaeus.io/v0alpha1",
+  "kind": "Decision",
+  "outcome": "deny",
+  "policy": {
+    "name": "vendor-onboarding",
+    "digest": "sha256:2378b5a1806bb11c618bd3a78122e773ec93bdfc45b751a18887d40f4ea536a2"
+  },
+  "ruleResults": [
+    {
+      "ruleId": "prohibited-service",
+      "status": "matched",
+      "outcome": "deny",
+      "confidence": 0.98,
+      "reasonCodes": ["policy.rule_matched"]
+    },
+    {
+      "ruleId": "complete-low-risk-submission",
+      "status": "not_matched",
+      "reasonCodes": ["policy.rule_not_matched"]
+    }
+  ],
+  "reasonCodes": ["policy.deny_rule_matched"]
+}

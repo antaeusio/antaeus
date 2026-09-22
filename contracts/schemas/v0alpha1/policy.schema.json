@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://antaeus.io/contracts/v0alpha1/policy.schema.json",
+  "title": "Antaeus Policy v0alpha1",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {
+      "const": "policy.antaeus.io/v0alpha1"
+    },
+    "kind": {
+      "const": "Policy"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "$ref": "common.schema.json#/$defs/policyName"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 4096
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "spec": {
+      "type": "object",
+      "required": ["defaultOutcome", "rules"],
+      "properties": {
+        "defaultOutcome": {
+          "$ref": "common.schema.json#/$defs/policyOutcome"
+        },
+        "rules": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/rule"
+          }
+        }
+      },
+      "unevaluatedProperties": false
+    }
+  },
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "required": ["id", "when", "outcome"],
+      "properties": {
+        "id": {
+          "$ref": "common.schema.json#/$defs/ruleId"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "when": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        },
+        "outcome": {
+          "$ref": "common.schema.json#/$defs/policyOutcome"
+        }
+      },
+      "unevaluatedProperties": false
+    }
+  },
+  "unevaluatedProperties": false
+}

@@ -1,0 +1,53 @@
+openapi: 3.1.2
+info:
+  title: Antaeus portable decision API
+  version: v0alpha1
+  description: >-
+    Provider-neutral synchronous decision contract. A typed failure Decision is
+    an HTTP 200 response; requests rejected before evaluation use RFC 9457
+    Problem Details.
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
+paths:
+  /v0alpha1/decisions:
+    post:
+      operationId: createDecision
+      summary: Evaluate one input against an immutable policy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../../schemas/v0alpha1/decision-request.schema.json
+      responses:
+        "200":
+          description: A completed allow, review, deny, or failure Decision.
+          content:
+            application/json:
+              schema:
+                $ref: ../../schemas/v0alpha1/decision.schema.json
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "413":
+          $ref: "#/components/responses/Problem"
+        "415":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "500":
+          $ref: "#/components/responses/Problem"
+components:
+  responses:
+    Problem:
+      description: The request was not accepted for evaluation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: ../../schemas/v0alpha1/problem.schema.json

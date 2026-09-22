@@ -1,0 +1,7 @@
+{
+  "type": "https://antaeus.io/problems/invalid-policy",
+  "title": "Invalid policy",
+  "status": 422,
+  "detail": "The submitted policy does not conform to policy.antaeus.io/v0alpha1.",
+  "code": "policy.invalid"
+}

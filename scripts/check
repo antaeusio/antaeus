@@ -5,7 +5,10 @@ set -eu
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 repo_root=$(CDPATH='' cd -- "$script_dir/.." && pwd)
 
-unformatted=$(find "$repo_root/cmd" "$repo_root/internal" -type f -name '*.go' -exec gofmt -l {} +)
+unformatted=$(find "$repo_root" -type f -name '*.go' \
+  -not -path "$repo_root/.git/*" \
+  -not -path "$repo_root/.tmp/*" \
+  -exec gofmt -l {} +)
 if [ -n "$unformatted" ]; then
   echo "check: gofmt is required for:" >&2
   echo "$unformatted" >&2
