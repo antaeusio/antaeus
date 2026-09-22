@@ -23,12 +23,17 @@ func TestEvaluatorMetadataSchemaRejectsInvalidCombinations(t *testing.T) {
 		name   string
 		mutate func(map[string]any)
 	}{
+		{name: "missing adapter version", mutate: func(e map[string]any) { delete(e, "adapterVersion") }},
+		{name: "blank adapter version", mutate: func(e map[string]any) { e["adapterVersion"] = "   " }},
 		{name: "missing mode", mutate: func(e map[string]any) { delete(e, "mode") }},
 		{name: "missing synthetic", mutate: func(e map[string]any) { delete(e, "synthetic") }},
 		{name: "invalid mode", mutate: func(e map[string]any) { e["mode"] = "other" }},
 		{name: "fixture not synthetic", mutate: func(e map[string]any) { e["synthetic"] = false }},
 		{name: "fixture set missing", mutate: func(e map[string]any) { delete(e, "fixtureSet") }},
+		{name: "fixture set blank", mutate: func(e map[string]any) { e["fixtureSet"] = "   " }},
+		{name: "fixture set invalid pattern", mutate: func(e map[string]any) { e["fixtureSet"] = "UPPER" }},
 		{name: "fixture version missing", mutate: func(e map[string]any) { delete(e, "fixtureVersion") }},
+		{name: "fixture version blank", mutate: func(e map[string]any) { e["fixtureVersion"] = "   " }},
 		{name: "semantic marked synthetic", mutate: func(e map[string]any) {
 			e["mode"] = "semantic"
 			e["synthetic"] = true

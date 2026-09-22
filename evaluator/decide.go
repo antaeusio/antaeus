@@ -56,14 +56,23 @@ func Decide(ctx context.Context, adapter Evaluator, input DecisionInput) (decisi
 	}
 
 	evaluationContext := ctx
+	effectiveDeadline := input.Deadline
 	if deadline, exists := ctx.Deadline(); !exists || input.Deadline.Before(deadline) {
 		var cancel context.CancelFunc
 		evaluationContext, cancel = context.WithDeadline(ctx, input.Deadline)
 		defer cancel()
+	} else {
+		effectiveDeadline = deadline
 	}
 	evidence, err := adapter.Evaluate(evaluationContext, request)
 	if contextError := evaluationContext.Err(); contextError != nil {
 		return decision.Decision{}, fmt.Errorf("evaluate context: %w", contextError)
+	}
+	// A deadline is an absolute contract boundary. Check the wall clock as well
+	// as context state so a result cannot slip through before the runtime's
+	// deadline timer has been observed.
+	if !time.Now().Before(effectiveDeadline) {
+		return decision.Decision{}, fmt.Errorf("evaluate context: %w", context.DeadlineExceeded)
 	}
 	if err != nil {
 		return decision.Decision{}, fmt.Errorf("evaluate: %w", err)
@@ -110,8 +119,8 @@ func Decide(ctx context.Context, adapter Evaluator, input DecisionInput) (decisi
 			Synthetic:      boolPointer(evidence.Metadata.Synthetic),
 			Provider:       evidence.Metadata.Provider,
 			Model:          evidence.Metadata.Model,
-			FixtureSet:     evidence.Metadata.FixtureSet,
-			FixtureVersion: evidence.Metadata.FixtureVersion,
+			FixtureSet:     optionalString(evidence.Metadata.FixtureSet),
+			FixtureVersion: optionalString(evidence.Metadata.FixtureVersion),
 			Route:          []string{evidence.Metadata.AdapterID},
 			Attempts:       1,
 		},
@@ -139,5 +148,12 @@ func cloneFailure(source *decision.Failure) *decision.Failure {
 }
 
 func boolPointer(value bool) *bool {
+	return &value
+}
+
+func optionalString(value string) *string {
+	if value == "" {
+		return nil
+	}
 	return &value
 }

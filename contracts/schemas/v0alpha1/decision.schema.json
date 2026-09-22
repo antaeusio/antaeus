@@ -110,7 +110,7 @@
     },
     "evaluator": {
       "type": "object",
-      "required": ["profileDigest", "adapter", "mode", "synthetic", "route", "attempts"],
+      "required": ["profileDigest", "adapter", "adapterVersion", "mode", "synthetic", "route", "attempts"],
       "properties": {
         "profileDigest": {
           "$ref": "common.schema.json#/$defs/digest"
@@ -124,7 +124,8 @@
           "maxLength": 128
         },
         "adapterVersion": {
-          "$ref": "common.schema.json#/$defs/version"
+          "$ref": "common.schema.json#/$defs/version",
+          "pattern": ".*\\S.*"
         },
         "mode": {
           "type": "string",

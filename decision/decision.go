@@ -104,13 +104,13 @@ type Evaluator struct {
 	ProfileDigest  string        `json:"profileDigest"`
 	ProfileVersion string        `json:"profileVersion,omitempty"`
 	Adapter        string        `json:"adapter"`
-	AdapterVersion string        `json:"adapterVersion,omitempty"`
+	AdapterVersion string        `json:"adapterVersion"`
 	Mode           EvaluatorMode `json:"mode"`
 	Synthetic      *bool         `json:"synthetic"`
 	Provider       string        `json:"provider,omitempty"`
 	Model          string        `json:"model,omitempty"`
-	FixtureSet     string        `json:"fixtureSet,omitempty"`
-	FixtureVersion string        `json:"fixtureVersion,omitempty"`
+	FixtureSet     *string       `json:"fixtureSet,omitempty"`
+	FixtureVersion *string       `json:"fixtureVersion,omitempty"`
 	Route          []string      `json:"route"`
 	Attempts       int           `json:"attempts"`
 	Fallback       bool          `json:"fallback,omitempty"`

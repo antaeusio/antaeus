@@ -129,29 +129,35 @@ func TestDecisionRejectsInvalidEvaluatorMetadata(t *testing.T) {
 	tests := []struct {
 		name   string
 		mutate func(*Evaluator)
+		path   string
 	}{
-		{name: "missing mode", mutate: func(e *Evaluator) { e.Mode = "" }},
-		{name: "invalid mode", mutate: func(e *Evaluator) { e.Mode = "other" }},
-		{name: "synthetic missing", mutate: func(e *Evaluator) { e.Synthetic = nil }},
-		{name: "fixture not synthetic", mutate: func(e *Evaluator) { e.Synthetic = testBool(false) }},
-		{name: "fixture set missing", mutate: func(e *Evaluator) { e.FixtureSet = "" }},
-		{name: "fixture version missing", mutate: func(e *Evaluator) { e.FixtureVersion = "" }},
+		{name: "missing adapter version", mutate: func(e *Evaluator) { e.AdapterVersion = "" }, path: "$.evaluator.adapterVersion"},
+		{name: "blank adapter version", mutate: func(e *Evaluator) { e.AdapterVersion = "   " }, path: "$.evaluator.adapterVersion"},
+		{name: "missing mode", mutate: func(e *Evaluator) { e.Mode = "" }, path: "$.evaluator.mode"},
+		{name: "invalid mode", mutate: func(e *Evaluator) { e.Mode = "other" }, path: "$.evaluator.mode"},
+		{name: "synthetic missing", mutate: func(e *Evaluator) { e.Synthetic = nil }, path: "$.evaluator.synthetic"},
+		{name: "fixture not synthetic", mutate: func(e *Evaluator) { e.Synthetic = testBool(false) }, path: "$.evaluator.synthetic"},
+		{name: "fixture set missing", mutate: func(e *Evaluator) { e.FixtureSet = nil }, path: "$.evaluator.fixtureSet"},
+		{name: "fixture set blank", mutate: func(e *Evaluator) { e.FixtureSet = testString("   ") }, path: "$.evaluator.fixtureSet"},
+		{name: "fixture set invalid pattern", mutate: func(e *Evaluator) { e.FixtureSet = testString("UPPER") }, path: "$.evaluator.fixtureSet"},
+		{name: "fixture version missing", mutate: func(e *Evaluator) { e.FixtureVersion = nil }, path: "$.evaluator.fixtureVersion"},
+		{name: "fixture version blank", mutate: func(e *Evaluator) { e.FixtureVersion = testString("   ") }, path: "$.evaluator.fixtureVersion"},
 		{name: "semantic marked synthetic", mutate: func(e *Evaluator) {
 			e.Mode = EvaluatorModeSemantic
 			e.Synthetic = testBool(true)
-			e.FixtureSet = ""
-			e.FixtureVersion = ""
-		}},
+			e.FixtureSet = nil
+			e.FixtureVersion = nil
+		}, path: "$.evaluator.synthetic"},
 		{name: "semantic with fixture set", mutate: func(e *Evaluator) {
 			e.Mode = EvaluatorModeSemantic
 			e.Synthetic = testBool(false)
-			e.FixtureVersion = ""
-		}},
+			e.FixtureVersion = nil
+		}, path: "$.evaluator.fixtureSet"},
 		{name: "semantic with fixture version", mutate: func(e *Evaluator) {
 			e.Mode = EvaluatorModeSemantic
 			e.Synthetic = testBool(false)
-			e.FixtureSet = ""
-		}},
+			e.FixtureSet = nil
+		}, path: "$.evaluator.fixtureVersion"},
 	}
 
 	for _, test := range tests {
@@ -163,11 +169,18 @@ func TestDecisionRejectsInvalidEvaluatorMetadata(t *testing.T) {
 			if err := candidate.Validate(); !errors.As(err, &validationError) {
 				t.Fatalf("Validate() error = %v, want ValidationError", err)
 			}
+			if validationError.Path != test.path {
+				t.Fatalf("ValidationError.Path = %q, want %q", validationError.Path, test.path)
+			}
 		})
 	}
 }
 
 func testBool(value bool) *bool {
+	return &value
+}
+
+func testString(value string) *string {
 	return &value
 }
 

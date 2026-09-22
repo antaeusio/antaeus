@@ -33,8 +33,8 @@ func TestDecideWithQuickstartFixture(t *testing.T) {
 	if got.Evaluator == nil || got.Evaluator.Synthetic == nil || !*got.Evaluator.Synthetic || got.Evaluator.Mode != decision.EvaluatorModeDeterministicFixture {
 		t.Fatalf("Decision.Evaluator = %#v, want visibly synthetic fixture", got.Evaluator)
 	}
-	if got.Evaluator.FixtureSet != "quickstart" || got.Evaluator.FixtureVersion != "v1" {
-		t.Fatalf("fixture identity = %q@%q, want quickstart@v1", got.Evaluator.FixtureSet, got.Evaluator.FixtureVersion)
+	if got.Evaluator.FixtureSet == nil || *got.Evaluator.FixtureSet != "quickstart" || got.Evaluator.FixtureVersion == nil || *got.Evaluator.FixtureVersion != "v1" {
+		t.Fatalf("fixture identity = %v@%v, want quickstart@v1", got.Evaluator.FixtureSet, got.Evaluator.FixtureVersion)
 	}
 	if err := got.ValidateAgainst(artifact); err != nil {
 		t.Fatalf("ValidateAgainst() error = %v", err)
@@ -102,6 +102,24 @@ func TestDecideRejectsMalformedAdapterResult(t *testing.T) {
 	}
 }
 
+func TestDecideRecordsSemanticEvaluatorMetadata(t *testing.T) {
+	artifact, _ := loadContracts(t)
+	adapter := evaluatorFunc(func(_ context.Context, request evaluator.Request) (evaluator.Result, error) {
+		return semanticResult(request), nil
+	})
+
+	got, err := evaluator.Decide(context.Background(), adapter, decisionInput(artifact))
+	if err != nil {
+		t.Fatalf("Decide() error = %v", err)
+	}
+	if got.Evaluator == nil || got.Evaluator.Mode != decision.EvaluatorModeSemantic || got.Evaluator.Synthetic == nil || *got.Evaluator.Synthetic {
+		t.Fatalf("Decision.Evaluator = %#v, want non-synthetic semantic metadata", got.Evaluator)
+	}
+	if got.Evaluator.FixtureSet != nil || got.Evaluator.FixtureVersion != nil {
+		t.Fatalf("fixture identity = %v@%v, want absent", got.Evaluator.FixtureSet, got.Evaluator.FixtureVersion)
+	}
+}
+
 func TestDecidePropagatesAdapterError(t *testing.T) {
 	artifact, _ := loadContracts(t)
 	want := errors.New("adapter unavailable")
@@ -138,13 +156,29 @@ func TestDecideEnforcesDeadlineAndCancellation(t *testing.T) {
 			t.Fatalf("Decide() error = %v, want context canceled", err)
 		}
 	})
+
+	t.Run("earlier parent deadline", func(t *testing.T) {
+		parentDeadline := time.Now().Add(30 * time.Second)
+		ctx, cancel := context.WithDeadline(context.Background(), parentDeadline)
+		defer cancel()
+		checkingAdapter := evaluatorFunc(func(ctx context.Context, request evaluator.Request) (evaluator.Result, error) {
+			got, ok := ctx.Deadline()
+			if !ok || !got.Equal(parentDeadline) {
+				t.Fatalf("context deadline = %v, want %v", got, parentDeadline)
+			}
+			return semanticResult(request), nil
+		})
+		if _, err := evaluator.Decide(ctx, checkingAdapter, decisionInput(artifact)); err != nil {
+			t.Fatalf("Decide() error = %v", err)
+		}
+	})
 }
 
 func TestDecideDiscardsEvidenceReturnedAfterDeadline(t *testing.T) {
 	artifact, _ := loadContracts(t)
-	adapter := evaluatorFunc(func(context.Context, evaluator.Request) (evaluator.Result, error) {
+	adapter := evaluatorFunc(func(_ context.Context, request evaluator.Request) (evaluator.Result, error) {
 		time.Sleep(20 * time.Millisecond)
-		return evaluator.Result{}, nil
+		return semanticResult(request), nil
 	})
 	input := decisionInput(artifact)
 	input.Deadline = time.Now().Add(time.Millisecond)
@@ -153,6 +187,25 @@ func TestDecideDiscardsEvidenceReturnedAfterDeadline(t *testing.T) {
 	_, err := evaluator.Decide(parent, adapter, input)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("Decide() error = %v, want deadline exceeded", err)
+	}
+}
+
+func semanticResult(request evaluator.Request) evaluator.Result {
+	ruleResults := make([]evaluator.RuleResult, len(request.Rules))
+	for i, rule := range request.Rules {
+		ruleResults[i] = evaluator.RuleResult{
+			RuleID:      rule.ID,
+			Status:      decision.RuleNotMatched,
+			ReasonCodes: []string{"evaluation.semantic_test"},
+		}
+	}
+	return evaluator.Result{
+		RuleResults: ruleResults,
+		Metadata: evaluator.Metadata{
+			AdapterID:      "io.antaeus.semantic-test",
+			AdapterVersion: "0.1.0",
+			Mode:           evaluator.ModeSemantic,
+		},
 	}
 }
 
