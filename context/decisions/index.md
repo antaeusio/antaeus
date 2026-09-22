@@ -4,4 +4,5 @@
 
 | id | status | title | keywords | refs | viol |
 |---|---|---|---|---|---|
+| `evaluator-fixture-contract` | canonical | Provider-neutral evaluator and deterministic fixture |  | 0 | 0 |
 | `policy-decision-contract` | canonical | Portable policy and decision contract |  | 0 | 0 |

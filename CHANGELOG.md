@@ -15,3 +15,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Portable v0alpha1 policy, decision request, Decision, and Problem Details schemas.
 - OpenAPI 3.1.2 description, examples, and offline conformance fixtures.
 - Public Go policy and decision types, canonical policy digests, validation, and deterministic reduction.
+- Provider-neutral evaluator types plus a digest-bound deterministic fixture-set contract and adapter.

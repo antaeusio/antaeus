@@ -1,0 +1,28 @@
+{
+  "apiVersion": "fixture.antaeus.io/v0alpha1",
+  "kind": "FixtureSet",
+  "metadata": {
+    "name": "quickstart",
+    "version": "v1"
+  },
+  "cases": [
+    {
+      "name": "aggregate-analytics",
+      "policyName": "vendor-onboarding",
+      "policyDigest": "sha256:2378b5a1806bb11c618bd3a78122e773ec93bdfc45b751a18887d40f4ea536a2",
+      "inputDigest": "sha256:c91ca7baff805c4a91ee54de61f1a192fee87e1b2d55cc9fa185c974517ce393",
+      "ruleResults": [
+        {
+          "ruleId": "prohibited-service",
+          "status": "not_matched",
+          "reasonCodes": ["fixture.exact_result"]
+        },
+        {
+          "ruleId": "complete-low-risk-submission",
+          "status": "not_matched",
+          "reasonCodes": ["fixture.exact_result"]
+        }
+      ]
+    }
+  ]
+}
