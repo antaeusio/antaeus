@@ -43,6 +43,25 @@ func TestQuickstartFixtureEvaluatesExactCase(t *testing.T) {
 	}
 }
 
+func TestLoadFileReadsQuickstartWithinLimit(t *testing.T) {
+	path := filepath.Join("..", "..", "contracts", "examples", "v0alpha1", "fixture-set", "quickstart.json")
+	set, err := LoadFile(path)
+	if err != nil {
+		t.Fatalf("LoadFile() error = %v", err)
+	}
+	if set.Metadata.Name != "quickstart" {
+		t.Fatalf("metadata name = %q, want quickstart", set.Metadata.Name)
+	}
+
+	largePath := filepath.Join(t.TempDir(), "large.json")
+	if err := os.WriteFile(largePath, []byte(strings.Repeat(" ", MaxSourceBytes+1)), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	if _, err := LoadFile(largePath); err == nil {
+		t.Fatal("LoadFile() error = nil, want source limit rejection")
+	}
+}
+
 func TestFixtureRejectsIdentityMismatch(t *testing.T) {
 	adapter, err := New(loadQuickstartSet(t), "aggregate-analytics")
 	if err != nil {

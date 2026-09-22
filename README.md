@@ -30,9 +30,9 @@ Provider credentials, customer data, hosted-service implementation, billing, and
 
 ## Development status
 
-The Go module is `github.com/antaeusio/antaeus`. Development requires Go 1.26.0 or newer; Go 1.27.1 is the preferred toolchain. The current command exposes only help and version information while policy loading and evaluation are implemented.
+The Go module is `github.com/antaeusio/antaeus`. Development requires Go 1.26.0 or newer; Go 1.27.1 is the preferred toolchain. The current command exposes help and version information plus early policy validation and deterministic local fixture evaluation; no semantic evaluator or release artifact exists yet.
 
-The language-neutral [portable contracts](./contracts/README.md) contain the authoritative JSON Schemas, OpenAPI description, examples, and conformance fixtures. The public `policy` package strictly loads constrained YAML 1.2 or JSON before validation, canonicalization, and digesting; `decision` implements typed invariants and deterministic reduction. The `evaluator` package defines normalized evidence exchange and can assemble a validated Decision from one evaluation, while `evaluator/fixture` provides an exact, network-free synthetic adapter for tests and quickstarts.
+The language-neutral [portable contracts](./contracts/README.md) contain the authoritative JSON Schemas, OpenAPI description, examples, and conformance fixtures. The public `policy` package strictly loads constrained YAML 1.2 or JSON before validation, canonicalization, and digesting; `decision` implements typed invariants and deterministic reduction. The `evaluator` package defines normalized evidence exchange and can assemble a validated Decision from one evaluation, while `evaluator/fixture` provides an exact, network-free synthetic adapter for tests and the [local fixture quickstart](./docs/quickstart.md).
 
 Run checks and build the development command through the repository-owned build lock:
 
@@ -41,6 +41,10 @@ scripts/check
 scripts/build
 .tmp/bin/antaeus version
 ```
+
+The command can now validate a policy and execute an exact synthetic fixture
+case locally. This credential-free path is test plumbing, not semantic model
+inference; see the [five-minute quickstart](./docs/quickstart.md).
 
 Build every planned binary target with `scripts/cross-build`. Generated files stay under `.tmp/` and are not release artifacts.
 
