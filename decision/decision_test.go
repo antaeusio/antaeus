@@ -14,7 +14,7 @@ import (
 
 func TestDecisionExamplesValidate(t *testing.T) {
 	artifact := loadPolicyExample(t)
-	for _, name := range []string{"allow.json", "review.json", "deny.json", "failure.json"} {
+	for _, name := range []string{"allow.json", "review.json", "deny.json", "failure.json", "fixture-review.json"} {
 		t.Run(name, func(t *testing.T) {
 			var decision Decision
 			decodeFixture(t, filepath.Join("examples", "v0alpha1", "decision", name), &decision)

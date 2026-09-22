@@ -56,6 +56,12 @@ func TestContractExamplesAgainstSchemas(t *testing.T) {
 			valid:    true,
 		},
 		{
+			name:     "fixture decision",
+			schema:   "decision.schema.json",
+			instance: filepath.Join("examples", "v0alpha1", "decision", "fixture-review.json"),
+			valid:    true,
+		},
+		{
 			name:     "problem details",
 			schema:   "problem.schema.json",
 			instance: filepath.Join("examples", "v0alpha1", "problem", "invalid-policy.json"),

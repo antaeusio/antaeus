@@ -182,6 +182,27 @@ func (e Evaluator) validate(path string) error {
 	if err := validateBoundedNonBlank(path+".adapter", e.Adapter, 128); err != nil {
 		return err
 	}
+	if !e.Mode.Valid() {
+		return invalid(path+".mode", "evaluator_mode.invalid", "must be semantic or deterministic-fixture")
+	}
+	if e.Mode == EvaluatorModeDeterministicFixture {
+		if !e.Synthetic {
+			return invalid(path+".synthetic", "synthetic.required", "must be true for deterministic fixture results")
+		}
+		if err := validateBoundedNonBlank(path+".fixtureSet", e.FixtureSet, 64); err != nil {
+			return err
+		}
+		if err := validateBoundedNonBlank(path+".fixtureVersion", e.FixtureVersion, 128); err != nil {
+			return err
+		}
+	} else {
+		if e.Synthetic {
+			return invalid(path+".synthetic", "synthetic.unexpected", "must be false for semantic evaluator results")
+		}
+		if e.FixtureSet != "" || e.FixtureVersion != "" {
+			return invalid(path+".fixtureSet", "fixture_identity.unexpected", "is allowed only for deterministic fixture results")
+		}
+	}
 	if e.Provider != "" {
 		if err := validateBoundedNonBlank(path+".provider", e.Provider, 128); err != nil {
 			return err

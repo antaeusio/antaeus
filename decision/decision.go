@@ -39,6 +39,14 @@ const (
 	RuleFailed        RuleStatus = "failed"
 )
 
+// EvaluatorMode distinguishes semantic evidence from synthetic fixture data.
+type EvaluatorMode string
+
+const (
+	EvaluatorModeSemantic             EvaluatorMode = "semantic"
+	EvaluatorModeDeterministicFixture EvaluatorMode = "deterministic-fixture"
+)
+
 // DecisionRequest is the portable synchronous evaluation request.
 type DecisionRequest struct {
 	APIVersion string                     `json:"apiVersion"`
@@ -93,14 +101,18 @@ type Failure struct {
 
 // Evaluator identifies the immutable execution profile and effective route.
 type Evaluator struct {
-	ProfileDigest  string   `json:"profileDigest"`
-	ProfileVersion string   `json:"profileVersion,omitempty"`
-	Adapter        string   `json:"adapter"`
-	Provider       string   `json:"provider,omitempty"`
-	Model          string   `json:"model,omitempty"`
-	Route          []string `json:"route"`
-	Attempts       int      `json:"attempts"`
-	Fallback       bool     `json:"fallback,omitempty"`
+	ProfileDigest  string        `json:"profileDigest"`
+	ProfileVersion string        `json:"profileVersion,omitempty"`
+	Adapter        string        `json:"adapter"`
+	Mode           EvaluatorMode `json:"mode"`
+	Synthetic      bool          `json:"synthetic"`
+	Provider       string        `json:"provider,omitempty"`
+	Model          string        `json:"model,omitempty"`
+	FixtureSet     string        `json:"fixtureSet,omitempty"`
+	FixtureVersion string        `json:"fixtureVersion,omitempty"`
+	Route          []string      `json:"route"`
+	Attempts       int           `json:"attempts"`
+	Fallback       bool          `json:"fallback,omitempty"`
 }
 
 // Valid reports whether the outcome is legal in a Decision.
@@ -121,4 +133,9 @@ func (s RuleStatus) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// Valid reports whether the evaluator mode is part of v0alpha1.
+func (m EvaluatorMode) Valid() bool {
+	return m == EvaluatorModeSemantic || m == EvaluatorModeDeterministicFixture
 }
