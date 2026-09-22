@@ -5,9 +5,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 )
 
 const MaxSourceBytes = 1 << 20
+
+// LoadFile reads and parses a fixture set without allocating beyond the
+// published source-size limit.
+func LoadFile(path string) (Set, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return Set{}, fmt.Errorf("open fixture set: %w", err)
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, MaxSourceBytes+1))
+	if err != nil {
+		return Set{}, fmt.Errorf("read fixture set: %w", err)
+	}
+	return Parse(data)
+}
 
 // Parse strictly decodes and validates one JSON fixture set. Unknown fields,
 // trailing JSON values, and oversized sources are rejected.

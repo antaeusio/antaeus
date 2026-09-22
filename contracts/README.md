@@ -103,4 +103,5 @@ Requests rejected before evaluation use a non-2xx status with RFC 9457 Problem D
 - `schemas/v0alpha1/` contains authoritative JSON Schemas.
 - `openapi/v0alpha1/openapi.yaml` describes the portable synchronous HTTP operation.
 - `examples/v0alpha1/` contains readable valid examples.
+- `examples/v0alpha1/input/` contains canonical local-evaluation inputs bound by fixture digests.
 - `conformance/v0alpha1/` contains machine-oriented valid, invalid, and canonicalization fixtures.
