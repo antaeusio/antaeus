@@ -1,0 +1,45 @@
+# Antaeus
+
+Antaeus is an open-source project for turning human-written semantic business policies into versioned, testable, auditable decisions that applications can safely consume.
+
+> **Project status:** repository foundation. There is no implementation or release yet, and the public contracts are still under design.
+
+## What Antaeus is for
+
+Antaeus is intended for bounded decisions that require interpretation of language, intent, context, or exceptions.
+
+Authentication answers **who**. Authorization answers **what they may do**. Antaeus addresses whether specific content or application state complies with a semantic business policy.
+
+Antaeus does not replace authentication, authorization, deterministic business rules, transactions, or application side effects. If a requirement can be expressed safely and completely as ordinary deterministic code, it does not belong in Antaeus.
+
+## Planned open-source capabilities
+
+The public project is intended to work without an Antaeus account. Its planned scope includes:
+
+- portable policy schemas and local validation;
+- named policy cases and regression testing;
+- a credential-free deterministic evaluator for repeatable tests;
+- provider-neutral evaluator interfaces and conformance fixtures;
+- optional local or bring-your-own-credential semantic evaluators;
+- typed `allow`, `review`, `deny`, and `failure` outcomes;
+- behavioral comparison across policy versions;
+- a command-line interface and intentionally supported embeddable packages; and
+- examples and release artifacts for supported platforms.
+
+Provider credentials, customer data, hosted-service implementation, billing, and private production integrations do not belong in this repository.
+
+## Repository status
+
+The repository currently contains its license, governance and contribution policies, security policy, agent instructions, and shared-checkout build lock. Product code, installation commands, and compatibility guarantees will be added only after the relevant public decisions and contracts are approved.
+
+Do not treat proposed behavior as released functionality. The changelog and future release notes will identify what is actually available.
+
+## Contributing and security
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the contribution process, [GOVERNANCE.md](./GOVERNANCE.md) for decision-making, and [SECURITY.md](./SECURITY.md) for private vulnerability reporting. Participation is governed by [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
+
+All build-producing commands in a shared checkout must run through `scripts/with-build-lock`. No build command exists yet.
+
+## License
+
+Antaeus is licensed under the [Apache License 2.0](./LICENSE).
