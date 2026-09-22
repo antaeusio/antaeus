@@ -33,6 +33,15 @@ func TestValidateResultRequiresExactOrder(t *testing.T) {
 	}
 }
 
+func TestValidateResultRequiresExactCount(t *testing.T) {
+	request := validRequest()
+	result := validResult()
+	result.RuleResults = nil
+	if err := ValidateResult(request, result); err == nil {
+		t.Fatal("ValidateResult() error = nil, want result count rejection")
+	}
+}
+
 func TestValidateResultRequiresSyntheticFixtureMarker(t *testing.T) {
 	request := validRequest()
 	result := validResult()

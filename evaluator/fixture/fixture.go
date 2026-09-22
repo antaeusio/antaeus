@@ -3,6 +3,7 @@ package fixture
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -68,7 +69,11 @@ func New(set Set, caseName string) (*Evaluator, error) {
 // access, reads no credentials, and makes no inference from policy text.
 func (e *Evaluator) Evaluate(ctx context.Context, request evaluator.Request) (evaluator.Result, error) {
 	if err := ctx.Err(); err != nil {
-		return evaluator.Result{}, &evaluator.Error{Code: "evaluation.cancelled", Retryable: false, Message: err.Error()}
+		code := "evaluation.cancelled"
+		if errors.Is(err, context.DeadlineExceeded) {
+			code = "evaluation.deadline_exceeded"
+		}
+		return evaluator.Result{}, &evaluator.Error{Code: code, Retryable: false, Message: err.Error()}
 	}
 	if err := request.Validate(); err != nil {
 		return evaluator.Result{}, &evaluator.Error{Code: "fixture.request_invalid", Retryable: false, Message: err.Error()}
