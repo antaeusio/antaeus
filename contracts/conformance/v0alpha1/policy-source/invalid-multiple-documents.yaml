@@ -1,0 +1,21 @@
+apiVersion: policy.antaeus.io/v0alpha1
+kind: Policy
+metadata:
+  name: first-document
+spec:
+  defaultOutcome: review
+  rules:
+    - id: check
+      when: The condition applies.
+      outcome: review
+---
+apiVersion: policy.antaeus.io/v0alpha1
+kind: Policy
+metadata:
+  name: second-document
+spec:
+  defaultOutcome: review
+  rules:
+    - id: check
+      when: The condition applies.
+      outcome: review

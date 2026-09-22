@@ -32,4 +32,13 @@ They must produce the exact UTF-8 bytes in `canonical/vendor-onboarding.canonica
 - `fixture-set/invalid-bad-digest.json` rejects a non-digest policy identity.
 - `fixture-set/invalid-empty-rule-results.json` rejects a case without exact rule evidence.
 
-Additional YAML parser-restriction and resource-limit fixtures will land with the constrained YAML loader. CI remains network-free for all conformance cases.
+## Policy source parsing
+
+`policy-source/valid-core-scalars.yaml` confirms YAML 1.2 core-schema behavior
+for plain strings that YAML 1.1 parsers commonly misresolve. The invalid YAML
+fixtures cover duplicate and non-string keys, directives, tags, anchors,
+aliases, merge keys, multiple documents, non-finite numbers, and lone JSON
+surrogates. Generated tests cover invalid UTF-8, the deliberately excluded
+line-break characters, and
+both sides of the byte, depth, and aggregate-node boundaries. CI
+remains network-free for all conformance cases.
