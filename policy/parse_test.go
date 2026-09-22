@@ -180,6 +180,20 @@ func TestParseYAMLNonSpecificTagForcesString(t *testing.T) {
 	}
 }
 
+func TestParseYAMLNonSpecificTagUsesCharacterColumns(t *testing.T) {
+	source := "\ufeffapiVersion: policy.antaeus.io/v0alpha1\n" +
+		"kind: Policy\n" +
+		"metadata: {name: example}\n" +
+		"spec: {defaultOutcome: review, rules: [{id: check, description: café, when: ! 123, outcome: allow}]}\n"
+	artifact, err := Parse([]byte(source), FormatYAML)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if artifact.Spec.Rules[0].When != "123" {
+		t.Fatalf("when = %q, want 123", artifact.Spec.Rules[0].When)
+	}
+}
+
 func TestStructuralDepthAndNodeLimitBoundaries(t *testing.T) {
 	for _, test := range []struct {
 		name   string

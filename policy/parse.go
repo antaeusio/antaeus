@@ -559,11 +559,23 @@ func hasNonSpecificTag(node *yaml.Node, sourceLines [][]byte) bool {
 		return false
 	}
 	line := sourceLines[node.Line-1]
-	offset := node.Column - 1
+	offset := yamlColumnByteOffset(line, node.Column, node.Line == 1)
 	if offset >= len(line) || line[offset] != '!' {
 		return false
 	}
 	return offset+1 == len(line) || line[offset+1] == ' ' || line[offset+1] == '\t'
+}
+
+func yamlColumnByteOffset(line []byte, column int, firstLine bool) int {
+	offset := 0
+	if firstLine && bytes.HasPrefix(line, []byte{0xef, 0xbb, 0xbf}) {
+		offset = 3
+	}
+	for character := 1; character < column && offset < len(line); character++ {
+		_, size := utf8.DecodeRune(line[offset:])
+		offset += size
+	}
+	return offset
 }
 
 func isYAMLNull(value string) bool {

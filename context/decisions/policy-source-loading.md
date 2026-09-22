@@ -18,7 +18,9 @@ Select JSON or YAML explicitly; file loading accepts only `.json`, `.yaml`, and
 typed decoding. Reject duplicate and non-string mapping keys, directives,
 custom or non-JSON tags, anchors, aliases, merge keys, multiple documents,
 invalid UTF-8, unknown properties, null optional strings, and non-finite or
-unrepresentable numbers.
+unrepresentable numbers. Restrict YAML source line breaks to LF or CRLF and
+reject bare CR, U+0085, U+2028, and U+2029 everywhere so legacy parser folding
+cannot alter accepted scalar text.
 
 Depth counts active object/array containers, including the root container;
 aggregate nodes count containers, scalar values, and mapping keys. The current
