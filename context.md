@@ -1,8 +1,11 @@
 # Repository Context
 
 ## Intent
-_Fill this in: one short paragraph on what this project is and the design
-philosophy that tiebreaks open decisions. Agents read it before planning._
+Antaeus is an independently useful open-source engine and CLI for turning
+human-written semantic business policies into versioned, testable, auditable
+decisions. Prefer portable contracts, deterministic behavior where possible,
+explicit failure, bounded evaluator interfaces, and clean security boundaries
+over provider convenience or hosted-service coupling.
 
 ## Constraints
 - Binding conventions for this repository live as one decision per file under

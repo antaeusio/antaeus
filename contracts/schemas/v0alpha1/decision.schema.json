@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://antaeus.io/contracts/v0alpha1/decision.schema.json",
+  "title": "Antaeus Decision v0alpha1",
+  "type": "object",
+  "required": ["apiVersion", "kind", "outcome", "policy", "ruleResults", "reasonCodes"],
+  "properties": {
+    "apiVersion": {
+      "const": "decision.antaeus.io/v0alpha1"
+    },
+    "kind": {
+      "const": "Decision"
+    },
+    "outcome": {
+      "$ref": "common.schema.json#/$defs/decisionOutcome"
+    },
+    "policy": {
+      "$ref": "common.schema.json#/$defs/policyIdentity"
+    },
+    "ruleResults": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "$ref": "#/$defs/ruleResult"
+      }
+    },
+    "reasonCodes": {
+      "$ref": "common.schema.json#/$defs/reasonCodes"
+    },
+    "failure": {
+      "$ref": "#/$defs/failure"
+    },
+    "evaluator": {
+      "$ref": "#/$defs/evaluator"
+    },
+    "extensions": {
+      "$ref": "common.schema.json#/$defs/extensions"
+    }
+  },
+  "$defs": {
+    "ruleResult": {
+      "type": "object",
+      "required": ["ruleId", "status", "reasonCodes"],
+      "properties": {
+        "ruleId": {
+          "$ref": "common.schema.json#/$defs/ruleId"
+        },
+        "status": {
+          "$ref": "common.schema.json#/$defs/ruleStatus"
+        },
+        "outcome": {
+          "$ref": "common.schema.json#/$defs/policyOutcome"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "reasonCodes": {
+          "$ref": "common.schema.json#/$defs/reasonCodes"
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 4096
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "matched"
+              }
+            },
+            "required": ["status"]
+          },
+          "then": {
+            "required": ["outcome"]
+          },
+          "else": {
+            "not": {
+              "required": ["outcome"]
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "failure": {
+      "type": "object",
+      "required": ["code", "stage", "retryable"],
+      "properties": {
+        "code": {
+          "$ref": "common.schema.json#/$defs/reasonCode"
+        },
+        "stage": {
+          "type": "string",
+          "enum": ["configuration", "policy_resolution", "evaluation", "reduction", "internal"]
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 4096
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "evaluator": {
+      "type": "object",
+      "required": ["profileDigest", "adapter", "route", "attempts"],
+      "properties": {
+        "profileDigest": {
+          "$ref": "common.schema.json#/$defs/digest"
+        },
+        "profileVersion": {
+          "$ref": "common.schema.json#/$defs/version"
+        },
+        "adapter": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "route": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "attempts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "fallback": {
+          "type": "boolean"
+        }
+      },
+      "unevaluatedProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "failure"
+          }
+        },
+        "required": ["outcome"]
+      },
+      "then": {
+        "required": ["failure"]
+      },
+      "else": {
+        "not": {
+          "required": ["failure"]
+        }
+      }
+    }
+  ],
+  "unevaluatedProperties": false
+}

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://antaeus.io/contracts/v0alpha1/problem.schema.json",
+  "title": "RFC 9457 Problem Details",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "format": "uri-reference"
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 256
+    },
+    "status": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 599
+    },
+    "detail": {
+      "type": "string",
+      "maxLength": 4096
+    },
+    "instance": {
+      "type": "string",
+      "format": "uri-reference"
+    },
+    "code": {
+      "$ref": "common.schema.json#/$defs/reasonCode"
+    }
+  },
+  "required": ["type", "title", "status"],
+  "additionalProperties": true
+}

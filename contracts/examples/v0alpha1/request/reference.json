@@ -1,0 +1,15 @@
+{
+  "apiVersion": "decision.antaeus.io/v0alpha1",
+  "kind": "DecisionRequest",
+  "policy": {
+    "reference": {
+      "name": "vendor-onboarding",
+      "digest": "sha256:2378b5a1806bb11c618bd3a78122e773ec93bdfc45b751a18887d40f4ea536a2",
+      "version": "2026-09-22.1"
+    }
+  },
+  "input": {
+    "serviceCategory": "analytics",
+    "description": "Processes aggregate product events."
+  }
+}

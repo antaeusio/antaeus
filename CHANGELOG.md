@@ -12,3 +12,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Go module and thin command foundation with version reporting.
 - Locked local validation and supported-target cross-build entry points.
 - Pre-v1 compatibility and planned platform-support documentation.
+- Portable v0alpha1 policy, decision request, Decision, and Problem Details schemas.
+- OpenAPI 3.1.2 description, examples, and offline conformance fixtures.
+- Public Go policy and decision types, canonical policy digests, validation, and deterministic reduction.

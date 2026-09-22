@@ -1,0 +1,11 @@
+{
+  "apiVersion": "policy.antaeus.io/v0alpha1",
+  "kind": "Policy",
+  "metadata": {
+    "name": "empty-rules"
+  },
+  "spec": {
+    "defaultOutcome": "review",
+    "rules": []
+  }
+}

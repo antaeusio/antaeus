@@ -2,7 +2,7 @@
 
 Antaeus is an open-source project for turning human-written semantic business policies into versioned, testable, auditable decisions that applications can safely consume.
 
-> **Project status:** early implementation. The repository contains a minimal Go command foundation, but there is no release or policy-evaluation implementation yet. Public contract artifacts will land with their conformance fixtures.
+> **Project status:** early implementation. The repository contains the initial portable policy and decision contracts plus a minimal Go command foundation, but there is no release or evaluator implementation yet.
 
 ## What Antaeus is for
 
@@ -30,7 +30,9 @@ Provider credentials, customer data, hosted-service implementation, billing, and
 
 ## Development status
 
-The Go module is `github.com/antaeusio/antaeus`. Development requires Go 1.26.0 or newer; Go 1.27.1 is the preferred toolchain. The current command exposes only help and version information while the first policy vertical slice is implemented.
+The Go module is `github.com/antaeusio/antaeus`. Development requires Go 1.26.0 or newer; Go 1.27.1 is the preferred toolchain. The current command exposes only help and version information while policy loading and evaluation are implemented.
+
+The language-neutral [portable contracts](./contracts/README.md) contain the authoritative JSON Schemas, OpenAPI description, examples, and conformance fixtures. The public `policy` and `decision` Go packages implement their typed invariants and deterministic decision reduction.
 
 Run checks and build the development command through the repository-owned build lock:
 

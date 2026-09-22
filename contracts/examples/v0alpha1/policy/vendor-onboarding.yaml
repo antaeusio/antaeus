@@ -1,0 +1,16 @@
+apiVersion: policy.antaeus.io/v0alpha1
+kind: Policy
+metadata:
+  name: vendor-onboarding
+  description: Route vendor submissions according to review policy.
+spec:
+  defaultOutcome: review
+  rules:
+    - id: prohibited-service
+      description: Deny services in a prohibited category.
+      when: The submitted service belongs to a prohibited category.
+      outcome: deny
+    - id: complete-low-risk-submission
+      description: Allow a complete submission with no material risk indicators.
+      when: The submission is complete and contains no material risk indicators.
+      outcome: allow
