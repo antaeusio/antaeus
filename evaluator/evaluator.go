@@ -27,7 +27,9 @@ const (
 )
 
 // Evaluator returns normalized evidence for every requested rule. It does not
-// receive or choose policy outcomes and performs no policy reduction.
+// receive or choose policy outcomes and performs no policy reduction. An
+// implementation must honor context cancellation and return promptly after the
+// context is done; callers do not detach or abandon adapter goroutines.
 type Evaluator interface {
 	Evaluate(context.Context, Request) (Result, error)
 }

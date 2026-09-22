@@ -32,7 +32,7 @@ Provider credentials, customer data, hosted-service implementation, billing, and
 
 The Go module is `github.com/antaeusio/antaeus`. Development requires Go 1.26.0 or newer; Go 1.27.1 is the preferred toolchain. The current command exposes only help and version information while policy loading and evaluation are implemented.
 
-The language-neutral [portable contracts](./contracts/README.md) contain the authoritative JSON Schemas, OpenAPI description, examples, and conformance fixtures. The public `policy` and `decision` Go packages implement their typed invariants and deterministic decision reduction. The `evaluator` package defines normalized evidence exchange, and `evaluator/fixture` provides an exact, network-free synthetic adapter for tests and quickstarts.
+The language-neutral [portable contracts](./contracts/README.md) contain the authoritative JSON Schemas, OpenAPI description, examples, and conformance fixtures. The public `policy` and `decision` Go packages implement their typed invariants and deterministic decision reduction. The `evaluator` package defines normalized evidence exchange and can assemble a validated Decision from one evaluation, while `evaluator/fixture` provides an exact, network-free synthetic adapter for tests and quickstarts.
 
 Run checks and build the development command through the repository-owned build lock:
 

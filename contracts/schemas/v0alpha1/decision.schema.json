@@ -110,7 +110,7 @@
     },
     "evaluator": {
       "type": "object",
-      "required": ["profileDigest", "adapter", "route", "attempts"],
+      "required": ["profileDigest", "adapter", "adapterVersion", "mode", "synthetic", "route", "attempts"],
       "properties": {
         "profileDigest": {
           "$ref": "common.schema.json#/$defs/digest"
@@ -123,6 +123,17 @@
           "minLength": 1,
           "maxLength": 128
         },
+        "adapterVersion": {
+          "$ref": "common.schema.json#/$defs/version",
+          "pattern": ".*\\S.*"
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["semantic", "deterministic-fixture"]
+        },
+        "synthetic": {
+          "type": "boolean"
+        },
         "provider": {
           "type": "string",
           "minLength": 1,
@@ -132,6 +143,14 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 256
+        },
+        "fixtureSet": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+        },
+        "fixtureVersion": {
+          "$ref": "common.schema.json#/$defs/version",
+          "pattern": ".*\\S.*"
         },
         "route": {
           "type": "array",
@@ -152,6 +171,39 @@
           "type": "boolean"
         }
       },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "deterministic-fixture"
+              }
+            },
+            "required": ["mode"]
+          },
+          "then": {
+            "properties": {
+              "synthetic": {
+                "const": true
+              }
+            },
+            "required": ["fixtureSet", "fixtureVersion"]
+          },
+          "else": {
+            "properties": {
+              "synthetic": {
+                "const": false
+              }
+            },
+            "not": {
+              "anyOf": [
+                {"required": ["fixtureSet"]},
+                {"required": ["fixtureVersion"]}
+              ]
+            }
+          }
+        }
+      ],
       "unevaluatedProperties": false
     }
   },

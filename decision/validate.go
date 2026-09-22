@@ -15,6 +15,7 @@ var (
 	digestPattern     = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 	reasonCodePattern = regexp.MustCompile(`^[a-z][a-z0-9_.-]{0,127}$`)
 	extensionPattern  = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$`)
+	fixtureSetPattern = regexp.MustCompile(`^[a-z][a-z0-9._-]{0,63}$`)
 )
 
 // ValidationError identifies one contract violation at a stable JSON path.
@@ -181,6 +182,39 @@ func (e Evaluator) validate(path string) error {
 	}
 	if err := validateBoundedNonBlank(path+".adapter", e.Adapter, 128); err != nil {
 		return err
+	}
+	if err := validateBoundedNonBlank(path+".adapterVersion", e.AdapterVersion, 128); err != nil {
+		return err
+	}
+	if !e.Mode.Valid() {
+		return invalid(path+".mode", "evaluator_mode.invalid", "must be semantic or deterministic-fixture")
+	}
+	if e.Synthetic == nil {
+		return invalid(path+".synthetic", "synthetic.missing", "is required")
+	}
+	if e.Mode == EvaluatorModeDeterministicFixture {
+		if !*e.Synthetic {
+			return invalid(path+".synthetic", "synthetic.required", "must be true for deterministic fixture results")
+		}
+		if e.FixtureSet == nil || !fixtureSetPattern.MatchString(*e.FixtureSet) {
+			return invalid(path+".fixtureSet", "fixture_set.invalid", "must match [a-z][a-z0-9._-]{0,63}")
+		}
+		if e.FixtureVersion == nil {
+			return invalid(path+".fixtureVersion", "fixture_version.missing", "is required for deterministic fixture results")
+		}
+		if err := validateBoundedNonBlank(path+".fixtureVersion", *e.FixtureVersion, 128); err != nil {
+			return err
+		}
+	} else {
+		if *e.Synthetic {
+			return invalid(path+".synthetic", "synthetic.unexpected", "must be false for semantic evaluator results")
+		}
+		if e.FixtureSet != nil {
+			return invalid(path+".fixtureSet", "fixture_identity.unexpected", "is allowed only for deterministic fixture results")
+		}
+		if e.FixtureVersion != nil {
+			return invalid(path+".fixtureVersion", "fixture_identity.unexpected", "is allowed only for deterministic fixture results")
+		}
 	}
 	if e.Provider != "" {
 		if err := validateBoundedNonBlank(path+".provider", e.Provider, 128); err != nil {

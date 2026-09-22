@@ -1,0 +1,160 @@
+package evaluator
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/antaeusio/antaeus/decision"
+	"github.com/antaeusio/antaeus/policy"
+)
+
+// DecisionInput binds a validated policy and canonical input to one evaluator
+// profile for a single local evaluation attempt. PolicyVersion is an optional
+// registry label; Policy.Digest, not that label, establishes content identity.
+type DecisionInput struct {
+	Policy         policy.Artifact
+	PolicyVersion  string
+	CanonicalInput json.RawMessage
+	Deadline       time.Time
+	CorrelationID  string
+	ProfileDigest  string
+	ProfileVersion string
+}
+
+// Decide obtains provider-neutral evidence, attaches policy-authored outcomes,
+// applies deterministic reduction, and returns a validated portable Decision.
+// Adapter and deadline errors remain Go errors at this single-attempt layer; a
+// future profile router owns retry exhaustion and typed failure Decisions.
+func Decide(ctx context.Context, adapter Evaluator, input DecisionInput) (decision.Decision, error) {
+	if adapter == nil {
+		return decision.Decision{}, fmt.Errorf("evaluator is required")
+	}
+	if err := input.Policy.Validate(); err != nil {
+		return decision.Decision{}, fmt.Errorf("validate policy: %w", err)
+	}
+	policyDigest, err := input.Policy.Digest()
+	if err != nil {
+		return decision.Decision{}, fmt.Errorf("digest policy: %w", err)
+	}
+	rules := make([]Rule, len(input.Policy.Spec.Rules))
+	for i, rule := range input.Policy.Spec.Rules {
+		rules[i] = Rule{ID: rule.ID, When: rule.When}
+	}
+	effectiveDeadline := input.Deadline
+	if parentDeadline, exists := ctx.Deadline(); exists && parentDeadline.Before(effectiveDeadline) {
+		effectiveDeadline = parentDeadline
+	}
+	request := Request{
+		PolicyName:     input.Policy.Metadata.Name,
+		PolicyDigest:   policyDigest,
+		CanonicalInput: input.CanonicalInput,
+		Rules:          rules,
+		Deadline:       effectiveDeadline,
+		CorrelationID:  input.CorrelationID,
+		ProfileDigest:  input.ProfileDigest,
+	}
+	if err := request.Validate(); err != nil {
+		return decision.Decision{}, fmt.Errorf("validate evaluator request: %w", err)
+	}
+
+	evaluationContext := ctx
+	if deadline, exists := ctx.Deadline(); !exists || effectiveDeadline.Before(deadline) {
+		var cancel context.CancelFunc
+		evaluationContext, cancel = context.WithDeadline(ctx, effectiveDeadline)
+		defer cancel()
+	}
+	evidence, err := adapter.Evaluate(evaluationContext, request)
+	// A deadline is an absolute contract boundary. Check the wall clock as well
+	// as context state so a result cannot slip through before the runtime's
+	// deadline timer has been observed.
+	if !time.Now().Before(effectiveDeadline) {
+		return decision.Decision{}, fmt.Errorf("evaluate context: %w", context.DeadlineExceeded)
+	}
+	if contextError := evaluationContext.Err(); contextError != nil {
+		return decision.Decision{}, fmt.Errorf("evaluate context: %w", contextError)
+	}
+	if err != nil {
+		return decision.Decision{}, fmt.Errorf("evaluate: %w", err)
+	}
+	if err := ValidateResult(request, evidence); err != nil {
+		return decision.Decision{}, fmt.Errorf("validate evaluator result: %w", err)
+	}
+
+	ruleResults := make([]decision.RuleResult, len(evidence.RuleResults))
+	for i, result := range evidence.RuleResults {
+		ruleResults[i] = decision.RuleResult{
+			RuleID:      result.RuleID,
+			Status:      result.Status,
+			Confidence:  cloneConfidence(result.Confidence),
+			ReasonCodes: append([]string(nil), result.ReasonCodes...),
+			Message:     result.Message,
+		}
+		if result.Status == decision.RuleMatched {
+			// ValidateResult proved that evidence remains in request and policy
+			// order, so the outcome is taken from the same indexed policy rule.
+			outcome := input.Policy.Spec.Rules[i].Outcome
+			ruleResults[i].Outcome = &outcome
+		}
+	}
+
+	reduction, err := decision.Reduce(input.Policy, ruleResults)
+	if err != nil {
+		return decision.Decision{}, fmt.Errorf("reduce decision: %w", err)
+	}
+	result := decision.Decision{
+		APIVersion:  decision.APIVersion,
+		Kind:        decision.KindDecision,
+		Outcome:     reduction.Outcome,
+		Policy:      decision.PolicyIdentity{Name: input.Policy.Metadata.Name, Digest: policyDigest, Version: input.PolicyVersion},
+		RuleResults: ruleResults,
+		ReasonCodes: append([]string(nil), reduction.ReasonCodes...),
+		Failure:     cloneFailure(reduction.Failure),
+		Evaluator: &decision.Evaluator{
+			ProfileDigest:  input.ProfileDigest,
+			ProfileVersion: input.ProfileVersion,
+			Adapter:        evidence.Metadata.AdapterID,
+			AdapterVersion: evidence.Metadata.AdapterVersion,
+			Mode:           decision.EvaluatorMode(evidence.Metadata.Mode),
+			Synthetic:      boolPointer(evidence.Metadata.Synthetic),
+			Provider:       evidence.Metadata.Provider,
+			Model:          evidence.Metadata.Model,
+			FixtureSet:     optionalString(evidence.Metadata.FixtureSet),
+			FixtureVersion: optionalString(evidence.Metadata.FixtureVersion),
+			Route:          []string{evidence.Metadata.AdapterID},
+			Attempts:       1,
+		},
+	}
+	if err := result.ValidateAgainst(input.Policy); err != nil {
+		return decision.Decision{}, fmt.Errorf("validate decision: %w", err)
+	}
+	return result, nil
+}
+
+func cloneConfidence(source *float64) *float64 {
+	if source == nil {
+		return nil
+	}
+	clone := *source
+	return &clone
+}
+
+func cloneFailure(source *decision.Failure) *decision.Failure {
+	if source == nil {
+		return nil
+	}
+	clone := *source
+	return &clone
+}
+
+func boolPointer(value bool) *bool {
+	return &value
+}
+
+func optionalString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
+}

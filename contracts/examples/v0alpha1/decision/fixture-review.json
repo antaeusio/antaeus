@@ -1,0 +1,33 @@
+{
+  "apiVersion": "decision.antaeus.io/v0alpha1",
+  "kind": "Decision",
+  "outcome": "review",
+  "policy": {
+    "name": "vendor-onboarding",
+    "digest": "sha256:2378b5a1806bb11c618bd3a78122e773ec93bdfc45b751a18887d40f4ea536a2"
+  },
+  "ruleResults": [
+    {
+      "ruleId": "prohibited-service",
+      "status": "not_matched",
+      "reasonCodes": ["fixture.exact_result"]
+    },
+    {
+      "ruleId": "complete-low-risk-submission",
+      "status": "not_matched",
+      "reasonCodes": ["fixture.exact_result"]
+    }
+  ],
+  "reasonCodes": ["policy.default_outcome"],
+  "evaluator": {
+    "profileDigest": "sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+    "adapter": "io.antaeus.fixture",
+    "adapterVersion": "0.1.0",
+    "mode": "deterministic-fixture",
+    "synthetic": true,
+    "fixtureSet": "quickstart",
+    "fixtureVersion": "v1",
+    "route": ["io.antaeus.fixture"],
+    "attempts": 1
+  }
+}
