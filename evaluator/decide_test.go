@@ -3,8 +3,10 @@ package evaluator_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -95,9 +97,47 @@ func TestDecideRejectsMalformedAdapterResult(t *testing.T) {
 			},
 		}, nil
 	})
-	if _, err := evaluator.Decide(context.Background(), adapter, decisionInput(artifact)); err == nil {
-		t.Fatal("Decide() error = nil, want malformed adapter result rejection")
+	if _, err := evaluator.Decide(context.Background(), adapter, decisionInput(artifact)); err == nil || !strings.Contains(err.Error(), "result count") {
+		t.Fatalf("Decide() error = %v, want result count rejection", err)
 	}
+}
+
+func TestDecidePropagatesAdapterError(t *testing.T) {
+	artifact, _ := loadContracts(t)
+	want := errors.New("adapter unavailable")
+	adapter := evaluatorFunc(func(context.Context, evaluator.Request) (evaluator.Result, error) {
+		return evaluator.Result{}, want
+	})
+	_, err := evaluator.Decide(context.Background(), adapter, decisionInput(artifact))
+	if !errors.Is(err, want) {
+		t.Fatalf("Decide() error = %v, want wrapped adapter error", err)
+	}
+}
+
+func TestDecideEnforcesDeadlineAndCancellation(t *testing.T) {
+	artifact, _ := loadContracts(t)
+	adapter := evaluatorFunc(func(ctx context.Context, _ evaluator.Request) (evaluator.Result, error) {
+		<-ctx.Done()
+		return evaluator.Result{}, ctx.Err()
+	})
+
+	t.Run("input deadline", func(t *testing.T) {
+		input := decisionInput(artifact)
+		input.Deadline = time.Now().Add(-time.Second)
+		_, err := evaluator.Decide(context.Background(), adapter, input)
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("Decide() error = %v, want deadline exceeded", err)
+		}
+	})
+
+	t.Run("parent cancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, err := evaluator.Decide(ctx, adapter, decisionInput(artifact))
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("Decide() error = %v, want context canceled", err)
+		}
+	})
 }
 
 type evaluatorFunc func(context.Context, evaluator.Request) (evaluator.Result, error)

@@ -17,3 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Public Go policy and decision types, canonical policy digests, validation, and deterministic reduction.
 - Provider-neutral evaluator types plus a digest-bound deterministic fixture-set contract and adapter.
 - Local evaluator execution that attaches policy outcomes after evidence, reduces deterministically, and records explicit fixture identity in Decision metadata.
+
+### Changed
+
+- Tightened the unreleased v0alpha1 evaluator metadata so mode and synthetic status are explicit and deterministic fixtures carry exact set and adapter versions.

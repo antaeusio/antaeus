@@ -78,8 +78,8 @@ results are always labeled `deterministic-fixture` and synthetic; they are test
 evidence, not semantic inference or an enforcement fallback.
 
 Decisions produced from fixture evidence record evaluator `mode`, `synthetic`,
-`fixtureSet`, and `fixtureVersion` alongside the profile digest, adapter, route,
-and attempt count. Semantic evaluator metadata requires `synthetic: false` and
+`fixtureSet`, and `fixtureVersion` alongside the profile digest, adapter and
+adapter version, route, and attempt count. Semantic evaluator metadata requires `synthetic: false` and
 cannot carry fixture identity.
 
 Case names are unique within a fixture set, and rule IDs are unique within each

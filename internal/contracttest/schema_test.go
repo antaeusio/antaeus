@@ -1,12 +1,58 @@
 package contracttest
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
 )
+
+func TestEvaluatorMetadataSchemaRejectsInvalidCombinations(t *testing.T) {
+	schema, err := newCompiler(t).Compile(schemaBase + "decision.schema.json")
+	if err != nil {
+		t.Fatalf("compile decision schema: %v", err)
+	}
+	validData, err := os.ReadFile(contractsPath(filepath.Join("examples", "v0alpha1", "decision", "fixture-review.json")))
+	if err != nil {
+		t.Fatalf("read valid fixture decision: %v", err)
+	}
+
+	tests := []struct {
+		name   string
+		mutate func(map[string]any)
+	}{
+		{name: "missing mode", mutate: func(e map[string]any) { delete(e, "mode") }},
+		{name: "invalid mode", mutate: func(e map[string]any) { e["mode"] = "other" }},
+		{name: "fixture not synthetic", mutate: func(e map[string]any) { e["synthetic"] = false }},
+		{name: "fixture set missing", mutate: func(e map[string]any) { delete(e, "fixtureSet") }},
+		{name: "fixture version missing", mutate: func(e map[string]any) { delete(e, "fixtureVersion") }},
+		{name: "semantic marked synthetic", mutate: func(e map[string]any) {
+			e["mode"] = "semantic"
+			e["synthetic"] = true
+			delete(e, "fixtureSet")
+			delete(e, "fixtureVersion")
+		}},
+		{name: "semantic with fixture identity", mutate: func(e map[string]any) {
+			e["mode"] = "semantic"
+			e["synthetic"] = false
+		}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var document map[string]any
+			if err := json.Unmarshal(validData, &document); err != nil {
+				t.Fatalf("decode valid fixture decision: %v", err)
+			}
+			test.mutate(document["evaluator"].(map[string]any))
+			if err := schema.Validate(document); err == nil {
+				t.Fatal("schema Validate() error = nil, want rejection")
+			}
+		})
+	}
+}
 
 const schemaBase = "https://antaeus.io/contracts/v0alpha1/"
 

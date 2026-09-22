@@ -15,6 +15,7 @@ var (
 	digestPattern     = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 	reasonCodePattern = regexp.MustCompile(`^[a-z][a-z0-9_.-]{0,127}$`)
 	extensionPattern  = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$`)
+	fixtureSetPattern = regexp.MustCompile(`^[a-z][a-z0-9._-]{0,63}$`)
 )
 
 // ValidationError identifies one contract violation at a stable JSON path.
@@ -182,6 +183,11 @@ func (e Evaluator) validate(path string) error {
 	if err := validateBoundedNonBlank(path+".adapter", e.Adapter, 128); err != nil {
 		return err
 	}
+	if e.AdapterVersion != "" {
+		if err := validateBoundedNonBlank(path+".adapterVersion", e.AdapterVersion, 128); err != nil {
+			return err
+		}
+	}
 	if !e.Mode.Valid() {
 		return invalid(path+".mode", "evaluator_mode.invalid", "must be semantic or deterministic-fixture")
 	}
@@ -189,8 +195,8 @@ func (e Evaluator) validate(path string) error {
 		if !e.Synthetic {
 			return invalid(path+".synthetic", "synthetic.required", "must be true for deterministic fixture results")
 		}
-		if err := validateBoundedNonBlank(path+".fixtureSet", e.FixtureSet, 64); err != nil {
-			return err
+		if !fixtureSetPattern.MatchString(e.FixtureSet) {
+			return invalid(path+".fixtureSet", "fixture_set.invalid", "must match [a-z][a-z0-9._-]{0,63}")
 		}
 		if err := validateBoundedNonBlank(path+".fixtureVersion", e.FixtureVersion, 128); err != nil {
 			return err

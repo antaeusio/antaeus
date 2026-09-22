@@ -125,6 +125,47 @@ func TestDecisionRejectsEmptyReasonCodes(t *testing.T) {
 	}
 }
 
+func TestDecisionRejectsInvalidEvaluatorMetadata(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*Evaluator)
+	}{
+		{name: "missing mode", mutate: func(e *Evaluator) { e.Mode = "" }},
+		{name: "invalid mode", mutate: func(e *Evaluator) { e.Mode = "other" }},
+		{name: "fixture not synthetic", mutate: func(e *Evaluator) { e.Synthetic = false }},
+		{name: "fixture set missing", mutate: func(e *Evaluator) { e.FixtureSet = "" }},
+		{name: "fixture version missing", mutate: func(e *Evaluator) { e.FixtureVersion = "" }},
+		{name: "semantic marked synthetic", mutate: func(e *Evaluator) {
+			e.Mode = EvaluatorModeSemantic
+			e.Synthetic = true
+			e.FixtureSet = ""
+			e.FixtureVersion = ""
+		}},
+		{name: "semantic with fixture set", mutate: func(e *Evaluator) {
+			e.Mode = EvaluatorModeSemantic
+			e.Synthetic = false
+			e.FixtureVersion = ""
+		}},
+		{name: "semantic with fixture version", mutate: func(e *Evaluator) {
+			e.Mode = EvaluatorModeSemantic
+			e.Synthetic = false
+			e.FixtureSet = ""
+		}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var candidate Decision
+			decodeFixture(t, filepath.Join("examples", "v0alpha1", "decision", "fixture-review.json"), &candidate)
+			test.mutate(candidate.Evaluator)
+			var validationError *ValidationError
+			if err := candidate.Validate(); !errors.As(err, &validationError) {
+				t.Fatalf("Validate() error = %v, want ValidationError", err)
+			}
+		})
+	}
+}
+
 func TestReducePrecedence(t *testing.T) {
 	deny := policy.OutcomeDeny
 	review := policy.OutcomeReview

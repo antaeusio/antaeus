@@ -104,6 +104,7 @@ type Evaluator struct {
 	ProfileDigest  string        `json:"profileDigest"`
 	ProfileVersion string        `json:"profileVersion,omitempty"`
 	Adapter        string        `json:"adapter"`
+	AdapterVersion string        `json:"adapterVersion,omitempty"`
 	Mode           EvaluatorMode `json:"mode"`
 	Synthetic      bool          `json:"synthetic"`
 	Provider       string        `json:"provider,omitempty"`

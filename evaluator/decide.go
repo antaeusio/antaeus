@@ -52,7 +52,13 @@ func Decide(ctx context.Context, adapter Evaluator, input DecisionInput) (decisi
 		return decision.Decision{}, fmt.Errorf("validate evaluator request: %w", err)
 	}
 
-	evidence, err := adapter.Evaluate(ctx, request)
+	evaluationContext := ctx
+	if deadline, exists := ctx.Deadline(); !exists || input.Deadline.Before(deadline) {
+		var cancel context.CancelFunc
+		evaluationContext, cancel = context.WithDeadline(ctx, input.Deadline)
+		defer cancel()
+	}
+	evidence, err := adapter.Evaluate(evaluationContext, request)
 	if err != nil {
 		return decision.Decision{}, fmt.Errorf("evaluate: %w", err)
 	}
@@ -70,6 +76,8 @@ func Decide(ctx context.Context, adapter Evaluator, input DecisionInput) (decisi
 			Message:     result.Message,
 		}
 		if result.Status == decision.RuleMatched {
+			// ValidateResult proved that evidence remains in request and policy
+			// order, so the outcome is taken from the same indexed policy rule.
 			outcome := input.Policy.Spec.Rules[i].Outcome
 			ruleResults[i].Outcome = &outcome
 		}
@@ -91,6 +99,7 @@ func Decide(ctx context.Context, adapter Evaluator, input DecisionInput) (decisi
 			ProfileDigest:  input.ProfileDigest,
 			ProfileVersion: input.ProfileVersion,
 			Adapter:        evidence.Metadata.AdapterID,
+			AdapterVersion: evidence.Metadata.AdapterVersion,
 			Mode:           decision.EvaluatorMode(evidence.Metadata.Mode),
 			Synthetic:      evidence.Metadata.Synthetic,
 			Provider:       evidence.Metadata.Provider,
