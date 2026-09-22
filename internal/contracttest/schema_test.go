@@ -24,6 +24,7 @@ func TestEvaluatorMetadataSchemaRejectsInvalidCombinations(t *testing.T) {
 		mutate func(map[string]any)
 	}{
 		{name: "missing mode", mutate: func(e map[string]any) { delete(e, "mode") }},
+		{name: "missing synthetic", mutate: func(e map[string]any) { delete(e, "synthetic") }},
 		{name: "invalid mode", mutate: func(e map[string]any) { e["mode"] = "other" }},
 		{name: "fixture not synthetic", mutate: func(e map[string]any) { e["synthetic"] = false }},
 		{name: "fixture set missing", mutate: func(e map[string]any) { delete(e, "fixtureSet") }},
@@ -34,9 +35,15 @@ func TestEvaluatorMetadataSchemaRejectsInvalidCombinations(t *testing.T) {
 			delete(e, "fixtureSet")
 			delete(e, "fixtureVersion")
 		}},
-		{name: "semantic with fixture identity", mutate: func(e map[string]any) {
+		{name: "semantic with fixture set", mutate: func(e map[string]any) {
 			e["mode"] = "semantic"
 			e["synthetic"] = false
+			delete(e, "fixtureVersion")
+		}},
+		{name: "semantic with fixture version", mutate: func(e map[string]any) {
+			e["mode"] = "semantic"
+			e["synthetic"] = false
+			delete(e, "fixtureSet")
 		}},
 	}
 

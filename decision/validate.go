@@ -191,8 +191,11 @@ func (e Evaluator) validate(path string) error {
 	if !e.Mode.Valid() {
 		return invalid(path+".mode", "evaluator_mode.invalid", "must be semantic or deterministic-fixture")
 	}
+	if e.Synthetic == nil {
+		return invalid(path+".synthetic", "synthetic.missing", "is required")
+	}
 	if e.Mode == EvaluatorModeDeterministicFixture {
-		if !e.Synthetic {
+		if !*e.Synthetic {
 			return invalid(path+".synthetic", "synthetic.required", "must be true for deterministic fixture results")
 		}
 		if !fixtureSetPattern.MatchString(e.FixtureSet) {
@@ -202,7 +205,7 @@ func (e Evaluator) validate(path string) error {
 			return err
 		}
 	} else {
-		if e.Synthetic {
+		if *e.Synthetic {
 			return invalid(path+".synthetic", "synthetic.unexpected", "must be false for semantic evaluator results")
 		}
 		if e.FixtureSet != "" || e.FixtureVersion != "" {

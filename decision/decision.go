@@ -106,7 +106,7 @@ type Evaluator struct {
 	Adapter        string        `json:"adapter"`
 	AdapterVersion string        `json:"adapterVersion,omitempty"`
 	Mode           EvaluatorMode `json:"mode"`
-	Synthetic      bool          `json:"synthetic"`
+	Synthetic      *bool         `json:"synthetic"`
 	Provider       string        `json:"provider,omitempty"`
 	Model          string        `json:"model,omitempty"`
 	FixtureSet     string        `json:"fixtureSet,omitempty"`

@@ -28,6 +28,11 @@ whose digest is sent to the adapter. After evidence returns, it attaches each
 matched rule's policy-authored outcome, applies the portable deterministic
 reducer, and validates the complete Decision against that artifact. Fixture
 identity, mode, and the synthetic marker remain visible in Decision metadata.
+This single-attempt runner returns configuration, adapter, cancellation, and
+deadline errors to its caller. The future evaluator-profile router owns retries
+and conversion of exhausted accepted evaluations into failed rule evidence and
+a typed failure Decision; transports must not invent a policy judgment from an
+error.
 
 Provide a visibly synthetic deterministic fixture adapter for offline tests and
 quickstarts. A versioned FixtureSet maps a named case plus exact policy and input

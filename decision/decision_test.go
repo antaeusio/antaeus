@@ -132,23 +132,24 @@ func TestDecisionRejectsInvalidEvaluatorMetadata(t *testing.T) {
 	}{
 		{name: "missing mode", mutate: func(e *Evaluator) { e.Mode = "" }},
 		{name: "invalid mode", mutate: func(e *Evaluator) { e.Mode = "other" }},
-		{name: "fixture not synthetic", mutate: func(e *Evaluator) { e.Synthetic = false }},
+		{name: "synthetic missing", mutate: func(e *Evaluator) { e.Synthetic = nil }},
+		{name: "fixture not synthetic", mutate: func(e *Evaluator) { e.Synthetic = testBool(false) }},
 		{name: "fixture set missing", mutate: func(e *Evaluator) { e.FixtureSet = "" }},
 		{name: "fixture version missing", mutate: func(e *Evaluator) { e.FixtureVersion = "" }},
 		{name: "semantic marked synthetic", mutate: func(e *Evaluator) {
 			e.Mode = EvaluatorModeSemantic
-			e.Synthetic = true
+			e.Synthetic = testBool(true)
 			e.FixtureSet = ""
 			e.FixtureVersion = ""
 		}},
 		{name: "semantic with fixture set", mutate: func(e *Evaluator) {
 			e.Mode = EvaluatorModeSemantic
-			e.Synthetic = false
+			e.Synthetic = testBool(false)
 			e.FixtureVersion = ""
 		}},
 		{name: "semantic with fixture version", mutate: func(e *Evaluator) {
 			e.Mode = EvaluatorModeSemantic
-			e.Synthetic = false
+			e.Synthetic = testBool(false)
 			e.FixtureSet = ""
 		}},
 	}
@@ -164,6 +165,10 @@ func TestDecisionRejectsInvalidEvaluatorMetadata(t *testing.T) {
 			}
 		})
 	}
+}
+
+func testBool(value bool) *bool {
+	return &value
 }
 
 func TestReducePrecedence(t *testing.T) {

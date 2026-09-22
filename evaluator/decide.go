@@ -11,7 +11,8 @@ import (
 )
 
 // DecisionInput binds a validated policy and canonical input to one evaluator
-// profile for a single local evaluation attempt.
+// profile for a single local evaluation attempt. PolicyVersion is an optional
+// registry label; Policy.Digest, not that label, establishes content identity.
 type DecisionInput struct {
 	Policy         policy.Artifact
 	PolicyVersion  string
@@ -24,6 +25,8 @@ type DecisionInput struct {
 
 // Decide obtains provider-neutral evidence, attaches policy-authored outcomes,
 // applies deterministic reduction, and returns a validated portable Decision.
+// Adapter and deadline errors remain Go errors at this single-attempt layer; a
+// future profile router owns retry exhaustion and typed failure Decisions.
 func Decide(ctx context.Context, adapter Evaluator, input DecisionInput) (decision.Decision, error) {
 	if adapter == nil {
 		return decision.Decision{}, fmt.Errorf("evaluator is required")
@@ -59,6 +62,9 @@ func Decide(ctx context.Context, adapter Evaluator, input DecisionInput) (decisi
 		defer cancel()
 	}
 	evidence, err := adapter.Evaluate(evaluationContext, request)
+	if contextError := evaluationContext.Err(); contextError != nil {
+		return decision.Decision{}, fmt.Errorf("evaluate context: %w", contextError)
+	}
 	if err != nil {
 		return decision.Decision{}, fmt.Errorf("evaluate: %w", err)
 	}
@@ -101,7 +107,7 @@ func Decide(ctx context.Context, adapter Evaluator, input DecisionInput) (decisi
 			Adapter:        evidence.Metadata.AdapterID,
 			AdapterVersion: evidence.Metadata.AdapterVersion,
 			Mode:           decision.EvaluatorMode(evidence.Metadata.Mode),
-			Synthetic:      evidence.Metadata.Synthetic,
+			Synthetic:      boolPointer(evidence.Metadata.Synthetic),
 			Provider:       evidence.Metadata.Provider,
 			Model:          evidence.Metadata.Model,
 			FixtureSet:     evidence.Metadata.FixtureSet,
@@ -130,4 +136,8 @@ func cloneFailure(source *decision.Failure) *decision.Failure {
 	}
 	clone := *source
 	return &clone
+}
+
+func boolPointer(value bool) *bool {
+	return &value
 }

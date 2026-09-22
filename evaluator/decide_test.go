@@ -30,7 +30,7 @@ func TestDecideWithQuickstartFixture(t *testing.T) {
 	if got.Outcome != decision.OutcomeReview {
 		t.Fatalf("Decision.Outcome = %q, want review", got.Outcome)
 	}
-	if got.Evaluator == nil || !got.Evaluator.Synthetic || got.Evaluator.Mode != decision.EvaluatorModeDeterministicFixture {
+	if got.Evaluator == nil || got.Evaluator.Synthetic == nil || !*got.Evaluator.Synthetic || got.Evaluator.Mode != decision.EvaluatorModeDeterministicFixture {
 		t.Fatalf("Decision.Evaluator = %#v, want visibly synthetic fixture", got.Evaluator)
 	}
 	if got.Evaluator.FixtureSet != "quickstart" || got.Evaluator.FixtureVersion != "v1" {
@@ -138,6 +138,22 @@ func TestDecideEnforcesDeadlineAndCancellation(t *testing.T) {
 			t.Fatalf("Decide() error = %v, want context canceled", err)
 		}
 	})
+}
+
+func TestDecideDiscardsEvidenceReturnedAfterDeadline(t *testing.T) {
+	artifact, _ := loadContracts(t)
+	adapter := evaluatorFunc(func(context.Context, evaluator.Request) (evaluator.Result, error) {
+		time.Sleep(20 * time.Millisecond)
+		return evaluator.Result{}, nil
+	})
+	input := decisionInput(artifact)
+	input.Deadline = time.Now().Add(time.Millisecond)
+	parent, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err := evaluator.Decide(parent, adapter, input)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Decide() error = %v, want deadline exceeded", err)
+	}
 }
 
 type evaluatorFunc func(context.Context, evaluator.Request) (evaluator.Result, error)
