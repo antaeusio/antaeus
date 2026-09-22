@@ -42,12 +42,16 @@ func Decide(ctx context.Context, adapter Evaluator, input DecisionInput) (decisi
 	for i, rule := range input.Policy.Spec.Rules {
 		rules[i] = Rule{ID: rule.ID, When: rule.When}
 	}
+	effectiveDeadline := input.Deadline
+	if parentDeadline, exists := ctx.Deadline(); exists && parentDeadline.Before(effectiveDeadline) {
+		effectiveDeadline = parentDeadline
+	}
 	request := Request{
 		PolicyName:     input.Policy.Metadata.Name,
 		PolicyDigest:   policyDigest,
 		CanonicalInput: input.CanonicalInput,
 		Rules:          rules,
-		Deadline:       input.Deadline,
+		Deadline:       effectiveDeadline,
 		CorrelationID:  input.CorrelationID,
 		ProfileDigest:  input.ProfileDigest,
 	}
@@ -56,23 +60,20 @@ func Decide(ctx context.Context, adapter Evaluator, input DecisionInput) (decisi
 	}
 
 	evaluationContext := ctx
-	effectiveDeadline := input.Deadline
-	if deadline, exists := ctx.Deadline(); !exists || input.Deadline.Before(deadline) {
+	if deadline, exists := ctx.Deadline(); !exists || effectiveDeadline.Before(deadline) {
 		var cancel context.CancelFunc
-		evaluationContext, cancel = context.WithDeadline(ctx, input.Deadline)
+		evaluationContext, cancel = context.WithDeadline(ctx, effectiveDeadline)
 		defer cancel()
-	} else {
-		effectiveDeadline = deadline
 	}
 	evidence, err := adapter.Evaluate(evaluationContext, request)
-	if contextError := evaluationContext.Err(); contextError != nil {
-		return decision.Decision{}, fmt.Errorf("evaluate context: %w", contextError)
-	}
 	// A deadline is an absolute contract boundary. Check the wall clock as well
 	// as context state so a result cannot slip through before the runtime's
 	// deadline timer has been observed.
 	if !time.Now().Before(effectiveDeadline) {
 		return decision.Decision{}, fmt.Errorf("evaluate context: %w", context.DeadlineExceeded)
+	}
+	if contextError := evaluationContext.Err(); contextError != nil {
+		return decision.Decision{}, fmt.Errorf("evaluate context: %w", contextError)
 	}
 	if err != nil {
 		return decision.Decision{}, fmt.Errorf("evaluate: %w", err)

@@ -166,6 +166,9 @@ func TestDecideEnforcesDeadlineAndCancellation(t *testing.T) {
 			if !ok || !got.Equal(parentDeadline) {
 				t.Fatalf("context deadline = %v, want %v", got, parentDeadline)
 			}
+			if !request.Deadline.Equal(parentDeadline) {
+				t.Fatalf("request deadline = %v, want %v", request.Deadline, parentDeadline)
+			}
 			return semanticResult(request), nil
 		})
 		if _, err := evaluator.Decide(ctx, checkingAdapter, decisionInput(artifact)); err != nil {
