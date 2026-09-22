@@ -22,4 +22,8 @@ They must produce the exact UTF-8 bytes in `canonical/vendor-onboarding.canonica
 - `decision/invalid-failure-missing-details.json` fails because a failure outcome requires a structured failure object.
 - `decision/invalid-non-match-outcome.json` fails because only a matched rule carries its policy outcome.
 
+## Deterministic reduction
+
+`reduction/cases.json` contains one policy plus ordered rule-result inputs and expected reduced outputs. Implementations must reproduce the specified outcome, required reason codes, and unresolved-rule failure exactly. The cases cover every precedence step, including matched deny over unresolved evidence and unresolved evidence over matched review.
+
 Additional YAML parser-restriction and resource-limit fixtures will land with the constrained YAML loader. CI remains network-free for all conformance cases.

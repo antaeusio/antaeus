@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/antaeusio/antaeus/policy"
@@ -193,6 +194,30 @@ func TestReducePrecedence(t *testing.T) {
 			}
 			if got.Outcome == OutcomeFailure && got.Failure == nil {
 				t.Fatal("Reduce().Failure is nil for failure outcome")
+			}
+		})
+	}
+}
+
+func TestReductionConformanceFixtures(t *testing.T) {
+	var fixture struct {
+		Policy policy.Artifact `json:"policy"`
+		Cases  []struct {
+			Name        string       `json:"name"`
+			RuleResults []RuleResult `json:"ruleResults"`
+			Expected    Reduction    `json:"expected"`
+		} `json:"cases"`
+	}
+	decodeFixture(t, filepath.Join("conformance", "v0alpha1", "reduction", "cases.json"), &fixture)
+
+	for _, test := range fixture.Cases {
+		t.Run(test.Name, func(t *testing.T) {
+			got, err := Reduce(fixture.Policy, test.RuleResults)
+			if err != nil {
+				t.Fatalf("Reduce() error = %v", err)
+			}
+			if !reflect.DeepEqual(got, test.Expected) {
+				t.Fatalf("Reduce() = %#v, want %#v", got, test.Expected)
 			}
 		})
 	}

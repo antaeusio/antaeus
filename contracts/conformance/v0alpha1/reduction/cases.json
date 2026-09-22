@@ -1,0 +1,161 @@
+{
+  "policy": {
+    "apiVersion": "policy.antaeus.io/v0alpha1",
+    "kind": "Policy",
+    "metadata": {
+      "name": "reduction-precedence"
+    },
+    "spec": {
+      "defaultOutcome": "review",
+      "rules": [
+        {
+          "id": "deny",
+          "when": "The deny condition applies.",
+          "outcome": "deny"
+        },
+        {
+          "id": "review",
+          "when": "The review condition applies.",
+          "outcome": "review"
+        },
+        {
+          "id": "allow",
+          "when": "The allow condition applies.",
+          "outcome": "allow"
+        }
+      ]
+    }
+  },
+  "cases": [
+    {
+      "name": "deny-precedes-unresolved",
+      "ruleResults": [
+        {
+          "ruleId": "deny",
+          "status": "matched",
+          "outcome": "deny",
+          "reasonCodes": ["evaluation.fixture"]
+        },
+        {
+          "ruleId": "review",
+          "status": "indeterminate",
+          "reasonCodes": ["evaluation.fixture"]
+        },
+        {
+          "ruleId": "allow",
+          "status": "not_matched",
+          "reasonCodes": ["evaluation.fixture"]
+        }
+      ],
+      "expected": {
+        "outcome": "deny",
+        "reasonCodes": ["policy.deny_rule_matched"]
+      }
+    },
+    {
+      "name": "unresolved-precedes-review",
+      "ruleResults": [
+        {
+          "ruleId": "deny",
+          "status": "not_matched",
+          "reasonCodes": ["evaluation.fixture"]
+        },
+        {
+          "ruleId": "review",
+          "status": "matched",
+          "outcome": "review",
+          "reasonCodes": ["evaluation.fixture"]
+        },
+        {
+          "ruleId": "allow",
+          "status": "failed",
+          "reasonCodes": ["evaluation.fixture"]
+        }
+      ],
+      "expected": {
+        "outcome": "failure",
+        "reasonCodes": ["evaluation.unresolved_rule"],
+        "failure": {
+          "code": "evaluation.unresolved_rule",
+          "stage": "evaluation",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "review-precedes-allow",
+      "ruleResults": [
+        {
+          "ruleId": "deny",
+          "status": "not_matched",
+          "reasonCodes": ["evaluation.fixture"]
+        },
+        {
+          "ruleId": "review",
+          "status": "matched",
+          "outcome": "review",
+          "reasonCodes": ["evaluation.fixture"]
+        },
+        {
+          "ruleId": "allow",
+          "status": "matched",
+          "outcome": "allow",
+          "reasonCodes": ["evaluation.fixture"]
+        }
+      ],
+      "expected": {
+        "outcome": "review",
+        "reasonCodes": ["policy.review_rule_matched"]
+      }
+    },
+    {
+      "name": "allow-precedes-default",
+      "ruleResults": [
+        {
+          "ruleId": "deny",
+          "status": "not_matched",
+          "reasonCodes": ["evaluation.fixture"]
+        },
+        {
+          "ruleId": "review",
+          "status": "not_matched",
+          "reasonCodes": ["evaluation.fixture"]
+        },
+        {
+          "ruleId": "allow",
+          "status": "matched",
+          "outcome": "allow",
+          "reasonCodes": ["evaluation.fixture"]
+        }
+      ],
+      "expected": {
+        "outcome": "allow",
+        "reasonCodes": ["policy.allow_rule_matched"]
+      }
+    },
+    {
+      "name": "policy-default",
+      "ruleResults": [
+        {
+          "ruleId": "deny",
+          "status": "not_matched",
+          "reasonCodes": ["evaluation.fixture"]
+        },
+        {
+          "ruleId": "review",
+          "status": "not_matched",
+          "reasonCodes": ["evaluation.fixture"]
+        },
+        {
+          "ruleId": "allow",
+          "status": "not_matched",
+          "reasonCodes": ["evaluation.fixture"]
+        }
+      ],
+      "expected": {
+        "outcome": "review",
+        "reasonCodes": ["policy.default_outcome"]
+      }
+    }
+  ]
+}

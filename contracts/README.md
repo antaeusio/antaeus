@@ -42,6 +42,24 @@ A valid policy is serialized with RFC 8785 JSON Canonicalization Scheme (JCS), e
 
 Every Decision and rule result carries at least one stable reason code. A failure Decision's top-level reason codes include its structured failure code. Results appear exactly once in policy order, and semantic validation recomputes the deterministic reduction rather than trusting the claimed outcome.
 
+## Deterministic reduction
+
+After evaluator routing is complete, every policy rule has exactly one result in policy order. `matched` carries that rule's configured policy outcome. `not_matched` carries no outcome. Both `indeterminate` and `failed` are unresolved and carry no outcome.
+
+Implementations reduce the complete result list in this exact precedence order:
+
+1. any matched `deny` rule yields `deny` with required top-level reason code `policy.deny_rule_matched`;
+2. otherwise, any `indeterminate` or `failed` result yields `failure` with required top-level reason code `evaluation.unresolved_rule`;
+3. otherwise, any matched `review` rule yields `review` with required top-level reason code `policy.review_rule_matched`;
+4. otherwise, any matched `allow` rule yields `allow` with required top-level reason code `policy.allow_rule_matched`; and
+5. otherwise, the policy's `defaultOutcome` applies with required top-level reason code `policy.default_outcome`.
+
+The required reduction code must appear in the Decision's top-level `reasonCodes`; implementations may add other bounded reason codes. A `failure` Decision must also include its structured `failure.code` in the top-level reason codes. One code can satisfy both requirements when the structured code is `evaluation.unresolved_rule`.
+
+An accepted evaluation produces one rule result per policy rule even when a configuration, evaluator, reduction, or internal failure prevents a judgment. Such rules use `indeterminate` or `failed`, so the reducer can reproduce `failure`; a matched `deny` still takes precedence. The reducer determines only the terminal outcome, its required reason code, and the standard unresolved-rule failure. Other structured failure details describe the execution failure and remain subject to schema and semantic validation.
+
+The language-neutral cases in `conformance/v0alpha1/reduction/cases.json` are normative input-to-output fixtures for this behavior.
+
 Requests rejected before evaluation use a non-2xx status with RFC 9457 Problem Details (`application/problem+json`). Policy `deny` and `review` outcomes are not transport errors.
 
 ## Layout
