@@ -1,0 +1,23 @@
+#!/bin/sh
+
+set -eu
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+repo_root=$(CDPATH='' cd -- "$script_dir/.." && pwd)
+dist_dir="$repo_root/.tmp/dist"
+
+for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64; do
+  goos=${target%/*}
+  goarch=${target#*/}
+  suffix=''
+  if [ "$goos" = windows ]; then
+    suffix='.exe'
+  fi
+
+  echo "cross-build: $goos/$goarch"
+  CGO_ENABLED=0 \
+    GOOS="$goos" \
+    GOARCH="$goarch" \
+    ANTAEUS_OUTPUT="$dist_dir/antaeus_${goos}_${goarch}${suffix}" \
+    "$repo_root/scripts/build"
+done

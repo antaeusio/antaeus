@@ -1,0 +1,33 @@
+#!/bin/sh
+
+set -eu
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+repo_root=$(CDPATH='' cd -- "$script_dir/.." && pwd)
+
+unformatted=$(find "$repo_root/cmd" "$repo_root/internal" -type f -name '*.go' -exec gofmt -l {} +)
+if [ -n "$unformatted" ]; then
+  echo "check: gofmt is required for:" >&2
+  echo "$unformatted" >&2
+  exit 1
+fi
+
+if ! command -v shellcheck >/dev/null 2>&1; then
+  echo "check: shellcheck is required" >&2
+  exit 69
+fi
+
+shellcheck \
+  "$repo_root/scripts/with-build-lock" \
+  "$repo_root/scripts/build" \
+  "$repo_root/scripts/check" \
+  "$repo_root/scripts/cross-build"
+
+# The single-quoted program intentionally expands $1 in the child shell.
+# shellcheck disable=SC2016
+exec "$repo_root/scripts/with-build-lock" sh -c '
+  set -eu
+  cd "$1"
+  go vet ./...
+  go test ./...
+' sh "$repo_root"

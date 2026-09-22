@@ -1,6 +1,6 @@
 # Contributing to Antaeus
 
-Antaeus is at the repository-foundation stage and does not yet have a released API or runnable implementation. Early contributions should focus on concrete design feedback, documentation corrections, and small changes agreed with the maintainers before implementation.
+Antaeus is in early implementation and does not yet have a released API or policy-evaluation implementation. Early contributions should focus on concrete design feedback, documentation corrections, tests, and small changes agreed with the maintainers before implementation.
 
 ## Before opening a change
 
@@ -12,13 +12,13 @@ Antaeus is at the repository-foundation stage and does not yet have a released A
 ## Development expectations
 
 - Follow the repository instructions in `AGENTS.md`.
+- Use Go 1.26.0 or newer; Go 1.27.1 is the preferred development toolchain.
 - Keep the open-source core useful without an Antaeus account.
 - Keep public contracts evaluator- and provider-neutral.
 - Add tests with behavior changes once executable code exists.
-- Run every build-producing command through `scripts/with-build-lock` in a shared checkout.
+- Run `scripts/check` before submitting Go or shell changes.
+- Use `scripts/build` for a local binary and `scripts/cross-build` for the supported target matrix. These entry points acquire `scripts/with-build-lock`; do not invoke underlying build commands directly in a shared checkout.
 - Do not claim checks passed unless you ran them.
-
-There is no supported build or test command yet. Those instructions will be added with the first vertical slice after the remaining architecture decisions are approved.
 
 ## Changes and review
 
