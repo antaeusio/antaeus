@@ -77,6 +77,10 @@ cases, identity mismatches, and incomplete rule mappings are errors. Fixture
 results are always labeled `deterministic-fixture` and synthetic; they are test
 evidence, not semantic inference or an enforcement fallback.
 
+Case names are unique within a fixture set, and rule IDs are unique within each
+case. JSON property names are case-sensitive and exact; unknown, case-variant,
+and duplicate properties are rejected before typed decoding.
+
 Requests rejected before evaluation use a non-2xx status with RFC 9457 Problem Details (`application/problem+json`). Policy `deny` and `review` outcomes are not transport errors.
 
 ## Layout

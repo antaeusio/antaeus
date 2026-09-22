@@ -285,14 +285,109 @@ func TestParseRejectsUnknownFieldsAndTrailingJSON(t *testing.T) {
 			if err != nil {
 				t.Fatalf("encode mutated fixture: %v", err)
 			}
-			if _, err := Parse(source); err == nil {
-				t.Fatal("Parse() error = nil, want unknown-field rejection")
+			if _, err := Parse(source); err == nil || !strings.Contains(err.Error(), "unknown property") {
+				t.Fatalf("Parse() error = %v, want unknown property rejection", err)
 			}
 		})
 	}
 
-	if _, err := Parse(append(readQuickstartSet(t), []byte(` {}`)...)); err == nil {
-		t.Fatal("Parse() error = nil, want trailing JSON rejection")
+	if _, err := Parse(append(readQuickstartSet(t), []byte(` {}`)...)); err == nil || !strings.Contains(err.Error(), "trailing JSON") {
+		t.Fatalf("Parse() error = %v, want trailing JSON rejection", err)
+	}
+
+	var document map[string]any
+	if err := json.Unmarshal(readQuickstartSet(t), &document); err != nil {
+		t.Fatalf("decode valid fixture: %v", err)
+	}
+	reencoded, err := json.Marshal(document)
+	if err != nil {
+		t.Fatalf("encode valid fixture: %v", err)
+	}
+	if _, err := Parse(reencoded); err != nil {
+		t.Fatalf("Parse() valid re-encoded fixture error = %v", err)
+	}
+}
+
+func TestParseRejectsCaseVariantKeys(t *testing.T) {
+	tests := []struct {
+		name string
+		old  string
+		new  string
+	}{
+		{name: "top level", old: `"apiVersion"`, new: `"APIVersion"`},
+		{name: "metadata", old: `"version": "v1"`, new: `"Version": "v1"`},
+		{name: "case digest", old: `"policyDigest"`, new: `"PolicyDigest"`},
+		{name: "rule result", old: `"ruleId"`, new: `"RULEID"`},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			source := strings.Replace(string(readQuickstartSet(t)), test.old, test.new, 1)
+			if _, err := Parse([]byte(source)); err == nil || !strings.Contains(err.Error(), "unknown property") {
+				t.Fatalf("Parse() error = %v, want exact-key rejection", err)
+			}
+		})
+	}
+}
+
+func TestParseRejectsDuplicateKeys(t *testing.T) {
+	tests := []struct {
+		name string
+		old  string
+		new  string
+	}{
+		{
+			name: "top level",
+			old:  `"kind": "FixtureSet",`,
+			new:  `"kind": "FixtureSet", "kind": "FixtureSet",`,
+		},
+		{
+			name: "metadata",
+			old:  `"name": "quickstart",`,
+			new:  `"name": "quickstart", "name": "different",`,
+		},
+		{
+			name: "case digest",
+			old:  `"policyDigest": "sha256:2378b5a1806bb11c618bd3a78122e773ec93bdfc45b751a18887d40f4ea536a2",`,
+			new:  `"policyDigest": "sha256:2378b5a1806bb11c618bd3a78122e773ec93bdfc45b751a18887d40f4ea536a2", "policyDigest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",`,
+		},
+		{
+			name: "rule result",
+			old:  `"ruleId": "prohibited-service",`,
+			new:  `"ruleId": "prohibited-service", "ruleId": "different",`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			source := strings.Replace(string(readQuickstartSet(t)), test.old, test.new, 1)
+			if _, err := Parse([]byte(source)); err == nil || !strings.Contains(err.Error(), "duplicate property") {
+				t.Fatalf("Parse() error = %v, want duplicate-key rejection", err)
+			}
+		})
+	}
+}
+
+func TestParseRejectsInvalidConformanceFixtures(t *testing.T) {
+	for _, name := range []string{"invalid-unknown-property.json", "invalid-bad-digest.json", "invalid-empty-rule-results.json"} {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join("..", "..", "contracts", "conformance", "v0alpha1", "fixture-set", name)
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("read %s: %v", path, err)
+			}
+			if _, err := Parse(data); err == nil {
+				t.Fatal("Parse() error = nil, want conformance fixture rejection")
+			}
+		})
+	}
+}
+
+func TestParseRejectsEmptyAndOversizedSources(t *testing.T) {
+	for _, source := range [][]byte{nil, make([]byte, MaxSourceBytes+1)} {
+		if _, err := Parse(source); err == nil {
+			t.Fatal("Parse() error = nil, want source size rejection")
+		}
 	}
 }
 
