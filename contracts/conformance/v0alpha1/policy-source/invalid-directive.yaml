@@ -1,0 +1,12 @@
+%YAML 1.2
+---
+apiVersion: policy.antaeus.io/v0alpha1
+kind: Policy
+metadata:
+  name: directive
+spec:
+  defaultOutcome: review
+  rules:
+    - id: check
+      when: The condition applies.
+      outcome: review

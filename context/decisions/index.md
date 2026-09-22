@@ -6,3 +6,4 @@
 |---|---|---|---|---|---|
 | `evaluator-fixture-contract` | canonical | Provider-neutral evaluator and deterministic fixture |  | 0 | 0 |
 | `policy-decision-contract` | canonical | Portable policy and decision contract |  | 0 | 0 |
+| `policy-source-loading` | canonical | Constrained policy source loading |  | 0 | 0 |

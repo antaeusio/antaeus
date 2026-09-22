@@ -1,0 +1,11 @@
+apiVersion: policy.antaeus.io/v0alpha1
+kind: Policy
+true: rejected
+metadata:
+  name: non-string-key
+spec:
+  defaultOutcome: review
+  rules:
+    - id: check
+      when: The condition applies.
+      outcome: review

@@ -1,0 +1,10 @@
+apiVersion: policy.antaeus.io/v0alpha1
+kind: Policy
+metadata:
+  name: !antaeus/name custom-tag
+spec:
+  defaultOutcome: review
+  rules:
+    - id: check
+      when: The condition applies.
+      outcome: review

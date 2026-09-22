@@ -1,0 +1,12 @@
+apiVersion: policy.antaeus.io/v0alpha1
+kind: Policy
+metadata:
+  name: core-scalars
+  description: yes
+spec:
+  defaultOutcome: review
+  rules:
+    - id: timestamp-text
+      description: 2026-09-22
+      when: The submitted text contains a date.
+      outcome: review
