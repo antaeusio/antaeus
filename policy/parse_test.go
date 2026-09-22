@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"go.yaml.in/yaml/v3"
 )
 
 func TestParseJSONAndYAMLProduceSameArtifactIdentity(t *testing.T) {
@@ -127,6 +129,7 @@ func TestParseYAMLRejectsUnsupportedFeatures(t *testing.T) {
 		{name: "duplicate key", source: strings.Replace(validYAML(), "kind: Policy", "kind: Policy\nkind: Policy", 1), code: "source.duplicate_key"},
 		{name: "non-string key", source: strings.Replace(validYAML(), "kind: Policy", "kind: Policy\ntrue: rejected", 1), code: "source.non_string_key"},
 		{name: "anchor", source: strings.Replace(validYAML(), "name: example", "name: &name example", 1), code: "source.alias"},
+		{name: "anchor on mapping key", source: strings.Replace(validYAML(), "kind: Policy", "&kind kind: Policy", 1), code: "source.alias"},
 		{name: "alias", source: strings.Replace(validYAML(), "name: example", "name: &name example\n  description: *name", 1), code: "source.alias"},
 		{name: "merge key", source: strings.Replace(validYAML(), "name: example", "<<: {name: example}", 1), code: "source.merge"},
 		{name: "custom tag", source: strings.Replace(validYAML(), "name: example", "name: !custom example", 1), code: "source.tag"},
@@ -191,6 +194,30 @@ func TestParseYAMLNonSpecificTagUsesCharacterColumns(t *testing.T) {
 	}
 	if artifact.Spec.Rules[0].When != "123" {
 		t.Fatalf("when = %q, want 123", artifact.Spec.Rules[0].When)
+	}
+}
+
+func TestParseYAMLNonSpecificTagTerminators(t *testing.T) {
+	t.Run("CRLF multiline", func(t *testing.T) {
+		source := strings.Replace(validYAML(), "name: example", "name: example\n  description: !\n    123", 1)
+		source = strings.ReplaceAll(source, "\n", "\r\n")
+		artifact, err := Parse([]byte(source), FormatYAML)
+		if err != nil {
+			t.Fatalf("Parse() error = %v", err)
+		}
+		if artifact.Metadata.Description == nil || *artifact.Metadata.Description != "123" {
+			t.Fatalf("description = %v, want 123", artifact.Metadata.Description)
+		}
+	})
+
+}
+
+func TestHasNonSpecificTagRecognizesFlowTerminators(t *testing.T) {
+	node := &yaml.Node{Line: 1, Column: 1}
+	for _, terminator := range []byte{',', '[', ']', '{', '}'} {
+		if !hasNonSpecificTag(node, [][]byte{{'!', terminator}}) {
+			t.Errorf("terminator %q was not recognized", terminator)
+		}
 	}
 }
 
@@ -290,6 +317,25 @@ func TestParseErrorIncludesLocationWhenAvailable(t *testing.T) {
 	}
 	if parseErr.Line == 0 || parseErr.Column == 0 {
 		t.Fatalf("ParseError location = %d:%d, want source location", parseErr.Line, parseErr.Column)
+	}
+}
+
+func TestParseErrorColumnCountsUnicodeCharacters(t *testing.T) {
+	_, err := Parse([]byte(`{"é":1,"é":2}`), FormatJSON)
+	var parseErr *ParseError
+	if !errors.As(err, &parseErr) {
+		t.Fatalf("Parse() error = %v, want ParseError", err)
+	}
+	if parseErr.Code != "source.duplicate_key" || parseErr.Column != 11 {
+		t.Fatalf("ParseError = %#v, want duplicate key at character column 11", parseErr)
+	}
+
+	_, err = Parse([]byte("\ufeffcafé\rkind: Policy"), FormatYAML)
+	if !errors.As(err, &parseErr) {
+		t.Fatalf("Parse() error = %v, want ParseError", err)
+	}
+	if parseErr.Code != "source.line_break" || parseErr.Column != 5 {
+		t.Fatalf("ParseError = %#v, want line break at character column 5", parseErr)
 	}
 }
 

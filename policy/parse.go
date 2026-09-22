@@ -31,6 +31,7 @@ const (
 )
 
 // ParseError reports a bounded source error. Line and Column are one-based
+// Unicode character positions, excluding an optional UTF-8 byte-order mark,
 // when the parser can identify a source location and zero otherwise.
 type ParseError struct {
 	Code    string
@@ -412,6 +413,9 @@ func yamlNodeValue(node *yaml.Node, containerDepth int, nodes *int, sourceLines 
 		result := make(map[string]any, len(node.Content)/2)
 		for i := 0; i < len(node.Content); i += 2 {
 			keyNode := node.Content[i]
+			if keyNode.Anchor != "" || keyNode.Alias != nil || keyNode.Kind == yaml.AliasNode {
+				return nil, parseError("source.alias", "YAML anchors and aliases are not supported", keyNode.Line, keyNode.Column)
+			}
 			if keyNode.Kind != yaml.ScalarNode {
 				return nil, parseError("source.non_string_key", "YAML mapping keys must be strings", keyNode.Line, keyNode.Column)
 			}
@@ -563,7 +567,15 @@ func hasNonSpecificTag(node *yaml.Node, sourceLines [][]byte) bool {
 	if offset >= len(line) || line[offset] != '!' {
 		return false
 	}
-	return offset+1 == len(line) || line[offset+1] == ' ' || line[offset+1] == '\t'
+	if offset+1 == len(line) {
+		return true
+	}
+	switch line[offset+1] {
+	case ' ', '\t', '\r', ',', '[', ']', '{', '}':
+		return true
+	default:
+		return false
+	}
 }
 
 func yamlColumnByteOffset(line []byte, column int, firstLine bool) int {
@@ -665,12 +677,14 @@ func parseErrorAtOffset(code, message string, source []byte, offset int64) *Pars
 	if offset > int64(len(source)) {
 		offset = int64(len(source))
 	}
-	line := 1 + bytes.Count(source[:offset], []byte{'\n'})
-	lastNewline := bytes.LastIndexByte(source[:offset], '\n')
-	column := int(offset) + 1
-	if lastNewline >= 0 {
-		column = int(offset) - lastNewline
+	prefix := source[:offset]
+	line := 1 + bytes.Count(prefix, []byte{'\n'})
+	lineStart := bytes.LastIndexByte(prefix, '\n') + 1
+	linePrefix := prefix[lineStart:]
+	if line == 1 {
+		linePrefix = bytes.TrimPrefix(linePrefix, []byte{0xef, 0xbb, 0xbf})
 	}
+	column := utf8.RuneCount(linePrefix) + 1
 	return parseError(code, message, line, column)
 }
 
