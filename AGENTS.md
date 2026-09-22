@@ -111,3 +111,28 @@ At the end of every substantive response, consult the private master roadmap whe
 - Recommend one concrete next outcome rather than a menu.
 - Respect dependencies, blockers, and completed work.
 - Do not begin the proposed follow-up until the human owner agrees, unless it is already part of the active request.
+
+<!-- METATRON:START (managed by metatron context setup — safe to edit inside) -->
+## Repository context — required first step
+
+This repository carries its own operating knowledge: binding conventions
+("decisions") as Open Knowledge Format markdown under `context/decisions/`.
+Before you explore or edit any code:
+
+1. Run `cat context.md` — it lists the binding conventions and where each one
+   lives. In a monorepo, use the `context/` nearest the files you are touching.
+2. Open the decision files relevant to your task with
+   `cat context/decisions/<topic>.md`. They say where fixes belong and which
+   pitfalls to avoid.
+3. Only then plan your change — and state which decision files you read.
+
+Reading these files is required, not optional: a change that contradicts a
+decision will be rejected in review. Listing the directory is not reading.
+
+To record a durable convention you discovered, add an OKF file under
+`context/decisions/` on your working branch (skill: `context-okf-llm-ingest` in
+`.roo/skills/`). The review gate is `pr`: it reaches the default branch only
+through a human-reviewed pull request — never push decision changes there
+directly. `context/candidate/` remains optional staging; content there is never
+authoritative.
+<!-- METATRON:END -->
