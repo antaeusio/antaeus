@@ -1,0 +1,135 @@
+#!/bin/sh
+
+set -u
+
+usage() {
+  echo "usage: scripts/with-build-lock command [arg ...]" >&2
+  exit 64
+}
+
+[ "$#" -gt 0 ] || usage
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd) || exit 70
+repo_root=$(CDPATH='' cd -- "$script_dir/.." && pwd) || exit 70
+tmp_dir="$repo_root/.tmp"
+lock_dir="$tmp_dir/antaeus-build.lock"
+wait_seconds=${ANTAEUS_BUILD_LOCK_WAIT_SECONDS:-600}
+poll_seconds=${ANTAEUS_BUILD_LOCK_POLL_SECONDS:-5}
+
+case "$wait_seconds" in
+  ''|*[!0-9]*)
+    echo "with-build-lock: ANTAEUS_BUILD_LOCK_WAIT_SECONDS must be a non-negative integer" >&2
+    exit 64
+    ;;
+esac
+
+case "$poll_seconds" in
+  ''|0|*[!0-9]*)
+    echo "with-build-lock: ANTAEUS_BUILD_LOCK_POLL_SECONDS must be a positive integer" >&2
+    exit 64
+    ;;
+esac
+
+mkdir -p "$tmp_dir" || exit 73
+
+# Invoked indirectly by the EXIT trap.
+# shellcheck disable=SC2329
+cleanup() {
+  if [ -d "$lock_dir" ] && [ -r "$lock_dir/pid" ]; then
+    lock_pid=$(sed -n '1p' "$lock_dir/pid" 2>/dev/null || true)
+    if [ "$lock_pid" = "$$" ]; then
+      rm -f "$lock_dir/pid" "$lock_dir/command_pid" "$lock_dir/session" "$lock_dir/started_at" "$lock_dir/host" "$lock_dir/command"
+      rmdir "$lock_dir" 2>/dev/null || true
+    fi
+  fi
+}
+
+# Invoked indirectly by the signal traps.
+# shellcheck disable=SC2329
+forward_signal() {
+  signal_name=$1
+  signal_status=$2
+  if [ "${command_pid:-}" ]; then
+    kill -s "$signal_name" "$command_pid" 2>/dev/null || true
+  fi
+  exit "$signal_status"
+}
+
+trap cleanup 0
+trap 'forward_signal HUP 129' HUP
+trap 'forward_signal INT 130' INT
+trap 'forward_signal TERM 143' TERM
+
+started_wait=$(date +%s)
+
+while ! mkdir "$lock_dir" 2>/dev/null; do
+  if [ ! -r "$lock_dir/pid" ]; then
+    echo "with-build-lock: lock exists without readable owner metadata; refusing to break $lock_dir" >&2
+    exit 73
+  fi
+
+  owner_pid=$(sed -n '1p' "$lock_dir/pid" 2>/dev/null || true)
+  case "$owner_pid" in
+    ''|*[!0-9]*)
+      echo "with-build-lock: lock has invalid owner metadata; refusing to break $lock_dir" >&2
+      exit 73
+      ;;
+  esac
+
+  if ! kill -0 "$owner_pid" 2>/dev/null; then
+    owner_command_pid=$(sed -n '1p' "$lock_dir/command_pid" 2>/dev/null || true)
+    case "$owner_command_pid" in
+      ''|*[!0-9]*)
+        owner_command_pid=''
+        ;;
+    esac
+
+    if [ "$owner_command_pid" ] && kill -0 "$owner_command_pid" 2>/dev/null; then
+      now=$(date +%s)
+      elapsed=$((now - started_wait))
+      if [ "$elapsed" -ge "$wait_seconds" ]; then
+        echo "with-build-lock: timed out after ${elapsed}s; owner PID $owner_pid is dead but command PID $owner_command_pid is still live" >&2
+        exit 75
+      fi
+      echo "with-build-lock: owner PID $owner_pid is dead; waiting for live command PID $owner_command_pid (${elapsed}s/${wait_seconds}s)" >&2
+      sleep "$poll_seconds"
+      continue
+    fi
+
+    stale_dir="$tmp_dir/antaeus-build.lock.stale.$$"
+    if mv "$lock_dir" "$stale_dir" 2>/dev/null; then
+      echo "with-build-lock: removed stale lock owned by verified-dead PID $owner_pid" >&2
+      rm -rf "$stale_dir"
+      continue
+    fi
+    continue
+  fi
+
+  now=$(date +%s)
+  elapsed=$((now - started_wait))
+  if [ "$elapsed" -ge "$wait_seconds" ]; then
+    echo "with-build-lock: timed out after ${elapsed}s waiting for live PID $owner_pid" >&2
+    exit 75
+  fi
+
+  owner_command=$(sed -n '1p' "$lock_dir/command" 2>/dev/null || echo unknown)
+  echo "with-build-lock: waiting for live PID $owner_pid (${elapsed}s/${wait_seconds}s): $owner_command" >&2
+  sleep "$poll_seconds"
+done
+
+session_id=${ANTAEUS_BUILD_SESSION_ID:-${CI_JOB_ID:-local}}
+hostname_value=$(hostname 2>/dev/null || echo unknown)
+started_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+
+printf '%s\n' "$$" >"$lock_dir/pid"
+printf '%s\n' "$session_id" >"$lock_dir/session"
+printf '%s\n' "$started_at" >"$lock_dir/started_at"
+printf '%s\n' "$hostname_value" >"$lock_dir/host"
+printf '%s\n' "$*" >"$lock_dir/command"
+
+"$@" &
+command_pid=$!
+printf '%s\n' "$command_pid" >"$lock_dir/command_pid"
+wait "$command_pid"
+command_status=$?
+exit "$command_status"
