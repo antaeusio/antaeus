@@ -2,7 +2,7 @@
 
 Antaeus is an open-source project for turning human-written semantic business policies into versioned, testable, auditable decisions that applications can safely consume.
 
-> **Project status:** repository foundation. There is no implementation or release yet, and the public contracts are still under design.
+> **Project status:** early implementation. The repository contains a minimal Go command foundation, but there is no release or policy-evaluation implementation yet. Public contract artifacts will land with their conformance fixtures.
 
 ## What Antaeus is for
 
@@ -28,17 +28,29 @@ The public project is intended to work without an Antaeus account. Its planned s
 
 Provider credentials, customer data, hosted-service implementation, billing, and private production integrations do not belong in this repository.
 
-## Repository status
+## Development status
 
-The repository currently contains its license, governance and contribution policies, security policy, agent instructions, and shared-checkout build lock. Product code, installation commands, and compatibility guarantees will be added only after the relevant public decisions and contracts are approved.
+The Go module is `github.com/antaeusio/antaeus`. Development requires Go 1.26.0 or newer; Go 1.27.1 is the preferred toolchain. The current command exposes only help and version information while the first policy vertical slice is implemented.
+
+Run checks and build the development command through the repository-owned build lock:
+
+```sh
+scripts/check
+scripts/build
+.tmp/bin/antaeus version
+```
+
+Build every planned binary target with `scripts/cross-build`. Generated files stay under `.tmp/` and are not release artifacts.
 
 Do not treat proposed behavior as released functionality. The changelog and future release notes will identify what is actually available.
+
+See [compatibility and platform support](./docs/compatibility.md) for the pre-v1 compatibility policy and planned release matrix.
 
 ## Contributing and security
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for the contribution process, [GOVERNANCE.md](./GOVERNANCE.md) for decision-making, and [SECURITY.md](./SECURITY.md) for private vulnerability reporting. Participation is governed by [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
 
-All build-producing commands in a shared checkout must run through `scripts/with-build-lock`. No build command exists yet.
+All build-producing commands in a shared checkout must run through the checked-in scripts, which use `scripts/with-build-lock`.
 
 ## License
 
