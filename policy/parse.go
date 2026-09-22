@@ -61,6 +61,9 @@ func Parse(source []byte, format Format) (Artifact, error) {
 	var err error
 	switch format {
 	case FormatJSON:
+		if err := validateJSONUnicodeEscapes(source); err != nil {
+			return Artifact{}, err
+		}
 		if err := validateJSONDocument(source); err != nil {
 			return Artifact{}, err
 		}
@@ -116,7 +119,7 @@ func formatForPath(path string) (Format, error) {
 }
 
 func decodeArtifact(data []byte) (Artifact, error) {
-	if err := rejectNullDescriptions(data); err != nil {
+	if err := validatePolicyObjectShape(data); err != nil {
 		return Artifact{}, err
 	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
@@ -131,45 +134,150 @@ func decodeArtifact(data []byte) (Artifact, error) {
 	return artifact, nil
 }
 
-func rejectNullDescriptions(data []byte) error {
-	var envelope struct {
-		Metadata struct {
-			Description json.RawMessage `json:"description"`
-		} `json:"metadata"`
-		Spec struct {
-			Rules []struct {
-				Description json.RawMessage `json:"description"`
-			} `json:"rules"`
-		} `json:"spec"`
-	}
-	if err := json.Unmarshal(data, &envelope); err != nil {
+func validatePolicyObjectShape(data []byte) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	var document any
+	if err := decoder.Decode(&document); err != nil {
 		return parseError("source.schema", boundedMessage(err.Error()), 0, 0)
 	}
-	if bytes.Equal(bytes.TrimSpace(envelope.Metadata.Description), []byte("null")) {
-		return parseError("source.schema", "metadata.description must be a string when present", 0, 0)
+	root, ok := document.(map[string]any)
+	if !ok {
+		return parseError("source.schema", "policy source must be an object", 0, 0)
 	}
-	for i, rule := range envelope.Spec.Rules {
-		if bytes.Equal(bytes.TrimSpace(rule.Description), []byte("null")) {
-			return parseError("source.schema", fmt.Sprintf("spec.rules[%d].description must be a string when present", i), 0, 0)
+	if err := validateExactKeys("$", root, "apiVersion", "kind", "metadata", "spec"); err != nil {
+		return err
+	}
+	if err := rejectNullValues("$", root); err != nil {
+		return err
+	}
+
+	if raw, exists := root["metadata"]; exists {
+		metadata, ok := raw.(map[string]any)
+		if !ok {
+			return parseError("source.schema", "$.metadata must be an object", 0, 0)
+		}
+		if err := validateExactKeys("$.metadata", metadata, "name", "description"); err != nil {
+			return err
+		}
+	}
+	if raw, exists := root["spec"]; exists {
+		spec, ok := raw.(map[string]any)
+		if !ok {
+			return parseError("source.schema", "$.spec must be an object", 0, 0)
+		}
+		if err := validateExactKeys("$.spec", spec, "defaultOutcome", "rules"); err != nil {
+			return err
+		}
+		if rawRules, exists := spec["rules"]; exists {
+			rules, ok := rawRules.([]any)
+			if !ok {
+				return parseError("source.schema", "$.spec.rules must be an array", 0, 0)
+			}
+			for i, rawRule := range rules {
+				rule, ok := rawRule.(map[string]any)
+				if !ok {
+					return parseError("source.schema", fmt.Sprintf("$.spec.rules[%d] must be an object", i), 0, 0)
+				}
+				if err := validateExactKeys(fmt.Sprintf("$.spec.rules[%d]", i), rule, "id", "description", "when", "outcome"); err != nil {
+					return err
+				}
+			}
 		}
 	}
 	return nil
+}
+
+func validateExactKeys(path string, object map[string]any, allowed ...string) error {
+	allowedSet := make(map[string]struct{}, len(allowed))
+	for _, name := range allowed {
+		allowedSet[name] = struct{}{}
+	}
+	for name := range object {
+		if _, exists := allowedSet[name]; !exists {
+			return parseError("source.schema", fmt.Sprintf("%s contains unknown property %q", path, name), 0, 0)
+		}
+	}
+	return nil
+}
+
+func rejectNullValues(path string, value any) error {
+	switch typed := value.(type) {
+	case nil:
+		return parseError("source.schema", path+" must not be null", 0, 0)
+	case map[string]any:
+		for name, child := range typed {
+			if err := rejectNullValues(path+"."+name, child); err != nil {
+				return err
+			}
+		}
+	case []any:
+		for i, child := range typed {
+			if err := rejectNullValues(fmt.Sprintf("%s[%d]", path, i), child); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func validateJSONUnicodeEscapes(source []byte) error {
+	inString := false
+	for i := 0; i < len(source); i++ {
+		switch source[i] {
+		case '"':
+			inString = !inString
+		case '\\':
+			if !inString || i+1 >= len(source) {
+				continue
+			}
+			if source[i+1] != 'u' {
+				i++
+				continue
+			}
+			code, ok := jsonHexCodeUnit(source, i+2)
+			if !ok {
+				continue
+			}
+			if code >= 0xdc00 && code <= 0xdfff {
+				return parseErrorAtOffset("source.invalid_unicode", "JSON string contains an unpaired low surrogate", source, int64(i))
+			}
+			if code >= 0xd800 && code <= 0xdbff {
+				if i+12 > len(source) || source[i+6] != '\\' || source[i+7] != 'u' {
+					return parseErrorAtOffset("source.invalid_unicode", "JSON string contains an unpaired high surrogate", source, int64(i))
+				}
+				low, valid := jsonHexCodeUnit(source, i+8)
+				if !valid || low < 0xdc00 || low > 0xdfff {
+					return parseErrorAtOffset("source.invalid_unicode", "JSON string contains an unpaired high surrogate", source, int64(i))
+				}
+				i += 11
+				continue
+			}
+			i += 5
+		}
+	}
+	return nil
+}
+
+func jsonHexCodeUnit(source []byte, start int) (uint16, bool) {
+	if start+4 > len(source) {
+		return 0, false
+	}
+	value, err := strconv.ParseUint(string(source[start:start+4]), 16, 16)
+	return uint16(value), err == nil
 }
 
 func validateJSONDocument(source []byte) error {
 	decoder := json.NewDecoder(bytes.NewReader(source))
 	decoder.UseNumber()
 	nodes := 0
-	if err := parseJSONValue(decoder, source, 1, &nodes); err != nil {
+	if err := parseJSONValue(decoder, source, 0, &nodes); err != nil {
 		return err
 	}
 	return ensureJSONEOF(decoder)
 }
 
-func parseJSONValue(decoder *json.Decoder, source []byte, depth int, nodes *int) error {
-	if depth > MaxNestingDepth {
-		return parseErrorAtOffset("source.depth", fmt.Sprintf("JSON nesting must not exceed %d", MaxNestingDepth), source, decoder.InputOffset())
-	}
+func parseJSONValue(decoder *json.Decoder, source []byte, containerDepth int, nodes *int) error {
 	*nodes++
 	if *nodes > MaxParsedNodes {
 		return parseErrorAtOffset("source.nodes", fmt.Sprintf("JSON must not exceed %d parsed nodes", MaxParsedNodes), source, decoder.InputOffset())
@@ -182,6 +290,10 @@ func parseJSONValue(decoder *json.Decoder, source []byte, depth int, nodes *int)
 	delimiter, isDelimiter := token.(json.Delim)
 	if !isDelimiter {
 		return nil
+	}
+	containerDepth++
+	if containerDepth > MaxNestingDepth {
+		return parseErrorAtOffset("source.depth", fmt.Sprintf("JSON nesting must not exceed %d containers", MaxNestingDepth), source, decoder.InputOffset())
 	}
 
 	switch delimiter {
@@ -204,13 +316,13 @@ func parseJSONValue(decoder *json.Decoder, source []byte, depth int, nodes *int)
 				return parseErrorAtOffset("source.duplicate_key", fmt.Sprintf("duplicate JSON object key %q", key), source, decoder.InputOffset())
 			}
 			seen[key] = struct{}{}
-			if err := parseJSONValue(decoder, source, depth+1, nodes); err != nil {
+			if err := parseJSONValue(decoder, source, containerDepth, nodes); err != nil {
 				return err
 			}
 		}
 	case '[':
 		for decoder.More() {
-			if err := parseJSONValue(decoder, source, depth+1, nodes); err != nil {
+			if err := parseJSONValue(decoder, source, containerDepth, nodes); err != nil {
 				return err
 			}
 		}
@@ -234,6 +346,9 @@ func ensureJSONEOF(decoder *json.Decoder) error {
 }
 
 func decodeYAMLDocument(source []byte) ([]byte, error) {
+	if err := validateYAMLLineBreaks(source); err != nil {
+		return nil, err
+	}
 	if line, column := yamlDirectiveLocation(source); line > 0 {
 		return nil, parseError("source.directive", "YAML directives are not supported", line, column)
 	}
@@ -258,7 +373,8 @@ func decodeYAMLDocument(source []byte) ([]byte, error) {
 	}
 
 	nodes := 0
-	model, err := yamlNodeValue(document.Content[0], 1, &nodes)
+	lines := bytes.Split(source, []byte{'\n'})
+	model, err := yamlNodeValue(document.Content[0], 0, &nodes, lines)
 	if err != nil {
 		return nil, err
 	}
@@ -269,10 +385,7 @@ func decodeYAMLDocument(source []byte) ([]byte, error) {
 	return data, nil
 }
 
-func yamlNodeValue(node *yaml.Node, depth int, nodes *int) (any, error) {
-	if depth > MaxNestingDepth {
-		return nil, parseError("source.depth", fmt.Sprintf("YAML nesting must not exceed %d", MaxNestingDepth), node.Line, node.Column)
-	}
+func yamlNodeValue(node *yaml.Node, containerDepth int, nodes *int, sourceLines [][]byte) (any, error) {
 	*nodes++
 	if *nodes > MaxParsedNodes {
 		return nil, parseError("source.nodes", fmt.Sprintf("YAML must not exceed %d parsed nodes", MaxParsedNodes), node.Line, node.Column)
@@ -286,6 +399,10 @@ func yamlNodeValue(node *yaml.Node, depth int, nodes *int) (any, error) {
 
 	switch node.Kind {
 	case yaml.MappingNode:
+		containerDepth++
+		if containerDepth > MaxNestingDepth {
+			return nil, parseError("source.depth", fmt.Sprintf("YAML nesting must not exceed %d containers", MaxNestingDepth), node.Line, node.Column)
+		}
 		if node.Tag != "!!map" && node.Tag != "tag:yaml.org,2002:map" {
 			return nil, parseError("source.tag", "custom YAML mapping tags are not supported", node.Line, node.Column)
 		}
@@ -295,7 +412,14 @@ func yamlNodeValue(node *yaml.Node, depth int, nodes *int) (any, error) {
 		result := make(map[string]any, len(node.Content)/2)
 		for i := 0; i < len(node.Content); i += 2 {
 			keyNode := node.Content[i]
-			if keyNode.Kind != yaml.ScalarNode || resolveYAMLScalarKind(keyNode) != "string" {
+			if keyNode.Kind != yaml.ScalarNode {
+				return nil, parseError("source.non_string_key", "YAML mapping keys must be strings", keyNode.Line, keyNode.Column)
+			}
+			keyKind, err := resolveYAMLScalarKind(keyNode, sourceLines)
+			if err != nil {
+				return nil, err
+			}
+			if keyKind != "string" {
 				return nil, parseError("source.non_string_key", "YAML mapping keys must be strings", keyNode.Line, keyNode.Column)
 			}
 			if keyNode.Tag == "!!merge" || keyNode.Tag == "tag:yaml.org,2002:merge" {
@@ -309,7 +433,7 @@ func yamlNodeValue(node *yaml.Node, depth int, nodes *int) (any, error) {
 			if *nodes > MaxParsedNodes {
 				return nil, parseError("source.nodes", fmt.Sprintf("YAML must not exceed %d parsed nodes", MaxParsedNodes), keyNode.Line, keyNode.Column)
 			}
-			value, err := yamlNodeValue(node.Content[i+1], depth+1, nodes)
+			value, err := yamlNodeValue(node.Content[i+1], containerDepth, nodes, sourceLines)
 			if err != nil {
 				return nil, err
 			}
@@ -317,12 +441,16 @@ func yamlNodeValue(node *yaml.Node, depth int, nodes *int) (any, error) {
 		}
 		return result, nil
 	case yaml.SequenceNode:
+		containerDepth++
+		if containerDepth > MaxNestingDepth {
+			return nil, parseError("source.depth", fmt.Sprintf("YAML nesting must not exceed %d containers", MaxNestingDepth), node.Line, node.Column)
+		}
 		if node.Tag != "!!seq" && node.Tag != "tag:yaml.org,2002:seq" {
 			return nil, parseError("source.tag", "custom YAML sequence tags are not supported", node.Line, node.Column)
 		}
 		result := make([]any, len(node.Content))
 		for i, child := range node.Content {
-			value, err := yamlNodeValue(child, depth+1, nodes)
+			value, err := yamlNodeValue(child, containerDepth, nodes, sourceLines)
 			if err != nil {
 				return nil, err
 			}
@@ -330,7 +458,7 @@ func yamlNodeValue(node *yaml.Node, depth int, nodes *int) (any, error) {
 		}
 		return result, nil
 	case yaml.ScalarNode:
-		return yamlScalarValue(node)
+		return yamlScalarValue(node, sourceLines)
 	default:
 		return nil, parseError("source.syntax", "unsupported YAML node", node.Line, node.Column)
 	}
@@ -341,8 +469,11 @@ var (
 	yamlFloatPattern   = regexp.MustCompile(`^[+-]?(?:(?:[0-9]+\.[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?|[0-9]+[eE][+-]?[0-9]+)$`)
 )
 
-func yamlScalarValue(node *yaml.Node) (any, error) {
-	kind := resolveYAMLScalarKind(node)
+func yamlScalarValue(node *yaml.Node, sourceLines [][]byte) (any, error) {
+	kind, err := resolveYAMLScalarKind(node, sourceLines)
+	if err != nil {
+		return nil, err
+	}
 	switch kind {
 	case "string":
 		return node.Value, nil
@@ -372,38 +503,94 @@ func yamlScalarValue(node *yaml.Node) (any, error) {
 	}
 }
 
-func resolveYAMLScalarKind(node *yaml.Node) string {
+func resolveYAMLScalarKind(node *yaml.Node, sourceLines [][]byte) (string, error) {
+	if hasNonSpecificTag(node, sourceLines) {
+		return "string", nil
+	}
 	if node.Style&yaml.TaggedStyle != 0 {
 		switch node.Tag {
 		case "!!str", "tag:yaml.org,2002:str":
-			return "string"
+			return "string", nil
 		case "!!null", "tag:yaml.org,2002:null":
-			return "null"
+			if !isYAMLNull(node.Value) {
+				return "", parseError("source.scalar", "explicit YAML null tag has an invalid value", node.Line, node.Column)
+			}
+			return "null", nil
 		case "!!bool", "tag:yaml.org,2002:bool":
-			return "boolean"
-		case "!!int", "!!float", "tag:yaml.org,2002:int", "tag:yaml.org,2002:float":
-			return "number"
+			if !isYAMLBoolean(node.Value) {
+				return "", parseError("source.scalar", "explicit YAML boolean tag has an invalid value", node.Line, node.Column)
+			}
+			return "boolean", nil
+		case "!!int", "tag:yaml.org,2002:int":
+			if !yamlIntegerPattern.MatchString(node.Value) {
+				return "", parseError("source.scalar", "explicit YAML integer tag has an invalid value", node.Line, node.Column)
+			}
+			return "number", nil
+		case "!!float", "tag:yaml.org,2002:float":
+			if !yamlIntegerPattern.MatchString(node.Value) && !yamlFloatPattern.MatchString(node.Value) && !isYAMLNonFinite(node.Value) {
+				return "", parseError("source.scalar", "explicit YAML float tag has an invalid value", node.Line, node.Column)
+			}
+			return "number", nil
 		default:
-			return "unsupported"
+			return "", parseError("source.tag", "custom and non-JSON YAML tags are not supported", node.Line, node.Column)
 		}
 	}
 	if node.Style != 0 {
-		return "string"
+		return "string", nil
 	}
 	value := node.Value
-	if value == "" || value == "~" || strings.EqualFold(value, "null") {
-		return "null"
+	if isYAMLNull(value) {
+		return "null", nil
 	}
-	if strings.EqualFold(value, "true") || strings.EqualFold(value, "false") {
-		return "boolean"
+	if isYAMLBoolean(value) {
+		return "boolean", nil
 	}
 	if yamlIntegerPattern.MatchString(value) || yamlFloatPattern.MatchString(value) {
-		return "number"
+		return "number", nil
 	}
-	if strings.EqualFold(value, ".inf") || strings.EqualFold(value, "+.inf") || strings.EqualFold(value, "-.inf") || strings.EqualFold(value, ".nan") {
-		return "number"
+	if isYAMLNonFinite(value) {
+		return "number", nil
 	}
-	return "string"
+	return "string", nil
+}
+
+func hasNonSpecificTag(node *yaml.Node, sourceLines [][]byte) bool {
+	if node.Line < 1 || node.Line > len(sourceLines) || node.Column < 1 {
+		return false
+	}
+	line := sourceLines[node.Line-1]
+	offset := node.Column - 1
+	if offset >= len(line) || line[offset] != '!' {
+		return false
+	}
+	return offset+1 == len(line) || line[offset+1] == ' ' || line[offset+1] == '\t'
+}
+
+func isYAMLNull(value string) bool {
+	switch value {
+	case "", "~", "null", "Null", "NULL":
+		return true
+	default:
+		return false
+	}
+}
+
+func isYAMLBoolean(value string) bool {
+	switch value {
+	case "true", "True", "TRUE", "false", "False", "FALSE":
+		return true
+	default:
+		return false
+	}
+}
+
+func isYAMLNonFinite(value string) bool {
+	switch value {
+	case ".inf", ".Inf", ".INF", "+.inf", "+.Inf", "+.INF", "-.inf", "-.Inf", "-.INF", ".nan", ".NaN", ".NAN":
+		return true
+	default:
+		return false
+	}
 }
 
 func allowedExplicitYAMLTag(tag string) bool {
@@ -416,6 +603,24 @@ func allowedExplicitYAMLTag(tag string) bool {
 	default:
 		return false
 	}
+}
+
+func validateYAMLLineBreaks(source []byte) error {
+	for offset := 0; offset < len(source); {
+		r, size := utf8.DecodeRune(source[offset:])
+		if r == '\r' {
+			if offset+1 >= len(source) || source[offset+1] != '\n' {
+				return parseErrorAtOffset("source.line_break", "YAML source must use LF or CRLF line breaks", source, int64(offset))
+			}
+			offset += 2
+			continue
+		}
+		if r == '\u0085' || r == '\u2028' || r == '\u2029' {
+			return parseErrorAtOffset("source.line_break", "YAML source contains a line-break character not supported by YAML 1.2.2", source, int64(offset))
+		}
+		offset += size
+	}
+	return nil
 }
 
 func yamlDirectiveLocation(source []byte) (int, int) {

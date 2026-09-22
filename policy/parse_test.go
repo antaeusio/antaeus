@@ -62,6 +62,26 @@ func TestParseJSONRejectsUnsafeOrAmbiguousInput(t *testing.T) {
 			code:   "source.schema",
 		},
 		{
+			name:   "case variant property",
+			source: []byte(strings.Replace(valid, `"kind": "Policy"`, `"Kind": "Policy"`, 1)),
+			code:   "source.schema",
+		},
+		{
+			name:   "case variant duplicate property",
+			source: []byte(strings.Replace(valid, `"description": "Route vendor submissions according to review policy."`, `"description": "first", "Description": "second"`, 1)),
+			code:   "source.schema",
+		},
+		{
+			name:   "lone high surrogate",
+			source: []byte(strings.Replace(valid, `"description": "Route vendor submissions according to review policy."`, `"description": "\ud800"`, 1)),
+			code:   "source.invalid_unicode",
+		},
+		{
+			name:   "lone low surrogate",
+			source: []byte(strings.Replace(valid, `"description": "Route vendor submissions according to review policy."`, `"description": "\udc00"`, 1)),
+			code:   "source.invalid_unicode",
+		},
+		{
 			name:   "trailing document",
 			source: []byte(valid + `{}`),
 			code:   "source.multiple_documents",
@@ -115,6 +135,14 @@ func TestParseYAMLRejectsUnsupportedFeatures(t *testing.T) {
 		{name: "boolean in string field", source: strings.Replace(validYAML(), "defaultOutcome: review", "defaultOutcome: true", 1), code: "source.schema"},
 		{name: "null optional description", source: strings.Replace(validYAML(), "name: example", "name: example\n  description:", 1), code: "source.schema"},
 		{name: "core decimal with leading zero", source: strings.Replace(validYAML(), "defaultOutcome: review", "defaultOutcome: 0777", 1), code: "source.schema"},
+		{name: "case variant property", source: strings.Replace(validYAML(), "kind: Policy", "Kind: Policy", 1), code: "source.schema"},
+		{name: "case variant duplicate property", source: strings.Replace(validYAML(), "name: example", "name: example\n  Name: second", 1), code: "source.schema"},
+		{name: "invalid explicit boolean", source: strings.Replace(validYAML(), "defaultOutcome: review", "defaultOutcome: !!bool yes", 1), code: "source.scalar"},
+		{name: "invalid explicit null", source: strings.Replace(validYAML(), "defaultOutcome: review", "defaultOutcome: !!null review", 1), code: "source.scalar"},
+		{name: "invalid explicit integer", source: strings.Replace(validYAML(), "defaultOutcome: review", "defaultOutcome: !!int 1.5", 1), code: "source.scalar"},
+		{name: "bare carriage return", source: strings.ReplaceAll(validYAML(), "\n", "\r"), code: "source.line_break"},
+		{name: "YAML 1.1 next-line character", source: strings.Replace(validYAML(), "The condition applies.", "The\u0085condition applies.", 1), code: "source.line_break"},
+		{name: "YAML 1.1 line separator", source: strings.Replace(validYAML(), "The condition applies.", "The\u2028condition applies.", 1), code: "source.line_break"},
 	}
 
 	for _, test := range tests {
@@ -126,7 +154,7 @@ func TestParseYAMLRejectsUnsupportedFeatures(t *testing.T) {
 }
 
 func TestParseYAMLUsesCoreSchemaStrings(t *testing.T) {
-	tests := []string{"yes", "on", "2026-09-22"}
+	tests := []string{"yes", "on", "2026-09-22", "tRUE", "nULL", "077legacy"}
 	for _, value := range tests {
 		t.Run(value, func(t *testing.T) {
 			source := strings.Replace(validYAML(), "name: example", "name: example\n  description: "+value, 1)
@@ -137,6 +165,45 @@ func TestParseYAMLUsesCoreSchemaStrings(t *testing.T) {
 			if artifact.Metadata.Description == nil || *artifact.Metadata.Description != value {
 				t.Fatalf("description = %v, want %q", artifact.Metadata.Description, value)
 			}
+		})
+	}
+}
+
+func TestParseYAMLNonSpecificTagForcesString(t *testing.T) {
+	source := strings.Replace(validYAML(), "name: example", "name: example\n  description: ! 123", 1)
+	artifact, err := Parse([]byte(source), FormatYAML)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if artifact.Metadata.Description == nil || *artifact.Metadata.Description != "123" {
+		t.Fatalf("description = %v, want 123", artifact.Metadata.Description)
+	}
+}
+
+func TestStructuralDepthAndNodeLimitBoundaries(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		parse  func([]byte) error
+		suffix string
+	}{
+		{name: "JSON", parse: validateJSONDocument, suffix: ""},
+		{name: "YAML", parse: func(source []byte) error { _, err := decodeYAMLDocument(source); return err }, suffix: "\n"},
+	} {
+		t.Run(test.name+" depth", func(t *testing.T) {
+			exact := []byte(strings.Repeat("[", MaxNestingDepth) + "null" + strings.Repeat("]", MaxNestingDepth) + test.suffix)
+			if err := test.parse(exact); err != nil {
+				t.Fatalf("exact depth error = %v", err)
+			}
+			over := []byte(strings.Repeat("[", MaxNestingDepth+1) + "null" + strings.Repeat("]", MaxNestingDepth+1) + test.suffix)
+			assertParseErrorCode(t, test.parse(over), "source.depth")
+		})
+		t.Run(test.name+" nodes", func(t *testing.T) {
+			exact := []byte("[" + strings.Repeat("null,", MaxParsedNodes-2) + "null]" + test.suffix)
+			if err := test.parse(exact); err != nil {
+				t.Fatalf("exact node count error = %v", err)
+			}
+			over := []byte("[" + strings.Repeat("null,", MaxParsedNodes-1) + "null]" + test.suffix)
+			assertParseErrorCode(t, test.parse(over), "source.nodes")
 		})
 	}
 }
@@ -160,11 +227,16 @@ func TestPolicySourceConformanceFixtures(t *testing.T) {
 		{name: "invalid-custom-tag.yaml", code: "source.tag"},
 		{name: "invalid-multiple-documents.yaml", code: "source.multiple_documents"},
 		{name: "invalid-nonfinite.yaml", code: "source.number"},
+		{name: "invalid-lone-surrogate.json", code: "source.invalid_unicode"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			source := readFixture(t, "conformance", "v0alpha1", "policy-source", test.name)
-			_, err := Parse(source, FormatYAML)
+			format := FormatYAML
+			if strings.HasSuffix(test.name, ".json") {
+				format = FormatJSON
+			}
+			_, err := Parse(source, format)
 			assertParseErrorCode(t, err, test.code)
 		})
 	}

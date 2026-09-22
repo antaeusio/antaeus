@@ -20,6 +20,13 @@ custom or non-JSON tags, anchors, aliases, merge keys, multiple documents,
 invalid UTF-8, unknown properties, null optional strings, and non-finite or
 unrepresentable numbers.
 
+Depth counts active object/array containers, including the root container;
+aggregate nodes count containers, scalar values, and mapping keys. The current
+YAML dependency composes a complete tree before the node/depth walk. The 1 MiB
+source cap bounds that allocation, and this is an accepted pre-release tradeoff;
+do not raise the cap or expose untrusted remote YAML parsing without replacing
+it with a streaming preflight or parser.
+
 Resolve untagged YAML scalars with YAML 1.2.2 core-schema rules instead of the
 parser library's legacy compatibility behavior. Convert the accepted tree to
 the JSON data model, decode the closed v0alpha1 artifact, run semantic

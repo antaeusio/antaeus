@@ -37,6 +37,7 @@ They must produce the exact UTF-8 bytes in `canonical/vendor-onboarding.canonica
 `policy-source/valid-core-scalars.yaml` confirms YAML 1.2 core-schema behavior
 for plain strings that YAML 1.1 parsers commonly misresolve. The invalid YAML
 fixtures cover duplicate and non-string keys, directives, tags, anchors,
-aliases, merge keys, multiple documents, and non-finite numbers. Generated
-tests cover invalid UTF-8 and the byte, depth, and aggregate-node limits. CI
+aliases, merge keys, multiple documents, non-finite numbers, and lone JSON
+surrogates. Generated tests cover invalid UTF-8, non-YAML-1.2 line breaks, and
+both sides of the byte, depth, and aggregate-node boundaries. CI
 remains network-free for all conformance cases.

@@ -30,7 +30,17 @@ Implementations must reject inputs exceeding any applicable limit before unbound
 | Reason codes per object | 16 |
 | Extensions per Decision | 32 |
 
+Nesting depth counts the active object/array container stack, including a root
+object or array; scalar leaves do not add a level. Aggregate parsed nodes count
+every object, array, scalar value, and object/mapping key. Implementations must
+accept inputs exactly at a published limit and reject inputs above it before
+typed evaluation.
+
 YAML authoring is restricted to one UTF-8 YAML 1.2.2 document representing the JSON data model. Duplicate or non-string keys, directives, custom tags, anchors, aliases, merge keys, multiple documents, invalid Unicode, non-finite numbers, and values outside these limits are rejected. JSON input rejects duplicate keys and trailing documents.
+
+Conformance fixtures define portable accept/reject behavior, not a portable
+error taxonomy. The Go `policy.ParseError.Code` values use the `source.*`
+namespace and are specific to the Go API.
 
 ## Canonical identity
 
