@@ -30,7 +30,7 @@ func loadCanonicalInput(path string) (json.RawMessage, error) {
 	if !utf8.Valid(source) {
 		return nil, fmt.Errorf("must contain valid UTF-8")
 	}
-	input := bytes.TrimSpace(source)
+	input := bytes.Trim(source, " \t\r\n")
 	if len(input) == 0 {
 		return nil, fmt.Errorf("must contain one canonical JSON object")
 	}

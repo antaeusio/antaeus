@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -29,8 +30,8 @@ Commands:
 `
 
 const (
-	localFixtureProfileDigest  = "sha256:0956d00418fadb9d1dd95aed13f5e0499093d47ae9d2550ac1cb8da611c0545f"
-	localFixtureProfileVersion = "v0alpha1"
+	localFixtureProfilePreimage = "antaeus.local.fixture/v0alpha1"
+	localFixtureProfileVersion  = "v0alpha1"
 )
 
 // Run executes the command and returns a process exit code.
@@ -86,7 +87,7 @@ func runEvaluate(args []string, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("evaluate", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	policyPath := flags.String("policy", "", "JSON or YAML policy file")
-	inputPath := flags.String("input", "", "canonical JSON input file")
+	inputPath := flags.String("input", "", "JSON object input file")
 	fixturePath := flags.String("fixture-set", "", "JSON fixture-set file")
 	caseName := flags.String("case", "", "fixture case name")
 	if err := flags.Parse(args); err != nil {
@@ -130,13 +131,18 @@ func runEvaluate(args []string, stdout, stderr io.Writer) int {
 		CanonicalInput: input,
 		Deadline:       time.Now().Add(30 * time.Second),
 		CorrelationID:  "cli-fixture-" + *caseName,
-		ProfileDigest:  localFixtureProfileDigest,
+		ProfileDigest:  localFixtureProfileDigest(),
 		ProfileVersion: localFixtureProfileVersion,
 	})
 	if err != nil {
 		return commandError(stderr, "evaluate", err)
 	}
 	return writeJSON(stdout, stderr, "evaluate", result)
+}
+
+func localFixtureProfileDigest() string {
+	digest := sha256.Sum256([]byte(localFixtureProfilePreimage))
+	return fmt.Sprintf("sha256:%x", digest)
 }
 
 func requiredFlags(values map[string]string) string {

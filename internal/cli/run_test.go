@@ -32,6 +32,18 @@ func TestRun(t *testing.T) {
 			wantStderr: "evaluate requires --policy, --input, --fixture-set, --case",
 		},
 		{
+			name:       "evaluate rejects unknown flag",
+			args:       []string{"evaluate", "--unknown"},
+			wantCode:   64,
+			wantStderr: "flag provided but not defined",
+		},
+		{
+			name:       "evaluate rejects positional argument",
+			args:       []string{"evaluate", "extra"},
+			wantCode:   64,
+			wantStderr: "does not accept positional arguments",
+		},
+		{
 			name:       "no arguments shows help",
 			wantCode:   0,
 			wantStdout: "Usage: antaeus <command>",
@@ -83,6 +95,13 @@ func TestRun(t *testing.T) {
 				t.Errorf("stderr = %q, want substring %q", stderr.String(), test.wantStderr)
 			}
 		})
+	}
+}
+
+func TestLocalFixtureProfileDigestHasDocumentedPreimage(t *testing.T) {
+	const want = "sha256:0956d00418fadb9d1dd95aed13f5e0499093d47ae9d2550ac1cb8da611c0545f"
+	if got := localFixtureProfileDigest(); got != want {
+		t.Fatalf("localFixtureProfileDigest() = %q, want %q", got, want)
 	}
 }
 
@@ -148,6 +167,59 @@ func TestRunEvaluateRejectsFixtureIdentityMismatch(t *testing.T) {
 	if stdout.Len() != 0 {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
+}
+
+func TestRunEvaluateConfigurationFailures(t *testing.T) {
+	tests := []struct {
+		name       string
+		policyPath string
+		caseName   string
+		want       string
+	}{
+		{
+			name:       "unknown case",
+			policyPath: contractPath("policy", "vendor-onboarding.yaml"),
+			caseName:   "missing",
+			want:       "fixture.case_missing",
+		},
+		{
+			name:       "invalid policy",
+			policyPath: writeCLIFile(t, "invalid.yaml", "kind: Policy\n"),
+			caseName:   "aggregate-analytics",
+			want:       "apiVersion",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			args := []string{
+				"evaluate",
+				"--policy", test.policyPath,
+				"--input", contractPath("input", "aggregate-analytics.json"),
+				"--fixture-set", contractPath("fixture-set", "quickstart.json"),
+				"--case", test.caseName,
+			}
+			if got := Run(args, &stdout, &stderr); got != 1 {
+				t.Fatalf("Run() = %d, want 1", got)
+			}
+			if stdout.Len() != 0 {
+				t.Fatalf("stdout = %q, want empty", stdout.String())
+			}
+			if !strings.Contains(stderr.String(), test.want) {
+				t.Fatalf("stderr = %q, want substring %q", stderr.String(), test.want)
+			}
+		})
+	}
+}
+
+func writeCLIFile(t *testing.T, name, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	return path
 }
 
 func contractPath(kind, name string) string {
