@@ -26,4 +26,10 @@ They must produce the exact UTF-8 bytes in `canonical/vendor-onboarding.canonica
 
 `reduction/cases.json` contains one policy plus ordered rule-result inputs and expected reduced outputs. Implementations must reproduce the specified outcome, required reason codes, and unresolved-rule failure exactly. The cases cover every precedence step, including matched deny over unresolved evidence and unresolved evidence over matched review.
 
+## Invalid fixture sets
+
+- `fixture-set/invalid-unknown-property.json` fails closed on an unknown rule-result property.
+- `fixture-set/invalid-bad-digest.json` rejects a non-digest policy identity.
+- `fixture-set/invalid-empty-rule-results.json` rejects a case without exact rule evidence.
+
 Additional YAML parser-restriction and resource-limit fixtures will land with the constrained YAML loader. CI remains network-free for all conformance cases.

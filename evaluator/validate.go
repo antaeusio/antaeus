@@ -107,6 +107,9 @@ func ValidateResult(request Request, result Result) error {
 	if result.Metadata.Mode == ModeDeterministicFixture && !result.Metadata.Synthetic {
 		return fmt.Errorf("deterministic fixture results must be synthetic")
 	}
+	if result.Metadata.Mode == ModeSemantic && result.Metadata.Synthetic {
+		return fmt.Errorf("semantic evaluator results cannot be marked synthetic")
+	}
 	if result.Metadata.Mode == ModeDeterministicFixture {
 		if err := validateNonBlank("fixture set", result.Metadata.FixtureSet, 64); err != nil {
 			return err

@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -257,13 +258,41 @@ func TestSetValidateRejectsInvalidData(t *testing.T) {
 }
 
 func TestParseRejectsUnknownFieldsAndTrailingJSON(t *testing.T) {
-	for _, source := range [][]byte{
-		[]byte(`{"apiVersion":"fixture.antaeus.io/v0alpha1","kind":"FixtureSet","metadata":{"name":"test","version":"v1"},"cases":[],"unknown":true}`),
-		append(readQuickstartSet(t), []byte(` {}`)...),
-	} {
-		if _, err := Parse(source); err == nil {
-			t.Fatal("Parse() error = nil, want strict decoding rejection")
-		}
+	tests := []struct {
+		name   string
+		mutate func(map[string]any)
+	}{
+		{name: "top level", mutate: func(document map[string]any) { document["unknown"] = true }},
+		{name: "metadata", mutate: func(document map[string]any) {
+			document["metadata"].(map[string]any)["unknown"] = true
+		}},
+		{name: "case", mutate: func(document map[string]any) {
+			document["cases"].([]any)[0].(map[string]any)["unknown"] = true
+		}},
+		{name: "rule result", mutate: func(document map[string]any) {
+			document["cases"].([]any)[0].(map[string]any)["ruleResults"].([]any)[0].(map[string]any)["unknown"] = true
+		}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var document map[string]any
+			if err := json.Unmarshal(readQuickstartSet(t), &document); err != nil {
+				t.Fatalf("decode valid fixture: %v", err)
+			}
+			test.mutate(document)
+			source, err := json.Marshal(document)
+			if err != nil {
+				t.Fatalf("encode mutated fixture: %v", err)
+			}
+			if _, err := Parse(source); err == nil {
+				t.Fatal("Parse() error = nil, want unknown-field rejection")
+			}
+		})
+	}
+
+	if _, err := Parse(append(readQuickstartSet(t), []byte(` {}`)...)); err == nil {
+		t.Fatal("Parse() error = nil, want trailing JSON rejection")
 	}
 }
 
@@ -287,9 +316,21 @@ func TestQuickstartFixtureMatchesContractExamples(t *testing.T) {
 	if err := json.Unmarshal(readContractFile(t, "request", "reference.json"), &decisionRequest); err != nil {
 		t.Fatalf("decode request example: %v", err)
 	}
-	canonicalInput, err := json.Marshal(decisionRequest.Input)
+	canonicalInput := json.RawMessage(`{"description":"Processes aggregate product events.","serviceCategory":"analytics"}`)
+	var canonicalValue any
+	if err := json.Unmarshal(canonicalInput, &canonicalValue); err != nil {
+		t.Fatalf("decode canonical input: %v", err)
+	}
+	var requestValue any
+	encodedRequestInput, err := json.Marshal(decisionRequest.Input)
 	if err != nil {
-		t.Fatalf("marshal canonical input: %v", err)
+		t.Fatalf("encode request input: %v", err)
+	}
+	if err := json.Unmarshal(encodedRequestInput, &requestValue); err != nil {
+		t.Fatalf("decode request input: %v", err)
+	}
+	if !reflect.DeepEqual(canonicalValue, requestValue) {
+		t.Fatalf("canonical fixture input does not match request example")
 	}
 	rules := make([]evaluator.Rule, len(artifact.Spec.Rules))
 	for i, rule := range artifact.Spec.Rules {

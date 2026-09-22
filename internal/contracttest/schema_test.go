@@ -68,6 +68,24 @@ func TestContractExamplesAgainstSchemas(t *testing.T) {
 			valid:    true,
 		},
 		{
+			name:     "fixture set unknown property",
+			schema:   "fixture-set.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "fixture-set", "invalid-unknown-property.json"),
+			valid:    false,
+		},
+		{
+			name:     "fixture set bad digest",
+			schema:   "fixture-set.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "fixture-set", "invalid-bad-digest.json"),
+			valid:    false,
+		},
+		{
+			name:     "fixture set empty rule results",
+			schema:   "fixture-set.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "fixture-set", "invalid-empty-rule-results.json"),
+			valid:    false,
+		},
+		{
 			name:     "unknown policy property",
 			schema:   "policy.schema.json",
 			instance: filepath.Join("conformance", "v0alpha1", "policy", "invalid-unknown-property.json"),

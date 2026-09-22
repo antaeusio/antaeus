@@ -33,7 +33,8 @@ type Evaluator interface {
 }
 
 // Request contains only provider-neutral evidence inputs. CanonicalInput must
-// be verified canonical JSON supplied by the caller.
+// be verified canonical JSON supplied by the caller, and Rules must be derived
+// in order from the same artifact identified by PolicyDigest.
 type Request struct {
 	PolicyName     string
 	PolicyDigest   string

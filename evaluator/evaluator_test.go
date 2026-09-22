@@ -51,6 +51,18 @@ func TestValidateResultRequiresSyntheticFixtureMarker(t *testing.T) {
 	}
 }
 
+func TestValidateResultRejectsSyntheticSemanticResult(t *testing.T) {
+	request := validRequest()
+	result := validResult()
+	result.Metadata.Mode = ModeSemantic
+	result.Metadata.Synthetic = true
+	result.Metadata.FixtureSet = ""
+	result.Metadata.FixtureVersion = ""
+	if err := ValidateResult(request, result); err == nil {
+		t.Fatal("ValidateResult() error = nil, want synthetic semantic rejection")
+	}
+}
+
 func TestInputDigestUsesExactCanonicalBytes(t *testing.T) {
 	request := validRequest()
 	got, err := request.InputDigest()
