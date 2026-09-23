@@ -180,6 +180,9 @@ func run(ctx context.Context, input Input, registry Registry, clock timing) (dec
 		if !ok || a.Evaluate == nil || a.Mode != entry.Mode || a.Protocol != entry.Protocol {
 			return decision.Decision{}, errors.New("routed adapter identity, mode, or protocol is unsupported")
 		}
+		if entry.Mode == profile.ModeDeterministicFixture && a.FixtureVersion != entry.Parameters["fixtureVersion"] {
+			return decision.Decision{}, errors.New("routed fixture version does not match the profile")
+		}
 		for _, capability := range entry.RequiredCapabilities {
 			if !slices.Contains(a.Capabilities, capability) {
 				return decision.Decision{}, errors.New("routed adapter lacks a required capability")
@@ -268,7 +271,7 @@ func (x *execution) metadata(e profile.Evaluator) evaluator.Metadata {
 	m := evaluator.Metadata{AdapterID: e.Adapter.ID, AdapterVersion: e.Adapter.Version, Mode: evaluator.Mode(e.Mode), Synthetic: e.Mode == profile.ModeDeterministicFixture, Provider: value(e.Provider), Model: value(e.Model)}
 	if m.Synthetic {
 		m.FixtureSet, _ = e.Parameters["fixtureSet"].(string)
-		m.FixtureVersion = x.registry[e.Adapter].FixtureVersion
+		m.FixtureVersion, _ = e.Parameters["fixtureVersion"].(string)
 	}
 	return m
 }
