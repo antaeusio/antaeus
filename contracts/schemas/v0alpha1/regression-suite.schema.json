@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://antaeus.io/contracts/v0alpha1/regression-suite.schema.json",
+  "title": "Antaeus RegressionSuite v0alpha1",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "policy", "fixtureSet", "cases"],
+  "properties": {
+    "apiVersion": {
+      "const": "regression.antaeus.io/v0alpha1"
+    },
+    "kind": {
+      "const": "RegressionSuite"
+    },
+    "metadata": {
+      "$ref": "#/$defs/versionedIdentity"
+    },
+    "policy": {
+      "type": "object",
+      "required": ["name", "digest"],
+      "properties": {
+        "name": {
+          "$ref": "common.schema.json#/$defs/policyName"
+        },
+        "digest": {
+          "$ref": "common.schema.json#/$defs/digest"
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "fixtureSet": {
+      "$ref": "#/$defs/versionedIdentity"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "versionedIdentity": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+        },
+        "version": {
+          "allOf": [
+            {
+              "$ref": "common.schema.json#/$defs/version"
+            },
+            {
+              "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+            }
+          ]
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "expectation": {
+      "type": "object",
+      "required": ["outcome", "reasonCodes"],
+      "properties": {
+        "outcome": {
+          "$ref": "common.schema.json#/$defs/decisionOutcome"
+        },
+        "reasonCodes": {
+          "$ref": "common.schema.json#/$defs/reasonCodes"
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "case": {
+      "type": "object",
+      "required": ["name", "fixtureCase", "input", "expect"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+        },
+        "fixtureCase": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+        },
+        "input": {
+          "type": "object"
+        },
+        "expect": {
+          "$ref": "#/$defs/expectation"
+        }
+      },
+      "unevaluatedProperties": false
+    }
+  },
+  "unevaluatedProperties": false
+}

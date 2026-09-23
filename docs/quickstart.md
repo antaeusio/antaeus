@@ -36,6 +36,20 @@ and prints one validated Decision JSON object. The Decision records
 `mode: deterministic-fixture`, `synthetic: true`, and the fixture identity so it
 cannot be confused with semantic evidence.
 
+Run the same synthetic fixture through the portable regression contract:
+
+```sh
+.tmp/bin/antaeus test \
+  --policy contracts/examples/v0alpha1/policy/vendor-onboarding.yaml \
+  --suite contracts/examples/v0alpha1/regression-suite/quickstart.json \
+  --fixture-set contracts/examples/v0alpha1/fixture-set/quickstart.json
+```
+
+This command prints a `RegressionResultSet`. A matching suite exits zero;
+expectation mismatches still print the complete result set and exit two.
+Configuration, loading, evaluator, and output errors exit one without a result
+set.
+
 An identity mismatch is an error. To add a local case, canonicalize the intended
 input, record its SHA-256 digest and the policy digest in a FixtureSet, then
 provide exact normalized rule results in policy order.

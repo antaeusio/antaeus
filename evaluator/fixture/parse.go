@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/antaeusio/antaeus/internal/exactjson"
 )
 
 const MaxSourceBytes = 1 << 20
@@ -54,12 +56,12 @@ func Parse(data []byte) (Set, error) {
 }
 
 func validateExactFixtureKeys(data []byte) error {
-	root, err := decodeExactObject(data, "fixture set", []string{"apiVersion", "kind", "metadata", "cases"})
+	root, err := exactjson.DecodeObject(data, "fixture set", []string{"apiVersion", "kind", "metadata", "cases"})
 	if err != nil {
 		return err
 	}
 	if metadata, exists := root["metadata"]; exists {
-		if _, err := decodeExactObject(metadata, "metadata", []string{"name", "version"}); err != nil {
+		if _, err := exactjson.DecodeObject(metadata, "metadata", []string{"name", "version"}); err != nil {
 			return err
 		}
 	}
@@ -69,7 +71,7 @@ func validateExactFixtureKeys(data []byte) error {
 			return fmt.Errorf("decode fixture cases: %w", err)
 		}
 		for i, encodedCase := range cases {
-			fixtureCase, err := decodeExactObject(encodedCase, fmt.Sprintf("case %d", i), []string{"name", "policyName", "policyDigest", "inputDigest", "ruleResults"})
+			fixtureCase, err := exactjson.DecodeObject(encodedCase, fmt.Sprintf("case %d", i), []string{"name", "policyName", "policyDigest", "inputDigest", "ruleResults"})
 			if err != nil {
 				return err
 			}
@@ -79,7 +81,7 @@ func validateExactFixtureKeys(data []byte) error {
 					return fmt.Errorf("decode case %d rule results: %w", i, err)
 				}
 				for resultIndex, encodedResult := range results {
-					if _, err := decodeExactObject(encodedResult, fmt.Sprintf("case %d rule result %d", i, resultIndex), []string{"ruleId", "status", "confidence", "reasonCodes", "message"}); err != nil {
+					if _, err := exactjson.DecodeObject(encodedResult, fmt.Sprintf("case %d rule result %d", i, resultIndex), []string{"ruleId", "status", "confidence", "reasonCodes", "message"}); err != nil {
 						return err
 					}
 				}
@@ -87,57 +89,4 @@ func validateExactFixtureKeys(data []byte) error {
 		}
 	}
 	return nil
-}
-
-func decodeExactObject(data []byte, name string, allowedKeys []string) (map[string]json.RawMessage, error) {
-	allowed := make(map[string]struct{}, len(allowedKeys))
-	for _, key := range allowedKeys {
-		allowed[key] = struct{}{}
-	}
-
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	opening, err := decoder.Token()
-	if err != nil {
-		return nil, fmt.Errorf("decode %s: %w", name, err)
-	}
-	if delimiter, ok := opening.(json.Delim); !ok || delimiter != '{' {
-		return nil, fmt.Errorf("decode %s: expected object", name)
-	}
-	values := make(map[string]json.RawMessage, len(allowedKeys))
-	for decoder.More() {
-		token, err := decoder.Token()
-		if err != nil {
-			return nil, fmt.Errorf("decode %s property: %w", name, err)
-		}
-		key, ok := token.(string)
-		if !ok {
-			return nil, fmt.Errorf("decode %s: property name is not a string", name)
-		}
-		if _, exists := allowed[key]; !exists {
-			return nil, fmt.Errorf("decode %s: unknown property %q", name, key)
-		}
-		if _, exists := values[key]; exists {
-			return nil, fmt.Errorf("decode %s: duplicate property %q", name, key)
-		}
-		var value json.RawMessage
-		if err := decoder.Decode(&value); err != nil {
-			return nil, fmt.Errorf("decode %s property %q: %w", name, key, err)
-		}
-		values[key] = value
-	}
-	closing, err := decoder.Token()
-	if err != nil {
-		return nil, fmt.Errorf("decode %s: %w", name, err)
-	}
-	if delimiter, ok := closing.(json.Delim); !ok || delimiter != '}' {
-		return nil, fmt.Errorf("decode %s: expected closing object", name)
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); err != io.EOF {
-		if err == nil {
-			return nil, fmt.Errorf("decode %s: trailing JSON value", name)
-		}
-		return nil, fmt.Errorf("decode %s trailing data: %w", name, err)
-	}
-	return values, nil
 }
