@@ -110,6 +110,11 @@ and duplicate properties are rejected before typed decoding.
 
 ## Evaluator profiles
 
+Local runners select profiles and credential references using the
+[local configuration precedence rules](../docs/local-configuration.md).
+The Go resolver operates on validated artifacts; CLI discovery and persistent
+project trust are not yet implemented.
+
 `evaluator-profile.schema.json` defines the immutable, non-secret mechanics for
 obtaining evaluator evidence. A profile declares bounded total and per-attempt
 timeouts, credential slot names, evaluator adapter and protocol identities,
