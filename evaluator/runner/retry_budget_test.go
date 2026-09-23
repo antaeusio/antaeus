@@ -28,7 +28,9 @@ func TestRetryBudgetBoundaries(t *testing.T) {
 		{"no fallback", 50 * time.Millisecond, false, "", []string{"semantic-primary"}, "evaluator.timeout", 0, 1},
 		{"deadline exhausted", 0, true, "", []string{"semantic-primary"}, "evaluation.deadline_exceeded", 0, 0},
 		{"cancel during jitter", 50 * time.Millisecond, true, "cancel", []string{"semantic-primary"}, "evaluation.cancelled", 0, 1},
+		{"cancel during jitter without fallback", 50 * time.Millisecond, false, "cancel", []string{"semantic-primary"}, "evaluation.cancelled", 0, 1},
 		{"deadline during jitter wins cancellation", 50 * time.Millisecond, true, "both", []string{"semantic-primary"}, "evaluation.deadline_exceeded", 0, 1},
+		{"deadline during jitter without fallback", 50 * time.Millisecond, false, "both", []string{"semantic-primary"}, "evaluation.deadline_exceeded", 0, 1},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			in := inputFixture(t)
