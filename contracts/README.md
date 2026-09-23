@@ -173,22 +173,25 @@ part of this artifact. An artifact that exists contains at least one adapter
 and one slot binding, and both dimensions are bounded to 16 entries.
 
 The variable name is configuration metadata, not a credential value, but may
-still reveal sensitive inventory. Normal output identifies only the adapter,
-slot, and source class. It does not print the variable name or value. Runtimes
-resolve only slots required by the selected profile, read the named variable
-from the existing process environment, and do not discover `.env` files,
-inspect unrelated environment variables, or walk directories to discover a
-bindings artifact. Local bindings are loaded only from an explicitly supplied
-path.
+still reveal sensitive inventory. Output may identify only the adapter, slot,
+and source class. No output mode—including verbose, debug, and error output—
+prints the variable name or value. Runtimes inspect only references used by
+evaluators in the selected profile's configured route and do not discover
+`.env` files, inspect unrelated environment variables, or walk directories to
+discover a bindings artifact. Local bindings are loaded only from an explicitly
+supplied path.
 
-An unbound slot referenced by an evaluator in the selected profile's configured
-route, and an unset or zero-length referenced variable, are the same
-pre-evaluation missing-credential configuration error. They are not retried,
-do not trigger evaluator fallback, and never print the reference name or a
-candidate value. Environment values are passed to the selected adapter as
-exact bytes; whitespace is not trimmed, and a whitespace-only non-empty value
-is therefore not treated as missing. Bindings for the deterministic fixture
-adapter are invalid.
+Immediately before evaluation starts, the runtime reads every reference used by
+the configured route exactly once and captures each non-empty value for that
+evaluation. It supplies a captured value only if its evaluator is invoked and
+releases all captured values when the evaluation ends. An unbound routed slot
+and an unset or zero-length referenced variable are the same missing-credential
+configuration error. The CLI reports it before evaluation; an HTTP service
+rejects it before accepting an evaluation and does not create a Decision. It is
+not retried and does not trigger evaluator fallback. Environment values are
+captured and passed as exact bytes; whitespace is not trimmed, and a
+whitespace-only non-empty value is therefore not treated as missing. Bindings
+for the deterministic fixture adapter are invalid.
 
 Local secret bindings use the same constrained JSON or YAML authoring rules,
 1 MiB source limit, nesting and aggregate-node bounds, duplicate-key rejection,
@@ -199,7 +202,11 @@ adapter ID and that evaluator's `credentialSlot`, which must also appear in the
 profile's `credentialSlots`. Bindings for adapters or slots not referenced by
 the selected profile's configured route are ignored and never resolved.
 Within the syntactic pattern, v0 does not restrict which process environment
-variable may be referenced.
+variable may be referenced. Selecting the explicit bindings file grants it
+authority to name process variables for the routed adapters, so operators must
+review it as sensitive local configuration even though it contains no values.
+Variable lookup follows host process semantics; portable configurations must
+not depend on environment names that differ only by letter case.
 
 ## Regression suites
 

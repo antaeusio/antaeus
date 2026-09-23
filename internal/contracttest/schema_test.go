@@ -234,6 +234,12 @@ func TestLocalSecretBindingsSchemaRejectsInvalidCombinations(t *testing.T) {
 		{name: "invalid slot ID", mutate: func(document map[string]any) {
 			document["secretBindings"] = map[string]any{"io.example.semantic": map[string]any{"Provider": environmentReference()}}
 		}},
+		{name: "slot ID too long", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"io.example.semantic": map[string]any{"s" + strings.Repeat("a", 64): environmentReference()}}
+		}},
+		{name: "uppercase adapter ID", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"Io.Example.Semantic": oneSlotBinding()}
+		}},
 		{name: "missing reference name", mutate: func(document map[string]any) {
 			document["secretBindings"] = map[string]any{"io.example.semantic": map[string]any{"provider-api-key": map[string]any{"source": "environment"}}}
 		}},
@@ -302,7 +308,7 @@ func TestLocalSecretBindingsSchemaAcceptsIdentifierLimits(t *testing.T) {
 		"kind":       "LocalSecretBindings",
 		"secretBindings": map[string]any{
 			"io." + strings.Repeat("a", 125): map[string]any{
-				"provider-api-key": map[string]any{
+				"s" + strings.Repeat("a", 63): map[string]any{
 					"source": "environment",
 					"name":   "K" + strings.Repeat("A", 127),
 				},

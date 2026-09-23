@@ -23,16 +23,24 @@ Resolve only references used by evaluators in the selected profile's configured
 route. A usable binding is the tuple of that evaluator's adapter ID and its
 `credentialSlot`, which must also be declared by the profile. Ignore and never
 resolve bindings for adapters or slots outside the selected route. Read a
-referenced variable from the existing process environment as late as possible,
-and do not scan parent directories, load `.env` files, or inspect unrelated
+referenced variable from the existing process environment immediately before
+evaluation starts. Read every configured-route reference exactly once and
+capture each non-empty value for that evaluation. Pass a captured value only if
+its evaluator is invoked, then release all captured values when evaluation
+ends. Do not scan parent directories, load `.env` files, or inspect unrelated
 variables.
 Load a bindings artifact only from an explicit path; do not discover it through
 a directory walk. Treat an unbound routed slot and an unset or zero-length
 variable as the same pre-evaluation missing-credential configuration error,
 without retry or fallback. Pass non-empty values unmodified; do not trim
 whitespace.
-Ordinary output and logs may identify the adapter, slot, and source class, but
-must redact the environment-variable name and value.
+The CLI reports this configuration error without starting evaluation; a service
+rejects it before accepting an evaluation and creates no Decision. Output in
+every mode may identify the adapter, slot, and source class, but must never
+print the environment-variable name or value. Selecting an explicit bindings
+file grants it authority to reference process variables for routed adapters;
+operators must review it as sensitive local configuration. Portable bindings
+must not rely on variable names that differ only by letter case.
 
 ## Rationale
 
