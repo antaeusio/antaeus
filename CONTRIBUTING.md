@@ -20,6 +20,58 @@ Antaeus is in early implementation, with policy validation, deterministic fixtur
 - Use `scripts/build` for a local binary and `scripts/cross-build` for the supported target matrix. These entry points acquire `scripts/with-build-lock`; do not invoke underlying build commands directly in a shared checkout.
 - Do not claim checks passed unless you ran them.
 
+## Local contribution workflow
+
+You do not need an Antaeus account, a hosted-service subscription, provider API
+keys, or access to a private repository to build, test, or contribute to this
+repository. Do not create an `.env` file for the workflow below. GitHub access
+is needed to submit an issue or pull request, not to run the local checks.
+
+Install Git, Go and ShellCheck so they are available on `PATH`. The commands
+below use a POSIX shell on macOS or Linux; Windows contributors can use a Linux
+environment in WSL. This does not claim native Windows validation of these shell
+scripts. The Go versions above match the current module and CI; CI pins
+ShellCheck 0.11.0. Cloning and initial tool/module downloads require network
+access. Once provisioned, the ordinary tests use local synthetic fixtures, not
+provider services; the vulnerability scan separately needs the live advisory
+database as described below.
+
+Start with a clone of the public repository:
+
+```sh
+git clone https://github.com/antaeusio/antaeus.git
+cd antaeus
+scripts/check
+scripts/build
+.tmp/bin/antaeus version
+.tmp/bin/antaeus validate contracts/examples/v0alpha1/policy/vendor-onboarding.yaml
+```
+
+`scripts/check` checks formatting and shell scripts, runs `go vet`, and runs the
+Go test suite. It owns the build lock: do not wrap it in another lock. Build
+outputs stay under ignored `.tmp/`. Continue with the
+[local fixture quickstart](./docs/quickstart.md) to evaluate a named synthetic
+case and run a regression suite; neither step requires a credential or makes a
+semantic model call.
+
+For a focused change, run the relevant package through the lock before the
+complete checks, for example:
+
+```sh
+scripts/with-build-lock go test -count=1 ./evaluator/runner
+```
+
+Changes to execution-text validation also need the
+[native JavaScript conformance check](./scripts/check-text-conformance.mjs):
+`node scripts/check-text-conformance.mjs` (CI uses Node 24.21.0). Run build and
+test commands sequentially in a shared checkout, including when a reviewer is
+working there.
+
+Use synthetic inputs in new tests and report the commands actually run in the
+pull request. Missing provider access is not a reason to skip the local checks.
+Contract changes must follow the [compatibility rules](./docs/compatibility.md);
+do not edit a published schema version to make a failing test pass.
+
 ## Automated validation
 
 Pull requests and pushes to `main` run the [Go validation workflow](./.github/workflows/validate.yml).
