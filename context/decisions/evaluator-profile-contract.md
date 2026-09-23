@@ -29,6 +29,9 @@ credential-free, and prohibited from enforcement routes. A v0 profile cannot
 mix semantic and deterministic-fixture evaluators. Eligible operational
 failures from either a primary or an invoked escalation continue into the
 ordered fallback list.
+A fallback after primary failure evaluates all rules. A fallback after
+escalation failure evaluates only the escalated rule results, preserving
+accepted primary results.
 
 Reserve `json-input`, `structured-rule-results`, and `confidence-scores` as v0
 capability IDs. Confidence thresholds apply per rule, missing confidence counts
@@ -43,7 +46,8 @@ cannot recurse into another escalation.
 Profiles never contain credential values, environment-variable names, hosted
 secret identifiers, or ambient behavior overrides. Adapter-specific parameters
 must validate against the schema registered for the exact adapter ID and
-version. The common schema closes the built-in fixture adapter parameters.
+version. The evaluator-profile schema closes the built-in fixture adapter
+parameters.
 Implementations additionally enforce relational invariants—unique IDs, valid
 references, acyclicity, route-position uniqueness, deadline consistency, and
 capability-backed confidence—because JSON Schema cannot express the full graph.

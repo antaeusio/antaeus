@@ -120,20 +120,22 @@ eligible transient classes. `maxAttempts` includes the first attempt; one
 attempt has an empty `retryOn` list and no backoff fields, while multiple
 attempts require at least one class plus explicit initial backoff, maximum
 backoff, and multiplier values. An invoked escalation that ends in an eligible
-operational failure continues into the configured fallback list. Invalid input, unsupported
-capability, malformed configuration, missing or rejected credentials, and
-deterministic request failures are not retryable.
+operational failure continues into the configured fallback list. Invalid input,
+unsupported capability, malformed configuration, missing or rejected
+credentials, and deterministic request failures are not retryable.
+A fallback invoked after primary failure evaluates every rule. A fallback
+invoked after escalation failure evaluates only the rules sent to escalation;
+accepted primary results remain unchanged.
 
 V0 reserves `json-input`, `structured-rule-results`, and `confidence-scores`
 as capability IDs. When confidence routing is enabled, every routed evaluator
-must declare `confidence-scores`. The threshold applies
-independently to each rule result; missing confidence is treated as below the
+must declare `confidence-scores`. The threshold applies independently to each
+rule result; missing confidence is treated as below the
 threshold. Escalation evaluates only primary results below the threshold;
 primary results at or above it remain unchanged, while escalation evidence
 replaces the below-threshold results. Only primary evidence can trigger
-escalation. Low or missing
-confidence from escalation or fallback evidence remains `indeterminate` and
-never triggers another escalation.
+escalation. Low or missing confidence from escalation or fallback evidence
+remains `indeterminate` and never triggers another escalation.
 
 Profiles contain logical credential slot names, never secret values,
 environment-variable names, hosted secret identifiers, or arbitrary endpoint
