@@ -1,7 +1,7 @@
 {
   "apiVersion": "evaluator.antaeus.io/v0alpha1",
   "kind": "EvaluatorProfile",
-  "metadata": {"name": "bad-terminal"},
+  "metadata": {"name": "bad-terminal-failure"},
   "spec": {
     "totalTimeoutMs": 2000,
     "credentialSlots": [],
@@ -21,7 +21,7 @@
       "primary": "fixture-primary",
       "fallbacks": [],
       "confidence": {"enabled": false},
-      "terminal": {"onIndeterminate": "review", "onFailure": "failure"}
+      "terminal": {"onIndeterminate": "failure", "onFailure": "allow"}
     }
   }
 }

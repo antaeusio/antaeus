@@ -14,7 +14,7 @@
         "requiredCapabilities": ["json-input"],
         "timeoutMs": 1000,
         "retry": {"maxAttempts": 1, "retryOn": []},
-        "parameters": {"endpoint": "https://internal.invalid"}
+        "parameters": {"fixtureSet": "quickstart", "fixtureVersion": "v1"}
       }
     ],
     "routing": {

@@ -115,10 +115,19 @@ func TestEvaluatorProfileSchemaRejectsInvalidCombinations(t *testing.T) {
 		}},
 		{name: "timeout below bound", mutate: func(_ map[string]any, evaluator, _ map[string]any) { evaluator["timeoutMs"] = float64(0) }},
 		{name: "retry count above bound", mutate: func(_ map[string]any, evaluator, _ map[string]any) {
-			evaluator["retry"].(map[string]any)["maxAttempts"] = float64(6)
+			retry := evaluator["retry"].(map[string]any)
+			retry["maxAttempts"] = float64(6)
+			retry["retryOn"] = []any{"timeout"}
+			retry["initialBackoffMs"] = float64(100)
+			retry["maxBackoffMs"] = float64(1000)
+			retry["multiplier"] = float64(2)
 		}},
 		{name: "retry missing class", mutate: func(_ map[string]any, evaluator, _ map[string]any) {
-			evaluator["retry"].(map[string]any)["maxAttempts"] = float64(2)
+			retry := evaluator["retry"].(map[string]any)
+			retry["maxAttempts"] = float64(2)
+			retry["initialBackoffMs"] = float64(100)
+			retry["maxBackoffMs"] = float64(1000)
+			retry["multiplier"] = float64(2)
 		}},
 		{name: "retry class without retry", mutate: func(_ map[string]any, evaluator, _ map[string]any) {
 			evaluator["retry"].(map[string]any)["retryOn"] = []any{"timeout"}
@@ -162,6 +171,27 @@ func TestEvaluatorProfileSchemaRejectsInvalidCombinations(t *testing.T) {
 				t.Fatal("schema Validate() error = nil, want rejection")
 			}
 		})
+	}
+}
+
+func TestEvaluatorProfileSchemaAcceptsConfidenceWithoutEscalation(t *testing.T) {
+	schema, err := newCompiler(t).Compile(schemaBase + "evaluator-profile.schema.json")
+	if err != nil {
+		t.Fatalf("compile evaluator profile schema: %v", err)
+	}
+	data, err := os.ReadFile(contractsPath(filepath.Join("examples", "v0alpha1", "evaluator-profile", "semantic-routing.json")))
+	if err != nil {
+		t.Fatalf("read semantic profile: %v", err)
+	}
+	var document map[string]any
+	if err := json.Unmarshal(data, &document); err != nil {
+		t.Fatalf("decode semantic profile: %v", err)
+	}
+	routing := document["spec"].(map[string]any)["routing"].(map[string]any)
+	delete(routing, "escalation")
+	routing["confidence"].(map[string]any)["onLowConfidence"] = "indeterminate"
+	if err := schema.Validate(document); err != nil {
+		t.Fatalf("Validate() error = %v", err)
 	}
 }
 
@@ -252,6 +282,12 @@ func TestContractExamplesAgainstSchemas(t *testing.T) {
 			name:     "evaluator profile terminal outcome",
 			schema:   "evaluator-profile.schema.json",
 			instance: filepath.Join("conformance", "v0alpha1", "evaluator-profile", "invalid-terminal-outcome.json"),
+			valid:    false,
+		},
+		{
+			name:     "evaluator profile terminal failure",
+			schema:   "evaluator-profile.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "evaluator-profile", "invalid-terminal-failure.json"),
 			valid:    false,
 		},
 		{

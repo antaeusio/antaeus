@@ -43,7 +43,7 @@
         "mode": "semantic",
         "adapter": {"id": "io.example.semantic", "version": "1.0.0"},
         "protocol": {"id": "io.antaeus.rule-match", "version": "v0alpha1"},
-        "requiredCapabilities": ["json-input", "structured-rule-results"],
+        "requiredCapabilities": ["json-input", "structured-rule-results", "confidence-scores"],
         "timeoutMs": 2000,
         "retry": {"maxAttempts": 1, "retryOn": []},
         "provider": "example",

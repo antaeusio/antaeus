@@ -125,10 +125,13 @@ capability, malformed configuration, missing or rejected credentials, and
 deterministic request failures are not retryable.
 
 V0 reserves `json-input`, `structured-rule-results`, and `confidence-scores`
-as capability IDs. Confidence routing requires `confidence-scores` on the
-primary and, when configured, the escalation evaluator. The threshold applies
+as capability IDs. When confidence routing is enabled, every routed evaluator
+must declare `confidence-scores`. The threshold applies
 independently to each rule result; missing confidence is treated as below the
-threshold. Only primary evidence can trigger escalation. Low or missing
+threshold. Escalation evaluates only primary results below the threshold;
+primary results at or above it remain unchanged, while escalation evidence
+replaces the below-threshold results. Only primary evidence can trigger
+escalation. Low or missing
 confidence from escalation or fallback evidence remains `indeterminate` and
 never triggers another escalation.
 

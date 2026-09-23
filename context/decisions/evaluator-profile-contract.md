@@ -33,7 +33,10 @@ ordered fallback list.
 Reserve `json-input`, `structured-rule-results`, and `confidence-scores` as v0
 capability IDs. Confidence thresholds apply per rule, missing confidence counts
 as below threshold, and only primary evidence can trigger the one escalation.
-The primary and escalation must declare `confidence-scores`. Low or missing
+When confidence routing is enabled, every routed evaluator must declare
+`confidence-scores`. Escalation re-evaluates only below-threshold primary rule
+results; accepted primary results remain unchanged and escalation evidence
+replaces only the re-evaluated results. Low or missing
 confidence from escalation or fallback evidence remains indeterminate and
 cannot recurse into another escalation.
 
