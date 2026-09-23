@@ -88,6 +88,17 @@ The other invalid fixtures cover unknown properties and present descriptions
 that are null, empty, or whitespace-only across the portable Unicode whitespace
 set, plus a whitespace-only suite version.
 
+## Execution metadata text
+
+`text/whitespace.json` distinguishes the published ECMA-262 nonblank patterns
+from explicit Unicode-whitespace patterns used by other artifact fields. Cases
+include every whitespace code point in either set, mixed text, U+0085/U+FEFF,
+controls and astral characters. Go result, Decision, runner and schema tests
+consume them. `node scripts/check-text-conformance.mjs` independently checks
+selected actual string subschemas using native JavaScript patterns and verifies
+code-point bounds; it is not a full JSON Schema validator. See the
+[field inventory and migration](../../../docs/execution-text.md).
+
 ## Policy source parsing
 
 `policy-source/valid-core-scalars.yaml` confirms YAML 1.2 core-schema behavior

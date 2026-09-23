@@ -7,6 +7,9 @@ confidence: high
 source_refs:
   - evaluator/evaluator.go
   - evaluator/decide.go
+  - evaluator/runner/runner.go
+  - docs/profile-execution.md
+  - docs/execution-text.md
   - evaluator/fixture/fixture.go
   - contracts/schemas/v0alpha1/fixture-set.schema.json
   - contracts/examples/v0alpha1/fixture-set/quickstart.json
@@ -29,12 +32,19 @@ matched rule's policy-authored outcome, applies the portable deterministic
 reducer, and validates the complete Decision against that artifact. Fixture
 identity, mode, and the synthetic marker remain visible in Decision metadata.
 This single-attempt runner returns configuration, adapter, cancellation, and
-deadline errors to its caller. The future evaluator-profile router owns retries
+deadline errors to its caller. The separate `evaluator/runner` profile router owns retries
 and conversion of exhausted accepted evaluations into failed rule evidence and
 a typed failure Decision; transports must not invent a policy judgment from an
 error. Evaluator implementations must honor context cancellation and return
 promptly when the context is done; the runner remains synchronous and does not
 detach adapter goroutines.
+
+Keep execution metadata aligned with its field-specific portable text rules.
+Do not apply one language's whitespace predicate globally: trace text and
+Decision adapter/fixture versions use ECMA-262 nonblank patterns, while authored
+profile and regression fields retain their explicit Unicode-whitespace rules.
+Preserve exact accepted text and code-point limits, and test both Go and native
+JavaScript interpretations without modifying published schemas.
 
 Provide a visibly synthetic deterministic fixture adapter for offline tests and
 quickstarts. A versioned FixtureSet maps a named case plus exact policy and input

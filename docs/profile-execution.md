@@ -216,6 +216,10 @@ classified adapter error stays unresolved and is not an operational retry signal
 
 ## Adapter boundary and audit data
 
+Execution metadata follows the [field-specific text rules and migration](./execution-text.md).
+Do not substitute Go's whitespace classification or requested-model identifiers
+for the published resolved-text pattern.
+
 An installed adapter declares its mode, protocol, capabilities, parameter
 validator, and synchronous Evaluate function. Fixture registrations also declare
 the fixture version. Adapter configuration and evidence-request buffers are

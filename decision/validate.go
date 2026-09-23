@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/antaeusio/antaeus/internal/textvalue"
 )
 
 var (
@@ -183,7 +185,7 @@ func (e Evaluator) validate(path string) error {
 	if err := validateBoundedNonBlank(path+".adapter", e.Adapter, 128); err != nil {
 		return err
 	}
-	if err := validateBoundedNonBlank(path+".adapterVersion", e.AdapterVersion, 128); err != nil {
+	if err := validateExecutionText(path+".adapterVersion", e.AdapterVersion, 128); err != nil {
 		return err
 	}
 	if !e.Mode.Valid() {
@@ -202,7 +204,7 @@ func (e Evaluator) validate(path string) error {
 		if e.FixtureVersion == nil {
 			return invalid(path+".fixtureVersion", "fixture_version.missing", "is required for deterministic fixture results")
 		}
-		if err := validateBoundedNonBlank(path+".fixtureVersion", *e.FixtureVersion, 128); err != nil {
+		if err := validateExecutionText(path+".fixtureVersion", *e.FixtureVersion, 128); err != nil {
 			return err
 		}
 	} else {
@@ -217,12 +219,12 @@ func (e Evaluator) validate(path string) error {
 		}
 	}
 	if e.Provider != "" {
-		if err := validateBoundedNonBlank(path+".provider", e.Provider, 128); err != nil {
+		if err := validateExecutionText(path+".provider", e.Provider, 128); err != nil {
 			return err
 		}
 	}
 	if e.Model != "" {
-		if err := validateBoundedNonBlank(path+".model", e.Model, 256); err != nil {
+		if err := validateExecutionText(path+".model", e.Model, 256); err != nil {
 			return err
 		}
 	}
@@ -270,6 +272,13 @@ func validateMessage(path, message string) error {
 func validateBoundedNonBlank(path, value string, maxRunes int) error {
 	if !utf8.ValidString(value) || strings.TrimSpace(value) == "" || utf8.RuneCountInString(value) > maxRunes {
 		return invalid(path, "string.invalid", fmt.Sprintf("must contain 1 to %d non-whitespace Unicode code points", maxRunes))
+	}
+	return nil
+}
+
+func validateExecutionText(path, value string, maxRunes int) error {
+	if !textvalue.ValidECMAText(value, maxRunes) {
+		return invalid(path, "string.invalid", fmt.Sprintf("must contain 1 to %d Unicode code points including non-whitespace ECMA-262 text", maxRunes))
 	}
 	return nil
 }

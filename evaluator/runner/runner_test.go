@@ -16,6 +16,7 @@ import (
 	"github.com/antaeusio/antaeus/evaluator"
 	"github.com/antaeusio/antaeus/evaluator/localbinding"
 	"github.com/antaeusio/antaeus/evaluator/profile"
+	"github.com/antaeusio/antaeus/internal/schematest"
 	"github.com/antaeusio/antaeus/policy"
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
 )
@@ -102,6 +103,7 @@ func traceSchema(t *testing.T) *jsonschema.Schema {
 		t.Fatal(err)
 	}
 	compiler := jsonschema.NewCompiler()
+	compiler.UseRegexpEngine(schematest.CompilePattern)
 	const schemaURL = "https://antaeus.io/contracts/v0alpha1/execution-trace.schema.json"
 	if err := compiler.AddResource(schemaURL, schemaDocument); err != nil {
 		t.Fatal(err)
