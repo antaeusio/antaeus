@@ -112,6 +112,9 @@ and duplicate properties are rejected before typed decoding.
 
 ## Evaluator profiles
 
+For the implemented Go evidence interface, registration and execution-layer
+boundaries, see the [evaluator and adapter guide](../docs/evaluator-adapters.md).
+
 The Go [profile runner](../docs/profile-execution.md) executes validated profiles
 and adds `io.antaeus.execution` Decision extensions conforming to
 `execution-trace.schema.json`. It caps the complete evaluation at 64 attempts,

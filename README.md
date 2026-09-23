@@ -37,6 +37,10 @@ the installed synthetic fixture through an explicitly selected evaluator profile
 with configuration precedence and a bounded execution trace. Remote adapters are
 not installed, and this path reads no credentials.
 
+For Go embedding and adapter authors, the [evaluator guide](./docs/evaluator-adapters.md)
+explains normalized evidence, registration and execution boundaries, with an
+executable fixture-backed example.
+
 The language-neutral [portable contracts](./contracts/README.md) contain the authoritative JSON Schemas, OpenAPI description, examples, and conformance fixtures. The public `policy` package strictly loads constrained YAML 1.2 or JSON before validation, canonicalization, and digesting; `decision` implements typed invariants and deterministic reduction. The `evaluator` package defines normalized evidence exchange and can assemble a validated Decision from one evaluation, while `evaluator/fixture` provides an exact, network-free synthetic adapter. The `regression` package runs identity-bound named cases through that same path; see the [local fixture quickstart](./docs/quickstart.md).
 
 Run checks and build the development command through the repository-owned build lock:
