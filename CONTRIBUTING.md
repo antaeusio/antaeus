@@ -33,8 +33,12 @@ hashes; the ShellCheck release archive is checksum-verified before execution.
 
 CI uses read-only repository permissions, does not retain checkout credentials,
 and requires no provider secrets. Tests use local fixtures rather than evaluator
-services; dependency/tool downloads are allowed. The scripts keep their local
-build-lock protection even in isolated CI checkouts.
+services; dependency/tool downloads are allowed during provisioning. Check,
+race and cross-build steps then disable the module proxy and require read-only
+module resolution. This is not a network sandbox for test code. The scripts
+keep their local build-lock protection even in isolated CI checkouts. New PR
+revisions cancel superseded PR runs; main pushes have distinct concurrency
+groups so they neither cancel running commits nor replace pending commits.
 
 This workflow does not publish artifacts or deploy anything. Cross-compilation
 is not native artifact smoke testing. Vulnerability scanning and release

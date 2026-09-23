@@ -9,8 +9,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: go-validation-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: go-validation-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:
@@ -39,6 +39,7 @@ jobs:
         env:
           EXPECTED_GO_VERSION: ${{ matrix.go }}
         run: |
+          test "$(go env GOTOOLCHAIN)" = local
           test "$(go env GOVERSION)" = "go${EXPECTED_GO_VERSION}"
           test "$(awk '$1 == "go" { print $2 }' go.mod)" = '1.26.0'
       - name: Install verified ShellCheck 0.11.0
@@ -52,6 +53,7 @@ jobs:
           tar -xJf "$archive" -C "$tool_dir"
           "$tool_dir/shellcheck-v0.11.0/shellcheck" --version
           echo "$tool_dir/shellcheck-v0.11.0" >> "$GITHUB_PATH"
+          echo "SHELLCHECK_EXPECTED_PATH=$tool_dir/shellcheck-v0.11.0/shellcheck" >> "$GITHUB_ENV"
       - name: Verify modules and tidy cleanliness
         run: |
           scripts/with-build-lock sh -eu -c '
@@ -61,11 +63,19 @@ jobs:
             git diff --exit-code -- go.mod go.sum
           '
       - name: Formatting, shell analysis, vet and offline tests
-        run: scripts/check
+        env:
+          GOPROXY: 'off'
+          GOFLAGS: '-mod=readonly'
+        run: |
+          test "$(command -v shellcheck)" = "$SHELLCHECK_EXPECTED_PATH"
+          shellcheck --version | grep -Fx 'version: 0.11.0'
+          scripts/check
       - name: Race tests on Linux amd64
         if: matrix.go == '1.27.1'
         env:
           CGO_ENABLED: '1' # Validation only; release builds stay pure Go.
+          GOPROXY: 'off'
+          GOFLAGS: '-mod=readonly'
         run: scripts/with-build-lock go test -race -count=1 ./...
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         if: matrix.go == '1.27.1'
@@ -79,4 +89,7 @@ jobs:
           node scripts/check-text-conformance.mjs
       - name: Pure-Go cross-builds for all planned release targets
         if: matrix.go == '1.27.1'
+        env:
+          GOPROXY: 'off'
+          GOFLAGS: '-mod=readonly'
         run: scripts/cross-build
