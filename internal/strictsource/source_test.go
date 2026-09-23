@@ -106,7 +106,9 @@ func TestDecodeRejectsNonPortableNumbers(t *testing.T) {
 	for _, source := range []string{
 		`{"value":1e400}`,
 		`{"value":9007199254740993}`,
+		`{"value":9007199254740993.5}`,
 		"value: 9007199254740993\n",
+		"value: 9007199254740993.5\n",
 	} {
 		format := FormatJSON
 		if strings.HasPrefix(source, "value:") {

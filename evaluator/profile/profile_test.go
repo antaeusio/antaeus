@@ -287,6 +287,36 @@ func TestSemanticJSONAndYAMLProduceSameIdentity(t *testing.T) {
 	if jsonDigest != yamlDigest {
 		t.Fatalf("digests = %q and %q", jsonDigest, yamlDigest)
 	}
+	canonical, err := jsonArtifact.CanonicalJSON()
+	if err != nil {
+		t.Fatalf("CanonicalJSON() error = %v", err)
+	}
+	roundTripped, err := Parse(canonical, FormatJSON)
+	if err != nil {
+		t.Fatalf("Parse(CanonicalJSON()) error = %v", err)
+	}
+	roundTripDigest, _ := roundTripped.Digest()
+	if roundTripDigest != jsonDigest {
+		t.Fatalf("round-trip digest = %q, want %q", roundTripDigest, jsonDigest)
+	}
+}
+
+func TestProgrammaticProfileHonorsWholeDocumentLimits(t *testing.T) {
+	artifact := mustParseExample(t, "semantic-routing.json")
+	var nested any = "leaf"
+	for i := 0; i < MaxNestingDepth-4; i++ {
+		nested = []any{nested}
+	}
+	artifact.Spec.Evaluators[0].Parameters = map[string]any{"nested": nested}
+	if got := contractErrorCode(artifact.Validate()); got != "source.depth" {
+		t.Fatalf("depth error code = %q", got)
+	}
+
+	artifact = mustParseExample(t, "semantic-routing.json")
+	artifact.Spec.Evaluators[0].Parameters = map[string]any{"nodes": make([]any, MaxParsedNodes-10)}
+	if got := contractErrorCode(artifact.Validate()); got != "source.nodes" {
+		t.Fatalf("node error code = %q", got)
+	}
 }
 
 func TestIntegerSpellingsHaveParity(t *testing.T) {

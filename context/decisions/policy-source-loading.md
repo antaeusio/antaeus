@@ -6,6 +6,7 @@ scope: policy/parser
 confidence: high
 source_refs:
   - policy/parse.go
+  - internal/strictsource/source.go
   - contracts/README.md
   - contracts/conformance/v0alpha1/policy-source/
 ---
@@ -34,6 +35,12 @@ parser library's legacy compatibility behavior. Convert the accepted tree to
 the JSON data model, decode the closed v0alpha1 artifact, run semantic
 validation, and only then canonicalize or compute its digest. Return stable,
 bounded parser error codes and include source coordinates when available.
+
+The shared strict-source decoder normalizes JSON and YAML numeric spellings to
+their RFC 8785 binary64 representation. It rejects non-finite or
+unrepresentable values and any value whose normalized magnitude exceeds the
+interoperable IEEE-754 safe-integer range. Current policy fields contain no
+numbers; the rule keeps every contract using the shared decoder portable.
 
 ## Rationale
 

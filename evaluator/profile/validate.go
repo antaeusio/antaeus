@@ -2,6 +2,7 @@ package profile
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"regexp"
@@ -92,7 +93,10 @@ func (a Artifact) Validate() error {
 			return invalid(path+".mode", "evaluator_mode.mixed", "semantic and deterministic-fixture evaluators cannot be mixed")
 		}
 	}
-	return validateRouting(a.Spec.Routing, evaluators)
+	if err := validateRouting(a.Spec.Routing, evaluators); err != nil {
+		return err
+	}
+	return validateEncodedArtifact(a)
 }
 
 // ValidateParameters validates semantic parameter objects against the exact
@@ -432,6 +436,21 @@ func canonicalParameters(parameters map[string]any) (json.RawMessage, error) {
 func validateParameterData(parameters map[string]any) error {
 	nodes := 0
 	return validateJSONValue(parameters, 0, &nodes)
+}
+
+func validateEncodedArtifact(artifact Artifact) error {
+	encoded, err := json.Marshal(artifact)
+	if err != nil {
+		return invalid("$", "source.schema", err.Error())
+	}
+	if _, err := strictsource.Decode(encoded, strictsource.FormatJSON, MaxSourceBytes, "evaluator profile"); err != nil {
+		var sourceErr *strictsource.Error
+		if errors.As(err, &sourceErr) {
+			return invalid("$", sourceErr.Code, sourceErr.Message)
+		}
+		return invalid("$", "source.schema", err.Error())
+	}
+	return nil
 }
 
 func validateJSONValue(value any, depth int, nodes *int) error {

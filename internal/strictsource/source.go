@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"math/big"
 	"regexp"
 	"strconv"
 	"strings"
@@ -72,24 +71,16 @@ func Decode(source []byte, format Format, maxBytes int, subject string) ([]byte,
 	}
 }
 
-var maxSafeInteger = big.NewInt(9_007_199_254_740_991)
-
 // NormalizeNumber returns the RFC 8785 representation of one accepted JSON
-// number. Integers outside the interoperable IEEE-754 safe range are rejected.
+// number. Values outside the interoperable IEEE-754 safe range are rejected.
 func NormalizeNumber(value string) (string, error) {
 	parsed, err := strconv.ParseFloat(value, 64)
 	if err != nil || math.IsNaN(parsed) || math.IsInf(parsed, 0) {
 		return "", parseError("source.number", "number must be finite and representable as IEEE-754 binary64", 0, 0)
 	}
-	rational, ok := new(big.Rat).SetString(value)
-	if !ok {
-		return "", parseError("source.number", "number is invalid", 0, 0)
-	}
-	if rational.IsInt() {
-		magnitude := new(big.Int).Abs(new(big.Int).Set(rational.Num()))
-		if magnitude.Cmp(maxSafeInteger) > 0 {
-			return "", parseError("source.number", "integer exceeds the interoperable IEEE-754 safe range", 0, 0)
-		}
+	const maxSafeInteger = float64(9_007_199_254_740_991)
+	if math.Abs(parsed) > maxSafeInteger {
+		return "", parseError("source.number", "number exceeds the interoperable IEEE-754 safe range", 0, 0)
 	}
 	canonical, err := jcs.Transform([]byte(value))
 	if err != nil {

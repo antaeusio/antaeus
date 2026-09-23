@@ -154,9 +154,10 @@ for that digest and cannot change profile content identity.
 
 Profile numbers use the RFC 8785 IEEE-754 binary64 data model. JSON and YAML
 spellings that represent the same number normalize to the same JCS value before
-typed validation. Non-finite or unrepresentable values and integral values
-outside the interoperable range `-9007199254740991` through
-`9007199254740991` are rejected before profile validation or digesting.
+typed validation. Non-finite or unrepresentable values and values whose
+normalized magnitude falls outside the interoperable range
+`-9007199254740991` through `9007199254740991` are rejected before profile
+validation or digesting.
 
 Known objects reject unknown properties. Adapter-specific `parameters` require
 a schema associated with the exact adapter ID and version; the core schema
