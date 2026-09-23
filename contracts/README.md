@@ -10,7 +10,8 @@ The initial version is `v0alpha1`:
 - decision requests use `apiVersion: decision.antaeus.io/v0alpha1` and `kind: DecisionRequest`;
 - decisions use `apiVersion: decision.antaeus.io/v0alpha1` and `kind: Decision`;
 - regression suites and result sets use `apiVersion: regression.antaeus.io/v0alpha1`; and
-- evaluator profiles use `apiVersion: evaluator.antaeus.io/v0alpha1` and `kind: EvaluatorProfile`.
+- evaluator profiles use `apiVersion: evaluator.antaeus.io/v0alpha1` and `kind: EvaluatorProfile`; and
+- local secret bindings use `apiVersion: config.antaeus.io/v0alpha1` and `kind: LocalSecretBindings`.
 
 Published schema versions are immutable. An incompatible structural or semantic change receives a new `apiVersion` and new schema path.
 
@@ -25,6 +26,7 @@ Implementations must reject inputs exceeding any applicable limit before unbound
 | Decision JSON | 1 MiB |
 | Regression suite source | 1 MiB |
 | Evaluator profile source | 1 MiB |
+| Local secret bindings source | 1 MiB |
 | JSON/YAML nesting depth | 32 |
 | Aggregate parsed nodes | 10,000 |
 | Rules per policy | 256 |
@@ -161,6 +163,51 @@ Semantic validation also requires initial backoff not to exceed maximum
 backoff. Instruction-template behavior is always bound by a content digest; an
 optional namespaced ID is descriptive only.
 
+## Local secret bindings
+
+`local-secret-bindings.schema.json` defines the non-secret local mapping from
+an evaluator adapter ID and profile-local credential slot to an environment
+variable reference. V0 accepts only `source: environment`; raw values, `.env`
+paths, hosted secret identifiers, and evaluator behavior overrides are not
+part of this artifact. An artifact that exists contains at least one adapter
+and one slot binding, and both dimensions are bounded to 16 entries.
+
+The variable name is configuration metadata, not a credential value, but may
+still reveal sensitive inventory. Output may identify only the adapter, slot,
+and source class. No output mode—including verbose, debug, and error output—
+prints the variable name or value. Runtimes inspect only references used by
+evaluators in the selected profile's configured route and do not discover
+`.env` files, inspect unrelated environment variables, or walk directories to
+discover a bindings artifact. Local bindings are loaded only from an explicitly
+supplied path.
+
+Immediately before evaluation starts, the runtime reads every reference used by
+the configured route exactly once and captures each non-empty value for that
+evaluation. It supplies a captured value only if its evaluator is invoked and
+releases all captured values when the evaluation ends. An unbound routed slot
+and an unset or zero-length referenced variable are the same missing-credential
+configuration error. The CLI reports it before evaluation; an HTTP service
+rejects it before accepting an evaluation and does not create a Decision. It is
+not retried and does not trigger evaluator fallback. Environment values are
+captured and passed as exact bytes; whitespace is not trimmed, and a
+whitespace-only non-empty value is therefore not treated as missing. Bindings
+for the deterministic fixture adapter are invalid.
+
+Local secret bindings use the same constrained JSON or YAML authoring rules,
+1 MiB source limit, nesting and aggregate-node bounds, duplicate-key rejection,
+and exact property names as evaluator profiles. Adapter keys intentionally name
+the adapter ID rather than a profile or adapter version. For the selected
+profile, a usable binding is the tuple of a configured route evaluator's
+adapter ID and that evaluator's `credentialSlot`, which must also appear in the
+profile's `credentialSlots`. Bindings for adapters or slots not referenced by
+the selected profile's configured route are ignored and never resolved.
+Within the syntactic pattern, v0 does not restrict which process environment
+variable may be referenced. Selecting the explicit bindings file grants it
+authority to name process variables for the routed adapters, so operators must
+review it as sensitive local configuration even though it contains no values.
+Variable lookup follows host process semantics; portable configurations must
+not depend on environment names that differ only by letter case.
+
 ## Regression suites
 
 `regression-suite.schema.json` defines named offline checks bound to one exact
@@ -190,4 +237,5 @@ Requests rejected before evaluation use a non-2xx status with RFC 9457 Problem D
 - `examples/v0alpha1/input/` contains canonical local-evaluation inputs bound by fixture digests.
 - `examples/v0alpha1/regression-suite/` and `regression-result-set/` contain a complete offline regression example.
 - `examples/v0alpha1/evaluator-profile/` contains a credential-free deterministic profile.
+- `examples/v0alpha1/local-secret-bindings/` contains non-secret environment-variable references.
 - `conformance/v0alpha1/` contains machine-oriented valid, invalid, and canonicalization fixtures.

@@ -2,8 +2,10 @@ package contracttest
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
@@ -195,6 +197,137 @@ func TestEvaluatorProfileSchemaAcceptsConfidenceWithoutEscalation(t *testing.T) 
 	}
 }
 
+func TestLocalSecretBindingsSchemaRejectsInvalidCombinations(t *testing.T) {
+	schema, err := newCompiler(t).Compile(schemaBase + "local-secret-bindings.schema.json")
+	if err != nil {
+		t.Fatalf("compile local secret bindings schema: %v", err)
+	}
+	validData, err := os.ReadFile(contractsPath(filepath.Join("examples", "v0alpha1", "local-secret-bindings", "development.json")))
+	if err != nil {
+		t.Fatalf("read local secret bindings: %v", err)
+	}
+	tests := []struct {
+		name   string
+		mutate func(map[string]any)
+	}{
+		{name: "empty bindings", mutate: func(document map[string]any) { document["secretBindings"] = map[string]any{} }},
+		{name: "too many adapters", mutate: func(document map[string]any) {
+			bindings := make(map[string]any, 17)
+			for i := 0; i < 17; i++ {
+				bindings[fmt.Sprintf("io.example.adapter%d", i)] = oneSlotBinding()
+			}
+			document["secretBindings"] = bindings
+		}},
+		{name: "too many slots", mutate: func(document map[string]any) {
+			slots := make(map[string]any, 17)
+			for i := 0; i < 17; i++ {
+				slots[fmt.Sprintf("slot-%d", i)] = environmentReference()
+			}
+			document["secretBindings"] = map[string]any{"io.example.semantic": slots}
+		}},
+		{name: "invalid adapter ID", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"semantic": oneSlotBinding()}
+		}},
+		{name: "fixture adapter", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"io.antaeus.fixture": oneSlotBinding()}
+		}},
+		{name: "invalid slot ID", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"io.example.semantic": map[string]any{"Provider": environmentReference()}}
+		}},
+		{name: "slot ID too long", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"io.example.semantic": map[string]any{"s" + strings.Repeat("a", 64): environmentReference()}}
+		}},
+		{name: "uppercase adapter ID", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"Io.Example.Semantic": oneSlotBinding()}
+		}},
+		{name: "missing reference name", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"io.example.semantic": map[string]any{"provider-api-key": map[string]any{"source": "environment"}}}
+		}},
+		{name: "empty reference name", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"io.example.semantic": map[string]any{"provider-api-key": map[string]any{"source": "environment", "name": ""}}}
+		}},
+		{name: "reference name starts with digit", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"io.example.semantic": map[string]any{"provider-api-key": map[string]any{"source": "environment", "name": "1EXAMPLE_API_KEY"}}}
+		}},
+		{name: "reference name too long", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"io.example.semantic": map[string]any{"provider-api-key": map[string]any{"source": "environment", "name": "K" + strings.Repeat("A", 128)}}}
+		}},
+		{name: "adapter ID too long", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"io." + strings.Repeat("a", 126): oneSlotBinding()}
+		}},
+		{name: "bare string reference", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"io.example.semantic": map[string]any{"provider-api-key": "EXAMPLE_API_KEY"}}
+		}},
+		{name: "wrong API version", mutate: func(document map[string]any) { document["apiVersion"] = "config.antaeus.io/v1" }},
+		{name: "wrong kind", mutate: func(document map[string]any) { document["kind"] = "SecretBindings" }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var document map[string]any
+			if err := json.Unmarshal(validData, &document); err != nil {
+				t.Fatalf("decode local secret bindings: %v", err)
+			}
+			test.mutate(document)
+			if err := schema.Validate(document); err == nil {
+				t.Fatal("schema Validate() error = nil, want rejection")
+			}
+		})
+	}
+}
+
+func TestLocalSecretBindingsSchemaAcceptsPublishedLimits(t *testing.T) {
+	schema, err := newCompiler(t).Compile(schemaBase + "local-secret-bindings.schema.json")
+	if err != nil {
+		t.Fatalf("compile local secret bindings schema: %v", err)
+	}
+	bindings := make(map[string]any, 16)
+	for adapter := 0; adapter < 16; adapter++ {
+		slots := make(map[string]any, 16)
+		for slot := 0; slot < 16; slot++ {
+			slots[fmt.Sprintf("slot-%d", slot)] = environmentReference()
+		}
+		bindings[fmt.Sprintf("io.example.adapter%d", adapter)] = slots
+	}
+	document := map[string]any{
+		"apiVersion":     "config.antaeus.io/v0alpha1",
+		"kind":           "LocalSecretBindings",
+		"secretBindings": bindings,
+	}
+	if err := schema.Validate(document); err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+}
+
+func TestLocalSecretBindingsSchemaAcceptsIdentifierLimits(t *testing.T) {
+	schema, err := newCompiler(t).Compile(schemaBase + "local-secret-bindings.schema.json")
+	if err != nil {
+		t.Fatalf("compile local secret bindings schema: %v", err)
+	}
+	document := map[string]any{
+		"apiVersion": "config.antaeus.io/v0alpha1",
+		"kind":       "LocalSecretBindings",
+		"secretBindings": map[string]any{
+			"io." + strings.Repeat("a", 125): map[string]any{
+				"s" + strings.Repeat("a", 63): map[string]any{
+					"source": "environment",
+					"name":   "K" + strings.Repeat("A", 127),
+				},
+			},
+		},
+	}
+	if err := schema.Validate(document); err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+}
+
+func oneSlotBinding() map[string]any {
+	return map[string]any{"provider-api-key": environmentReference()}
+}
+
+func environmentReference() map[string]any {
+	return map[string]any{"source": "environment", "name": "EXAMPLE_API_KEY"}
+}
+
 const schemaBase = "https://antaeus.io/contracts/v0alpha1/"
 
 func TestContractExamplesAgainstSchemas(t *testing.T) {
@@ -271,6 +404,60 @@ func TestContractExamplesAgainstSchemas(t *testing.T) {
 			schema:   "evaluator-profile.schema.json",
 			instance: filepath.Join("examples", "v0alpha1", "evaluator-profile", "semantic-routing.json"),
 			valid:    true,
+		},
+		{
+			name:     "local secret bindings",
+			schema:   "local-secret-bindings.schema.json",
+			instance: filepath.Join("examples", "v0alpha1", "local-secret-bindings", "development.json"),
+			valid:    true,
+		},
+		{
+			name:     "local secret bindings with raw value",
+			schema:   "local-secret-bindings.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "local-secret-bindings", "invalid-secret-value.json"),
+			valid:    false,
+		},
+		{
+			name:     "local secret bindings unsupported source",
+			schema:   "local-secret-bindings.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "local-secret-bindings", "invalid-source.json"),
+			valid:    false,
+		},
+		{
+			name:     "local secret bindings invalid environment name",
+			schema:   "local-secret-bindings.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "local-secret-bindings", "invalid-environment-name.json"),
+			valid:    false,
+		},
+		{
+			name:     "local secret bindings empty adapter",
+			schema:   "local-secret-bindings.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "local-secret-bindings", "invalid-empty-adapter.json"),
+			valid:    false,
+		},
+		{
+			name:     "local secret bindings dotenv path",
+			schema:   "local-secret-bindings.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "local-secret-bindings", "invalid-dotenv-path.json"),
+			valid:    false,
+		},
+		{
+			name:     "local secret bindings hosted identifier",
+			schema:   "local-secret-bindings.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "local-secret-bindings", "invalid-hosted-identifier.json"),
+			valid:    false,
+		},
+		{
+			name:     "local secret bindings behavior override",
+			schema:   "local-secret-bindings.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "local-secret-bindings", "invalid-behavior-override.json"),
+			valid:    false,
+		},
+		{
+			name:     "local secret bindings dotenv source",
+			schema:   "local-secret-bindings.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "local-secret-bindings", "invalid-dotenv-source.json"),
+			valid:    false,
 		},
 		{
 			name:     "evaluator profile unknown property",
@@ -447,6 +634,7 @@ func newCompiler(t *testing.T) *jsonschema.Compiler {
 		"decision.schema.json",
 		"fixture-set.schema.json",
 		"evaluator-profile.schema.json",
+		"local-secret-bindings.schema.json",
 		"regression-suite.schema.json",
 		"regression-result-set.schema.json",
 		"problem.schema.json",

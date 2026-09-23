@@ -44,6 +44,16 @@ The valid semantic example exercises explicit retry backoff, confidence-based
 escalation, credential slots, a digest-bound instruction template, and an
 operational fallback.
 
+## Local secret bindings
+
+The valid example maps an adapter and logical credential slot to an environment
+variable reference without containing a value. Invalid fixtures reject a raw
+value field, inline and `.env` source classes, `.env` discovery metadata, hosted
+secret identifiers, evaluator behavior overrides, an unsafe environment-variable
+name, and an adapter entry without any slot bindings. Programmatic schema tests
+cover the adapter and slot count boundaries, identifiers, discriminators,
+required reference fields, and the forbidden deterministic fixture adapter.
+
 ## Regression suites
 
 `regression-suite/valid-input-max-depth.json` fixes the maximum inline-input

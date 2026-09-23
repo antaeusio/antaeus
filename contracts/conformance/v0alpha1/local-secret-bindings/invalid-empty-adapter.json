@@ -1,0 +1,7 @@
+{
+  "apiVersion": "config.antaeus.io/v0alpha1",
+  "kind": "LocalSecretBindings",
+  "secretBindings": {
+    "io.example.semantic": {}
+  }
+}
