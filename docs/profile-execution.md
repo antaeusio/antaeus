@@ -66,7 +66,10 @@ attempt and clearing that attempt's buffer immediately on return.
 Before accepting evaluation, the runner snapshots and validates policy/profile
 artifacts, verifies canonical input, validates all semantic adapter parameters,
 checks exact installed identities/protocols/capabilities for all routed adapters,
-and requires every routed credential. Missing credentials, unsupported adapters,
+and requires every routed credential. Each routed fixture registration must
+match the profile's pinned `fixtureVersion` before any adapter is invoked;
+expected result metadata is derived from that pinned identity. Missing
+credentials, unsupported adapters,
 invalid inputs, invalid registry labels, and pre-existing cancellation return Go
 errors without invoking an evaluator or creating a Decision. Enforcement rejects
 deterministic fixtures. Fixture evidence remains visibly synthetic in local use.

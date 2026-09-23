@@ -404,6 +404,49 @@ func TestRegistryFixtureCannotEnforce(t *testing.T) {
 	}
 }
 
+func TestFixtureVersionMustMatchEveryRoutedProfileEntry(t *testing.T) {
+	for _, tt := range []struct {
+		name, registered string
+		fallback         bool
+	}{
+		{"wrong registration", "v2", false},
+		{"missing registration version", "", false},
+		{"mismatched fallback pin", "v1", true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			in := inputFixture(t)
+			p, err := profile.LoadFile("../../contracts/examples/v0alpha1/evaluator-profile/quickstart-fixture.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tt.fallback {
+				fallback := p.Spec.Evaluators[0]
+				fallback.ID = "fixture-fallback"
+				fallback.Parameters = map[string]any{"fixtureSet": "quickstart", "fixtureVersion": "v2"}
+				p.Spec.Evaluators = append(p.Spec.Evaluators, fallback)
+				p.Spec.Routing.Fallbacks = []string{fallback.ID}
+				p.Spec.Routing.FallbackOn = []profile.TransientFailure{profile.FailureUnavailable}
+			}
+			if err := p.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			in.Profile = p
+			registry := Registry{p.Spec.Evaluators[0].Adapter: {
+				Mode: profile.ModeDeterministicFixture, Protocol: p.Spec.Evaluators[0].Protocol,
+				Capabilities: p.Spec.Evaluators[0].RequiredCapabilities, FixtureVersion: tt.registered,
+				Evaluate: func(context.Context, evaluator.Request, Configuration) (evaluator.Result, error) {
+					t.Fatal("fixture version mismatch must fail before any adapter call")
+					return evaluator.Result{}, nil
+				},
+			}}
+			d, err := Run(context.Background(), in, registry)
+			if err == nil || err.Error() != "routed fixture version does not match the profile" || d.Kind != "" {
+				t.Fatalf("decision=%+v error=%v", d, err)
+			}
+		})
+	}
+}
+
 func TestNoSecretOrErrorPayloadInTrace(t *testing.T) {
 	in := inputFixture(t)
 	d, err := Run(context.Background(), in, installed(func(context.Context, evaluator.Request, Configuration) (evaluator.Result, error) {
