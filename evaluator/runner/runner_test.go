@@ -476,20 +476,26 @@ func TestNoSecretOrErrorPayloadInTrace(t *testing.T) {
 	}
 }
 
-func TestBackoffCannotOutliveTotalBudget(t *testing.T) {
+func TestBackoffPreservesRemainingBudgetForFallback(t *testing.T) {
 	in := inputFixture(t)
 	in.Profile.Spec.TotalTimeoutMS = 2000
 	clock := &fakeTime{current: time.Now()}
 	calls := 0
-	d, err := run(context.Background(), in, installed(func(context.Context, evaluator.Request, Configuration) (evaluator.Result, error) {
+	d, err := run(context.Background(), in, installed(func(_ context.Context, r evaluator.Request, c Configuration) (evaluator.Result, error) {
 		calls++
-		clock.current = clock.current.Add(1950 * time.Millisecond)
-		return evaluator.Result{}, &evaluator.Error{Code: "evaluator.timeout", Retryable: true}
+		if calls == 1 {
+			clock.current = clock.current.Add(1950 * time.Millisecond)
+			return evaluator.Result{}, &evaluator.Error{Code: "evaluator.timeout", Retryable: true}
+		}
+		if c.Evaluator.ID != "semantic-fallback" || r.Deadline.Sub(clock.current) != 50*time.Millisecond {
+			t.Fatal("fallback did not receive remaining budget")
+		}
+		return evidence(r, c, 1), nil
 	}), clock.timing())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if calls != 1 || !reflect.DeepEqual(clock.delays, []time.Duration{50 * time.Millisecond}) || traceOf(t, d).Terminal != "evaluation.deadline_exceeded" {
+	if calls != 2 || len(clock.delays) != 0 || traceOf(t, d).Terminal != "completed" || !d.Evaluator.Fallback {
 		t.Fatalf("calls=%d delays=%v trace=%+v", calls, clock.delays, traceOf(t, d))
 	}
 }

@@ -108,6 +108,19 @@ unchanged. Published portable schemas and policy/profile identities are unchange
 This is a documented first-minor development change, not a patch backport or a
 claim that v0.1.0 has been released.
 
+Retry-budget handling also changes in this minor release. Previously a retry
+delay at least as long as the remaining budget slept until the deadline and
+ended with `evaluation.deadline_exceeded`. It now skips that futile wait and may
+invoke an eligible fallback while time remains. Successful fallback evidence can
+therefore produce a real `allow`, `review` or `deny` where the old runner returned
+`failure`; the reducer and policy meaning are unchanged. Without a successful
+recovery, the last transient code (for example `evaluator.timeout`) can replace
+the old deadline code in trace terminal and failed-rule reasons. The generic
+core failure mapping is unchanged by this retry change. Go and CLI consumers
+must not assume that this budget boundary always returns failure or a deadline
+code; inspect the actual outcome, evidence and trace. No provider may run beyond
+the total/caller deadline, and an already expired or cancelled run still stops.
+
 Calls are synchronous. Adapters must honor context cancellation and return
 promptly; the runner does not detach goroutines or forcibly stop an uncooperative
 implementation. Each attempt's context and request carry the earlier of its
@@ -139,8 +152,15 @@ For retry number `n` (1 is the first retry), the base delay in milliseconds is
 `min(maxBackoffMs, initialBackoffMs * multiplier^(n-1))`, truncated to an integer.
 The production clock uses equal jitter uniformly over the inclusive interval
 from half that base delay to the full base delay, at nanosecond resolution, and
-clips waiting to the remaining total deadline. Tests inject a clock and jitter
-source. Retries retain identical policy/profile/input identity, correlation ID,
+consumes one jitter draw per contemplated retry. If that delay is greater than
+or equal to the remaining total budget, retries stop without sleeping: preserve
+the last transient failure so an eligible configured fallback can use the time
+left. Without an eligible fallback, return that failure promptly. An already
+expired deadline or cancellation wins over the prior error; neither starts a
+fallback. Otherwise wait normally within the context deadline. This means jitter
+can affect retry-versus-fallback selection near the budget boundary; the trace
+records what actually ran. Tests inject a clock and jitter source.
+Retries retain identical policy/profile/input identity, correlation ID,
 and rule subset. An adapter that supports provider idempotency must derive and
 reuse an appropriate stable key for that evaluator and logical request.
 

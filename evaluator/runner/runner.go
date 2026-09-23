@@ -359,12 +359,18 @@ func (x *execution) invoke(ctx context.Context, id, route string, indexes []int)
 		}
 		base := math.Min(float64(*e.Retry.MaxBackoffMS), float64(*e.Retry.InitialBackoffMS)*math.Pow(*e.Retry.Multiplier, float64(attempt-1)))
 		delay := x.time.jitter(time.Duration(base) * time.Millisecond)
+		if code := x.stopped(ctx); code != "" {
+			return failedRules(rules, code), code
+		}
 		remaining := x.request.Deadline.Sub(x.time.now())
+		// The clock may advance between stopped and this budget measurement.
 		if remaining <= 0 {
 			return failedRules(rules, "evaluation.deadline_exceeded"), "evaluation.deadline_exceeded"
 		}
-		if delay > remaining {
-			delay = remaining
+		if delay >= remaining {
+			// No retry can start after this wait. Preserve the transient failure
+			// so a configured fallback can still use the remaining budget.
+			break
 		}
 		if err := x.time.sleep(ctx, delay); err != nil {
 			code := x.stopped(ctx)
