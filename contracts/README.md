@@ -217,6 +217,12 @@ review it as sensitive local configuration even though it contains no values.
 Variable lookup follows host process semantics; portable configurations must
 not depend on environment names that differ only by letter case.
 
+The Go implementation loads an explicit artifact with
+`localbinding.LoadFile` and captures routed credentials with
+`localbinding.Preflight`. Preflight resolves every distinct adapter-and-slot
+tuple in the configured route exactly once before evaluation. Returned values
+are copied for adapter use and the captured set is cleared at evaluation end.
+
 ## Regression suites
 
 `regression-suite.schema.json` defines named offline checks bound to one exact

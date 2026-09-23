@@ -8,6 +8,7 @@ source_refs:
   - contracts/schemas/v0alpha1/local-secret-bindings.schema.json
   - contracts/examples/v0alpha1/local-secret-bindings/development.json
   - contracts/README.md
+  - evaluator/localbinding
 ---
 
 ## Pattern
@@ -41,6 +42,14 @@ print the environment-variable name or value. Selecting an explicit bindings
 file grants it authority to reference process variables for routed adapters;
 operators must review it as sensitive local configuration. Portable bindings
 must not rely on variable names that differ only by letter case.
+
+Load Go binding artifacts through `localbinding.LoadFile` or parse bytes with
+`localbinding.Parse`. Immediately before evaluation, call
+`localbinding.Preflight` with the validated evaluator profile and an explicit
+environment lookup. Preflight reads each distinct configured-route adapter and
+slot tuple once, fails before evaluation if any reference is unbound, unset, or
+empty, and ignores all unused bindings. The returned credential set exposes
+copies only and must be cleared when evaluation ends.
 
 ## Rationale
 
