@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/big"
 	"regexp"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 
+	"github.com/gowebpki/jcs"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -62,12 +64,78 @@ func Decode(source []byte, format Format, maxBytes int, subject string) ([]byte,
 		if err := validateJSONDocument(source, subject); err != nil {
 			return nil, err
 		}
-		return source, nil
+		return normalizeJSONDocument(source)
 	case FormatYAML:
 		return decodeYAMLDocument(source, subject)
 	default:
 		return nil, parseError("source.format", fmt.Sprintf("unsupported %s format %q", subject, format), 0, 0)
 	}
+}
+
+// NormalizeNumber returns the RFC 8785 representation of one accepted JSON
+// number. Values outside the interoperable IEEE-754 safe range are rejected.
+func NormalizeNumber(value string) (string, error) {
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil || math.IsNaN(parsed) || math.IsInf(parsed, 0) {
+		return "", parseError("source.number", "number must be finite and representable as IEEE-754 binary64", 0, 0)
+	}
+	if parsed == 0 {
+		rational, ok := new(big.Rat).SetString(value)
+		if !ok || rational.Sign() != 0 {
+			return "", parseError("source.number", "nonzero number must not underflow to zero", 0, 0)
+		}
+	}
+	const maxSafeInteger = float64(9_007_199_254_740_991)
+	if math.Abs(parsed) > maxSafeInteger {
+		return "", parseError("source.number", "number exceeds the interoperable IEEE-754 safe range", 0, 0)
+	}
+	canonical, err := jcs.Transform([]byte(value))
+	if err != nil {
+		return "", parseError("source.number", "number cannot be canonicalized", 0, 0)
+	}
+	return string(canonical), nil
+}
+
+func normalizeJSONDocument(source []byte) ([]byte, error) {
+	decoder := json.NewDecoder(bytes.NewReader(source))
+	decoder.UseNumber()
+	var document any
+	if err := decoder.Decode(&document); err != nil {
+		return nil, parseError("source.syntax", boundedMessage(err.Error()), 0, 0)
+	}
+	if err := normalizeNumbers(&document); err != nil {
+		return nil, err
+	}
+	encoded, err := json.Marshal(document)
+	if err != nil {
+		return nil, parseError("source.syntax", boundedMessage(err.Error()), 0, 0)
+	}
+	return encoded, nil
+}
+
+func normalizeNumbers(value *any) error {
+	switch typed := (*value).(type) {
+	case json.Number:
+		canonical, err := NormalizeNumber(string(typed))
+		if err != nil {
+			return err
+		}
+		*value = json.Number(canonical)
+	case map[string]any:
+		for key, child := range typed {
+			if err := normalizeNumbers(&child); err != nil {
+				return err
+			}
+			typed[key] = child
+		}
+	case []any:
+		for index := range typed {
+			if err := normalizeNumbers(&typed[index]); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // NewError constructs a bounded source error for a contract-specific decoder.
@@ -237,7 +305,7 @@ func decodeYAMLDocument(source []byte, subject string) ([]byte, error) {
 	if err != nil {
 		return nil, parseError("source.syntax", boundedMessage(err.Error()), 0, 0)
 	}
-	return data, nil
+	return normalizeJSONDocument(data)
 }
 
 func yamlNodeValue(node *yaml.Node, containerDepth int, nodes *int, sourceLines [][]byte) (any, error) {
@@ -351,10 +419,11 @@ func yamlScalarValue(node *yaml.Node, sourceLines [][]byte) (any, error) {
 			}
 			return integer, nil
 		}
-		number, err := strconv.ParseFloat(value, 64)
-		if err != nil || math.IsInf(number, 0) || math.IsNaN(number) {
-			return nil, parseError("source.number", "YAML number must be finite and representable as JSON", node.Line, node.Column)
+		canonical, err := NormalizeNumber(value)
+		if err != nil {
+			return nil, parseError("source.number", err.Error(), node.Line, node.Column)
 		}
+		number, _ := strconv.ParseFloat(canonical, 64)
 		return number, nil
 	default:
 		return nil, parseError("source.tag", "custom and non-JSON YAML tags are not supported", node.Line, node.Column)

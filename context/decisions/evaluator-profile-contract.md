@@ -9,6 +9,7 @@ source_refs:
   - contracts/examples/v0alpha1/evaluator-profile/quickstart-fixture.json
   - contracts/examples/v0alpha1/evaluator-profile/semantic-routing.json
   - contracts/README.md
+  - evaluator/profile
 ---
 
 ## Pattern
@@ -54,6 +55,23 @@ capability-backed confidence—because JSON Schema cannot express the full graph
 The relational validator also requires initial backoff not to exceed maximum
 backoff. Instruction templates require a content digest; any template ID is an
 optional descriptive label rather than mutable identity.
+
+Load Go profiles through `profile.LoadFile` or parse bytes with `profile.Parse`.
+Both use the same constrained JSON/YAML source rules and limits as policies,
+then enforce the closed v0alpha1 shape and relational invariants before
+canonicalization or digesting. Core parsing validates the built-in fixture
+parameters. Before executing any semantic profile, call
+`Artifact.ValidateParameters` with a validator registered for each exact
+adapter ID and version; loading for inspection does not imply that an installed
+adapter accepts its parameter object.
+Both authored source and the JCS-canonical profile representation are bounded
+to 1 MiB. Programmatically constructed profiles measure the canonical form,
+not Go's implementation-specific HTML-escaped JSON encoding.
+Normalize accepted numeric spellings to their RFC 8785 binary64 representation
+before typed validation. Reject non-finite values and integers outside the
+interoperable IEEE-754 safe range after binary64 conversion so out-of-range
+source spellings cannot collapse to an accepted digest. Adapter validators
+receive the exact JCS-canonical parameter bytes covered by profile identity.
 
 ## Rationale
 
