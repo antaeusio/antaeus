@@ -59,12 +59,12 @@ func Decode(source []byte, format Format, maxBytes int, subject string) ([]byte,
 		if err := validateJSONUnicodeEscapes(source); err != nil {
 			return nil, err
 		}
-		if err := validateJSONDocument(source); err != nil {
+		if err := validateJSONDocument(source, subject); err != nil {
 			return nil, err
 		}
 		return source, nil
 	case FormatYAML:
-		return decodeYAMLDocument(source)
+		return decodeYAMLDocument(source, subject)
 	default:
 		return nil, parseError("source.format", fmt.Sprintf("unsupported %s format %q", subject, format), 0, 0)
 	}
@@ -121,14 +121,14 @@ func jsonHexCodeUnit(source []byte, start int) (uint16, bool) {
 	return uint16(value), err == nil
 }
 
-func validateJSONDocument(source []byte) error {
+func validateJSONDocument(source []byte, subject string) error {
 	decoder := json.NewDecoder(bytes.NewReader(source))
 	decoder.UseNumber()
 	nodes := 0
 	if err := parseJSONValue(decoder, source, 0, &nodes); err != nil {
 		return err
 	}
-	return ensureJSONEOF(decoder)
+	return EnsureJSONEOF(decoder, subject)
 }
 
 func parseJSONValue(decoder *json.Decoder, source []byte, containerDepth int, nodes *int) error {
@@ -189,17 +189,18 @@ func parseJSONValue(decoder *json.Decoder, source []byte, containerDepth int, no
 	return nil
 }
 
-func ensureJSONEOF(decoder *json.Decoder) error {
+// EnsureJSONEOF rejects trailing JSON syntax or a second JSON document.
+func EnsureJSONEOF(decoder *json.Decoder, subject string) error {
 	var trailing any
 	if err := decoder.Decode(&trailing); err == io.EOF {
 		return nil
 	} else if err != nil {
 		return parseError("source.syntax", boundedMessage(err.Error()), 0, 0)
 	}
-	return parseError("source.multiple_documents", "policy source must contain exactly one document", 0, 0)
+	return parseError("source.multiple_documents", subject+" source must contain exactly one document", 0, 0)
 }
 
-func decodeYAMLDocument(source []byte) ([]byte, error) {
+func decodeYAMLDocument(source []byte, subject string) ([]byte, error) {
 	if err := validateYAMLLineBreaks(source); err != nil {
 		return nil, err
 	}
@@ -211,7 +212,7 @@ func decodeYAMLDocument(source []byte) ([]byte, error) {
 	var document yaml.Node
 	if err := decoder.Decode(&document); err != nil {
 		if err == io.EOF {
-			return nil, parseError("source.empty", "policy source must contain one document", 0, 0)
+			return nil, parseError("source.empty", subject+" source must contain one document", 0, 0)
 		}
 		return nil, yamlSyntaxError(err)
 	}
@@ -220,10 +221,10 @@ func decodeYAMLDocument(source []byte) ([]byte, error) {
 		if err != nil {
 			return nil, yamlSyntaxError(err)
 		}
-		return nil, parseError("source.multiple_documents", "policy source must contain exactly one YAML document", trailing.Line, trailing.Column)
+		return nil, parseError("source.multiple_documents", subject+" source must contain exactly one YAML document", trailing.Line, trailing.Column)
 	}
 	if document.Kind != yaml.DocumentNode || len(document.Content) != 1 {
-		return nil, parseError("source.syntax", "policy source must contain one YAML document", document.Line, document.Column)
+		return nil, parseError("source.syntax", subject+" source must contain one YAML document", document.Line, document.Column)
 	}
 
 	nodes := 0

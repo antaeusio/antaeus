@@ -3,6 +3,7 @@ package policy
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -18,25 +19,37 @@ const (
 )
 
 // Format identifies one supported policy authoring syntax.
-type Format = strictsource.Format
+type Format string
 
 const (
-	FormatJSON = strictsource.FormatJSON
-	FormatYAML = strictsource.FormatYAML
+	FormatJSON Format = "json"
+	FormatYAML Format = "yaml"
 )
 
 // ParseError reports a bounded source error. Line and Column are one-based
 // Unicode character positions, excluding an optional UTF-8 byte-order mark,
 // when the parser can identify a source location and zero otherwise.
-type ParseError = strictsource.Error
+type ParseError struct {
+	Code    string
+	Message string
+	Line    int
+	Column  int
+}
+
+func (e *ParseError) Error() string {
+	if e.Line > 0 {
+		return fmt.Sprintf("line %d, column %d: %s", e.Line, e.Column, e.Message)
+	}
+	return e.Message
+}
 
 // Parse decodes, structurally constrains, and semantically validates one
 // policy source document. FormatJSON accepts exact JSON; FormatYAML accepts the
 // constrained YAML 1.2 core-schema subset documented in contracts/README.md.
 func Parse(source []byte, format Format) (Artifact, error) {
-	data, err := strictsource.Decode(source, format, MaxSourceBytes, "policy")
+	data, err := strictsource.Decode(source, strictsource.Format(format), MaxSourceBytes, "policy")
 	if err != nil {
-		return Artifact{}, err
+		return Artifact{}, policySourceError(err)
 	}
 	artifact, err := decodeArtifact(data)
 	if err != nil {
@@ -89,9 +102,8 @@ func decodeArtifact(data []byte) (Artifact, error) {
 	if err := decoder.Decode(&artifact); err != nil {
 		return Artifact{}, parseError("source.schema", err.Error(), 0, 0)
 	}
-	var trailing any
-	if err := decoder.Decode(&trailing); err != io.EOF {
-		return Artifact{}, parseError("source.trailing", "source must contain exactly one document", 0, 0)
+	if err := strictsource.EnsureJSONEOF(decoder, "policy"); err != nil {
+		return Artifact{}, policySourceError(err)
 	}
 	return artifact, nil
 }
@@ -184,5 +196,19 @@ func rejectNullValues(path string, value any) error {
 }
 
 func parseError(code, message string, line, column int) *ParseError {
-	return strictsource.NewError(code, message, line, column)
+	err := strictsource.NewError(code, message, line, column)
+	return &ParseError{Code: err.Code, Message: err.Message, Line: err.Line, Column: err.Column}
+}
+
+func policySourceError(err error) error {
+	var sourceErr *strictsource.Error
+	if !errors.As(err, &sourceErr) {
+		return err
+	}
+	return &ParseError{
+		Code:    sourceErr.Code,
+		Message: sourceErr.Message,
+		Line:    sourceErr.Line,
+		Column:  sourceErr.Column,
+	}
 }
