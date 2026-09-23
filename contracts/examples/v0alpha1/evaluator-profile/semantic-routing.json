@@ -1,0 +1,65 @@
+{
+  "apiVersion": "evaluator.antaeus.io/v0alpha1",
+  "kind": "EvaluatorProfile",
+  "metadata": {
+    "name": "semantic-routing",
+    "description": "Complete semantic routing example with escalation and fallback."
+  },
+  "spec": {
+    "totalTimeoutMs": 10000,
+    "credentialSlots": [{"name": "provider-api-key"}],
+    "evaluators": [
+      {
+        "id": "semantic-primary",
+        "mode": "semantic",
+        "adapter": {"id": "io.example.semantic", "version": "1.0.0"},
+        "protocol": {"id": "io.antaeus.rule-match", "version": "v0alpha1"},
+        "requiredCapabilities": ["json-input", "structured-rule-results", "confidence-scores"],
+        "timeoutMs": 2000,
+        "retry": {"maxAttempts": 2, "retryOn": ["timeout", "throttled"], "initialBackoffMs": 100, "maxBackoffMs": 1000, "multiplier": 2},
+        "provider": "example",
+        "model": "model-1",
+        "modelRevision": "2026-09-01",
+        "instructionTemplate": {"id": "io.example.template", "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+        "credentialSlot": "provider-api-key",
+        "parameters": {}
+      },
+      {
+        "id": "semantic-escalation",
+        "mode": "semantic",
+        "adapter": {"id": "io.example.semantic", "version": "1.0.0"},
+        "protocol": {"id": "io.antaeus.rule-match", "version": "v0alpha1"},
+        "requiredCapabilities": ["json-input", "structured-rule-results", "confidence-scores"],
+        "timeoutMs": 2000,
+        "retry": {"maxAttempts": 1, "retryOn": []},
+        "provider": "example",
+        "model": "model-2",
+        "modelRevision": "2026-09-01",
+        "credentialSlot": "provider-api-key",
+        "parameters": {}
+      },
+      {
+        "id": "semantic-fallback",
+        "mode": "semantic",
+        "adapter": {"id": "io.example.semantic", "version": "1.0.0"},
+        "protocol": {"id": "io.antaeus.rule-match", "version": "v0alpha1"},
+        "requiredCapabilities": ["json-input", "structured-rule-results", "confidence-scores"],
+        "timeoutMs": 2000,
+        "retry": {"maxAttempts": 1, "retryOn": []},
+        "provider": "example",
+        "model": "model-3",
+        "modelRevision": "2026-09-01",
+        "credentialSlot": "provider-api-key",
+        "parameters": {}
+      }
+    ],
+    "routing": {
+      "primary": "semantic-primary",
+      "escalation": "semantic-escalation",
+      "fallbacks": ["semantic-fallback"],
+      "fallbackOn": ["timeout", "unavailable", "throttled"],
+      "confidence": {"enabled": true, "minimumAccepted": 0.75, "onLowConfidence": "escalate"},
+      "terminal": {"onIndeterminate": "failure", "onFailure": "failure"}
+    }
+  }
+}

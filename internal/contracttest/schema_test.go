@@ -66,6 +66,135 @@ func TestEvaluatorMetadataSchemaRejectsInvalidCombinations(t *testing.T) {
 	}
 }
 
+func TestEvaluatorProfileSchemaRejectsInvalidCombinations(t *testing.T) {
+	schema, err := newCompiler(t).Compile(schemaBase + "evaluator-profile.schema.json")
+	if err != nil {
+		t.Fatalf("compile evaluator profile schema: %v", err)
+	}
+	validData, err := os.ReadFile(contractsPath(filepath.Join("examples", "v0alpha1", "evaluator-profile", "quickstart-fixture.json")))
+	if err != nil {
+		t.Fatalf("read evaluator profile: %v", err)
+	}
+	semantic := func(evaluator map[string]any) {
+		evaluator["mode"] = "semantic"
+		evaluator["adapter"] = map[string]any{"id": "io.example.semantic", "version": "1"}
+		evaluator["parameters"] = map[string]any{}
+	}
+	tests := []struct {
+		name   string
+		mutate func(map[string]any, map[string]any, map[string]any)
+	}{
+		{name: "fixture mode with other adapter", mutate: func(_ map[string]any, evaluator, _ map[string]any) {
+			evaluator["adapter"] = map[string]any{"id": "io.example.semantic", "version": "1"}
+		}},
+		{name: "fixture adapter with semantic mode", mutate: func(_ map[string]any, evaluator, _ map[string]any) { evaluator["mode"] = "semantic" }},
+		{name: "fixture provider", mutate: func(_ map[string]any, evaluator, _ map[string]any) { evaluator["provider"] = "example" }},
+		{name: "fixture model", mutate: func(_ map[string]any, evaluator, _ map[string]any) { evaluator["model"] = "model-1" }},
+		{name: "fixture template", mutate: func(_ map[string]any, evaluator, _ map[string]any) {
+			evaluator["instructionTemplate"] = map[string]any{"digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}
+		}},
+		{name: "fixture parameter", mutate: func(_ map[string]any, evaluator, _ map[string]any) {
+			evaluator["parameters"].(map[string]any)["endpoint"] = "https://example.invalid"
+		}},
+		{name: "fallback missing classes", mutate: func(_ map[string]any, _ map[string]any, routing map[string]any) {
+			routing["fallbacks"] = []any{"other"}
+		}},
+		{name: "classes without fallback", mutate: func(_ map[string]any, _ map[string]any, routing map[string]any) {
+			routing["fallbackOn"] = []any{"timeout"}
+		}},
+		{name: "escalate missing evaluator", mutate: func(_ map[string]any, _ map[string]any, routing map[string]any) {
+			routing["confidence"] = map[string]any{"enabled": true, "minimumAccepted": 0.5, "onLowConfidence": "escalate"}
+		}},
+		{name: "unused escalation", mutate: func(_ map[string]any, _ map[string]any, routing map[string]any) { routing["escalation"] = "other" }},
+		{name: "disabled confidence threshold", mutate: func(_ map[string]any, _ map[string]any, routing map[string]any) {
+			routing["confidence"].(map[string]any)["minimumAccepted"] = 0.5
+		}},
+		{name: "template missing digest", mutate: func(_ map[string]any, evaluator, _ map[string]any) {
+			semantic(evaluator)
+			evaluator["instructionTemplate"] = map[string]any{"id": "io.example.template"}
+		}},
+		{name: "timeout below bound", mutate: func(_ map[string]any, evaluator, _ map[string]any) { evaluator["timeoutMs"] = float64(0) }},
+		{name: "retry count above bound", mutate: func(_ map[string]any, evaluator, _ map[string]any) {
+			retry := evaluator["retry"].(map[string]any)
+			retry["maxAttempts"] = float64(6)
+			retry["retryOn"] = []any{"timeout"}
+			retry["initialBackoffMs"] = float64(100)
+			retry["maxBackoffMs"] = float64(1000)
+			retry["multiplier"] = float64(2)
+		}},
+		{name: "retry missing class", mutate: func(_ map[string]any, evaluator, _ map[string]any) {
+			retry := evaluator["retry"].(map[string]any)
+			retry["maxAttempts"] = float64(2)
+			retry["initialBackoffMs"] = float64(100)
+			retry["maxBackoffMs"] = float64(1000)
+			retry["multiplier"] = float64(2)
+		}},
+		{name: "retry class without retry", mutate: func(_ map[string]any, evaluator, _ map[string]any) {
+			evaluator["retry"].(map[string]any)["retryOn"] = []any{"timeout"}
+		}},
+		{name: "backoff without retry", mutate: func(_ map[string]any, evaluator, _ map[string]any) {
+			retry := evaluator["retry"].(map[string]any)
+			retry["initialBackoffMs"] = float64(100)
+			retry["maxBackoffMs"] = float64(1000)
+			retry["multiplier"] = float64(2)
+		}},
+		{name: "retry missing schedule", mutate: func(_ map[string]any, evaluator, _ map[string]any) {
+			retry := evaluator["retry"].(map[string]any)
+			retry["maxAttempts"] = float64(2)
+			retry["retryOn"] = []any{"timeout"}
+		}},
+		{name: "unsafe provider", mutate: func(_ map[string]any, evaluator, _ map[string]any) {
+			semantic(evaluator)
+			evaluator["provider"] = "https://internal.invalid"
+		}},
+		{name: "mixed evaluator modes", mutate: func(spec map[string]any, evaluator, _ map[string]any) {
+			clone := make(map[string]any, len(evaluator))
+			for key, value := range evaluator {
+				clone[key] = value
+			}
+			semantic(clone)
+			clone["id"] = "semantic"
+			spec["evaluators"] = append(spec["evaluators"].([]any), clone)
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var document map[string]any
+			if err := json.Unmarshal(validData, &document); err != nil {
+				t.Fatalf("decode valid profile: %v", err)
+			}
+			spec := document["spec"].(map[string]any)
+			evaluator := spec["evaluators"].([]any)[0].(map[string]any)
+			routing := spec["routing"].(map[string]any)
+			test.mutate(spec, evaluator, routing)
+			if err := schema.Validate(document); err == nil {
+				t.Fatal("schema Validate() error = nil, want rejection")
+			}
+		})
+	}
+}
+
+func TestEvaluatorProfileSchemaAcceptsConfidenceWithoutEscalation(t *testing.T) {
+	schema, err := newCompiler(t).Compile(schemaBase + "evaluator-profile.schema.json")
+	if err != nil {
+		t.Fatalf("compile evaluator profile schema: %v", err)
+	}
+	data, err := os.ReadFile(contractsPath(filepath.Join("examples", "v0alpha1", "evaluator-profile", "semantic-routing.json")))
+	if err != nil {
+		t.Fatalf("read semantic profile: %v", err)
+	}
+	var document map[string]any
+	if err := json.Unmarshal(data, &document); err != nil {
+		t.Fatalf("decode semantic profile: %v", err)
+	}
+	routing := document["spec"].(map[string]any)["routing"].(map[string]any)
+	delete(routing, "escalation")
+	routing["confidence"].(map[string]any)["onLowConfidence"] = "indeterminate"
+	if err := schema.Validate(document); err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+}
+
 const schemaBase = "https://antaeus.io/contracts/v0alpha1/"
 
 func TestContractExamplesAgainstSchemas(t *testing.T) {
@@ -130,6 +259,60 @@ func TestContractExamplesAgainstSchemas(t *testing.T) {
 			schema:   "fixture-set.schema.json",
 			instance: filepath.Join("examples", "v0alpha1", "fixture-set", "quickstart.json"),
 			valid:    true,
+		},
+		{
+			name:     "quickstart evaluator profile",
+			schema:   "evaluator-profile.schema.json",
+			instance: filepath.Join("examples", "v0alpha1", "evaluator-profile", "quickstart-fixture.json"),
+			valid:    true,
+		},
+		{
+			name:     "semantic routing evaluator profile",
+			schema:   "evaluator-profile.schema.json",
+			instance: filepath.Join("examples", "v0alpha1", "evaluator-profile", "semantic-routing.json"),
+			valid:    true,
+		},
+		{
+			name:     "evaluator profile unknown property",
+			schema:   "evaluator-profile.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "evaluator-profile", "invalid-unknown-property.json"),
+			valid:    false,
+		},
+		{
+			name:     "evaluator profile terminal outcome",
+			schema:   "evaluator-profile.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "evaluator-profile", "invalid-terminal-outcome.json"),
+			valid:    false,
+		},
+		{
+			name:     "evaluator profile terminal failure",
+			schema:   "evaluator-profile.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "evaluator-profile", "invalid-terminal-failure.json"),
+			valid:    false,
+		},
+		{
+			name:     "fixture evaluator credential",
+			schema:   "evaluator-profile.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "evaluator-profile", "invalid-fixture-credential.json"),
+			valid:    false,
+		},
+		{
+			name:     "evaluator profile incomplete confidence",
+			schema:   "evaluator-profile.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "evaluator-profile", "invalid-confidence.json"),
+			valid:    false,
+		},
+		{
+			name:     "evaluator profile mixed modes",
+			schema:   "evaluator-profile.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "evaluator-profile", "invalid-mixed-modes.json"),
+			valid:    false,
+		},
+		{
+			name:     "deterministic mode with other adapter",
+			schema:   "evaluator-profile.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "evaluator-profile", "invalid-fixture-adapter.json"),
+			valid:    false,
 		},
 		{
 			name:     "quickstart regression suite",
@@ -263,6 +446,7 @@ func newCompiler(t *testing.T) *jsonschema.Compiler {
 		"decision-request.schema.json",
 		"decision.schema.json",
 		"fixture-set.schema.json",
+		"evaluator-profile.schema.json",
 		"regression-suite.schema.json",
 		"regression-result-set.schema.json",
 		"problem.schema.json",
