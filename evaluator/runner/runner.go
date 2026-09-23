@@ -53,6 +53,9 @@ type Input struct {
 	CanonicalInput json.RawMessage
 	CorrelationID  string
 	Enforcement    bool
+	// AllowSyntheticFixtures explicitly permits non-enforcement fixture runs.
+	// Enforcement always rejects fixtures, even when this flag is true.
+	AllowSyntheticFixtures bool
 	// Credentials must be obtained after configuration selection and project
 	// trust. The caller owns and clears this set; Run clears its own copies.
 	Credentials *localbinding.Credentials
@@ -90,6 +93,8 @@ type timing struct {
 // Run validates all configuration before accepting an evaluation. Thereafter,
 // exhausted adapter, deadline, and cancellation failures become failed evidence
 // and a typed Decision. A matched deny still wins the deterministic reducer.
+// Adapter panics propagate after credential cleanup and context cancellation;
+// they do not return a Decision. Embedding hosts own panic isolation/recovery.
 func Run(ctx context.Context, input Input, registry Registry) (decision.Decision, error) {
 	return run(ctx, input, registry, timing{time.Now, sleep, func(base time.Duration) time.Duration {
 		return base/2 + time.Duration(rand.Int64N(int64(base-base/2)+1))
@@ -190,6 +195,9 @@ func run(ctx context.Context, input Input, registry Registry, clock timing) (dec
 		}
 		if input.Enforcement && entry.Mode == profile.ModeDeterministicFixture {
 			return decision.Decision{}, errors.New("deterministic fixtures cannot run in enforcement mode")
+		}
+		if entry.Mode == profile.ModeDeterministicFixture && !input.AllowSyntheticFixtures {
+			return decision.Decision{}, errors.New("deterministic fixtures require explicit synthetic execution permission")
 		}
 		if entry.CredentialSlot != nil {
 			key := localbinding.Key{AdapterID: entry.Adapter.ID, Slot: *entry.CredentialSlot}

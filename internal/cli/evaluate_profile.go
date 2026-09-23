@@ -134,6 +134,9 @@ func runEvaluateProfileWith(args []string, stdout, stderr io.Writer, runtime con
 	result, err := runner.Run(context.Background(), runner.Input{
 		Policy: artifact, Profile: p, CanonicalInput: input,
 		CorrelationID: "cli-fixture-" + caseName, Credentials: credentials,
+		// This command installs and accepts only synthetic fixture adapters.
+		// Revisit this opt-in before adding semantic execution to the command.
+		AllowSyntheticFixtures: true,
 	}, registry)
 	if err != nil {
 		return commandError(stderr, "evaluate-profile", err)

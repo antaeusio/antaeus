@@ -149,6 +149,7 @@ func TestRegistryRequiresExactAdapterVersion(t *testing.T) {
 				t.Fatal(err)
 			}
 			in.Profile = p
+			in.AllowSyntheticFixtures = true
 			registry := Registry{key: {Mode: profile.ModeDeterministicFixture, Protocol: p.Spec.Evaluators[0].Protocol, Capabilities: p.Spec.Evaluators[0].RequiredCapabilities, FixtureVersion: "v1", Evaluate: func(context.Context, evaluator.Request, Configuration) (evaluator.Result, error) {
 				t.Fatal("wrong routed adapter version accepted")
 				return evaluator.Result{}, nil

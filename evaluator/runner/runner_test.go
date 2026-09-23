@@ -401,6 +401,7 @@ func TestRegistryFixtureCannotEnforce(t *testing.T) {
 	}
 	in.Profile = p
 	in.Enforcement = true
+	in.AllowSyntheticFixtures = true // enforcement wins even with explicit opt-in
 	registry := Registry{p.Spec.Evaluators[0].Adapter: {Mode: profile.ModeDeterministicFixture, Protocol: p.Spec.Evaluators[0].Protocol, Capabilities: p.Spec.Evaluators[0].RequiredCapabilities, FixtureVersion: "v1", Evaluate: func(context.Context, evaluator.Request, Configuration) (evaluator.Result, error) {
 		t.Fatal("enforcement fixture executed")
 		return evaluator.Result{}, nil
@@ -437,6 +438,7 @@ func TestFixtureVersionMustMatchEveryRoutedProfileEntry(t *testing.T) {
 				t.Fatal(err)
 			}
 			in.Profile = p
+			in.AllowSyntheticFixtures = true
 			registry := Registry{p.Spec.Evaluators[0].Adapter: {
 				Mode: profile.ModeDeterministicFixture, Protocol: p.Spec.Evaluators[0].Protocol,
 				Capabilities: p.Spec.Evaluators[0].RequiredCapabilities, FixtureVersion: tt.registered,
@@ -515,6 +517,7 @@ func TestParentDeadlineAndFixtureLabeling(t *testing.T) {
 		t.Fatal(err)
 	}
 	in.Profile = p
+	in.AllowSyntheticFixtures = true
 	registry := Registry{p.Spec.Evaluators[0].Adapter: {Mode: profile.ModeDeterministicFixture, Protocol: p.Spec.Evaluators[0].Protocol, Capabilities: p.Spec.Evaluators[0].RequiredCapabilities, FixtureVersion: "v1", Evaluate: func(_ context.Context, r evaluator.Request, c Configuration) (evaluator.Result, error) {
 		if len(c.Credential) != 0 {
 			t.Fatal("fixture received credential")

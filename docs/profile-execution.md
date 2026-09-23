@@ -72,13 +72,41 @@ expected result metadata is derived from that pinned identity. Missing
 credentials, unsupported adapters,
 invalid inputs, invalid registry labels, and pre-existing cancellation return Go
 errors without invoking an evaluator or creating a Decision. Enforcement rejects
-deterministic fixtures. Fixture evidence remains visibly synthetic in local use.
+deterministic fixtures even when `AllowSyntheticFixtures` is true. Otherwise,
+fixture execution requires the explicit `AllowSyntheticFixtures: true` Go input;
+the zero value rejects it before any adapter call or Decision. The guard covers
+every configured route, including uninvoked escalation and fallback. Semantic
+profiles do not need this opt-in. This is an intentional-use guard, not an
+authorization mechanism: a trusted embedding boundary chooses execution mode.
+The fixture-only CLI sets the opt-in internally without a bypass flag; revisit
+that internal permission before adding semantic adapters to the command.
+Fixture evidence remains visibly synthetic in local use.
 
-Once the first attempt starts, adapter failures, malformed results, cancellation,
+Once the first attempt starts, returned adapter errors, malformed results, cancellation,
 and deadline exhaustion become failed rule evidence. The existing deterministic
 reducer determines the outcome; an already accepted matched deny still outranks
 unresolved rules. No failure synthesizes a policy outcome or invokes an
 unconfigured evaluator.
+
+Programming panics are an explicit exception: adapter panics propagate after
+deferred credential cleanup and attempt/total context cancellation. They return
+no Decision or completed trace, even if cancellation or a deadline is also
+observable. The runner does not recover, log or serialize the panic. An unhandled
+runtime/host panic can still print sensitive values or stacks; this is not a
+redaction guarantee. Embedding hosts must design supervision/isolation and avoid
+blindly reusing potentially corrupted adapter state. Panic containment needs a
+distinct quarantine signal and cannot be treated as an ordinary retryable error.
+
+### Development migration for the planned v0.1.0 release
+
+Go callers intentionally executing fixtures must add `AllowSyntheticFixtures:
+true` to `runner.Input`; callers relying on the previous zero-value permission
+now receive a pre-acceptance error. `Enforcement: true` always prohibits fixtures.
+No change is needed for semantic profiles. The existing fixture-only CLI retains
+its flags, outputs and exit classes, and the legacy `evaluate`/`test` paths are
+unchanged. Published portable schemas and policy/profile identities are unchanged.
+This is a documented first-minor development change, not a patch backport or a
+claim that v0.1.0 has been released.
 
 Calls are synchronous. Adapters must honor context cancellation and return
 promptly; the runner does not detach goroutines or forcibly stop an uncooperative
