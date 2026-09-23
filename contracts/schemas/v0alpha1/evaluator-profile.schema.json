@@ -56,6 +56,30 @@
           "$ref": "#/$defs/routing"
         }
       },
+      "not": {
+        "allOf": [
+          {
+            "properties": {
+              "evaluators": {
+                "contains": {
+                  "properties": {"mode": {"const": "semantic"}},
+                  "required": ["mode"]
+                }
+              }
+            }
+          },
+          {
+            "properties": {
+              "evaluators": {
+                "contains": {
+                  "properties": {"mode": {"const": "deterministic-fixture"}},
+                  "required": ["mode"]
+                }
+              }
+            }
+          }
+        ]
+      },
       "unevaluatedProperties": false
     }
   },
@@ -104,7 +128,7 @@
     },
     "retry": {
       "type": "object",
-      "required": ["maxAttempts"],
+      "required": ["maxAttempts", "retryOn"],
       "properties": {
         "maxAttempts": {
           "type": "integer",
@@ -125,12 +149,39 @@
           "type": "number",
           "minimum": 1,
           "maximum": 10
+        },
+        "retryOn": {
+          "type": "array",
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/transientFailure"
+          }
         }
       },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"maxAttempts": {"const": 1}},
+            "required": ["maxAttempts"]
+          },
+          "then": {
+            "properties": {"retryOn": {"maxItems": 0}}
+          },
+          "else": {
+            "properties": {"retryOn": {"minItems": 1}}
+          }
+        }
+      ],
       "unevaluatedProperties": false
+    },
+    "transientFailure": {
+      "type": "string",
+      "enum": ["timeout", "unavailable", "throttled"]
     },
     "instructionTemplate": {
       "type": "object",
+      "required": ["digest"],
       "properties": {
         "id": {
           "$ref": "#/$defs/namespacedId"
@@ -139,16 +190,6 @@
           "$ref": "common.schema.json#/$defs/digest"
         }
       },
-      "oneOf": [
-        {
-          "required": ["id"],
-          "not": {"required": ["digest"]}
-        },
-        {
-          "required": ["digest"],
-          "not": {"required": ["id"]}
-        }
-      ],
       "unevaluatedProperties": false
     },
     "fixtureParameters": {
@@ -200,21 +241,17 @@
         },
         "provider": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128,
-          "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"
         },
         "model": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256,
-          "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,255}$",
+          "not": {"pattern": "://"}
         },
         "modelRevision": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256,
-          "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,255}$",
+          "not": {"pattern": "://"}
         },
         "instructionTemplate": {
           "$ref": "#/$defs/instructionTemplate"
@@ -244,6 +281,17 @@
                 {"required": ["instructionTemplate"]},
                 {"required": ["credentialSlot"]}
               ]
+            },
+            "properties": {
+              "adapter": {
+                "properties": {
+                  "id": {"const": "io.antaeus.fixture"}
+                },
+                "required": ["id"]
+              },
+              "parameters": {
+                "$ref": "#/$defs/fixtureParameters"
+              }
             }
           }
         },
@@ -342,8 +390,7 @@
           "maxItems": 3,
           "uniqueItems": true,
           "items": {
-            "type": "string",
-            "enum": ["timeout", "unavailable", "throttled"]
+            "$ref": "#/$defs/transientFailure"
           }
         },
         "confidence": {
@@ -382,6 +429,9 @@
           },
           "then": {
             "required": ["escalation"]
+          },
+          "else": {
+            "not": {"required": ["escalation"]}
           }
         }
       ],

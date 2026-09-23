@@ -1,7 +1,7 @@
 {
   "apiVersion": "evaluator.antaeus.io/v0alpha1",
   "kind": "EvaluatorProfile",
-  "metadata": {"name": "unknown-property"},
+  "metadata": {"name": "mixed-modes"},
   "spec": {
     "totalTimeoutMs": 2000,
     "credentialSlots": [],
@@ -15,6 +15,16 @@
         "timeoutMs": 1000,
         "retry": {"maxAttempts": 1, "retryOn": []},
         "parameters": {"fixtureSet": "quickstart", "fixtureVersion": "v1"}
+      },
+      {
+        "id": "semantic-fallback",
+        "mode": "semantic",
+        "adapter": {"id": "io.example.semantic", "version": "1"},
+        "protocol": {"id": "io.antaeus.rule-match", "version": "v0alpha1"},
+        "requiredCapabilities": ["json-input"],
+        "timeoutMs": 1000,
+        "retry": {"maxAttempts": 1, "retryOn": []},
+        "parameters": {}
       }
     ],
     "routing": {
@@ -22,7 +32,6 @@
       "fallbacks": [],
       "confidence": {"enabled": false},
       "terminal": {"onIndeterminate": "failure", "onFailure": "failure"}
-    },
-    "secret": "must-not-appear"
+    }
   }
 }

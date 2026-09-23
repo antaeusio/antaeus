@@ -115,11 +115,21 @@ capability requirements, retry behavior, confidence routing, escalation,
 operational fallbacks, and failure-only terminal behavior. Confidence can
 change routing only; it never creates or replaces a policy outcome.
 
+Retries and fallbacks name only `timeout`, `unavailable`, and `throttled` as
+eligible transient classes. `maxAttempts` includes the first attempt; one
+attempt has an empty `retryOn` list, while multiple attempts require at least
+one class. An invoked escalation that ends in an eligible operational failure
+continues into the configured fallback list. Invalid input, unsupported
+capability, malformed configuration, missing or rejected credentials, and
+deterministic request failures are not retryable.
+
 Profiles contain logical credential slot names, never secret values,
 environment-variable names, hosted secret identifiers, or arbitrary endpoint
 overrides. Runtime bindings resolve slots separately. Deterministic fixture
 evaluators cannot declare credentials, providers, models, or instruction
 templates and are never valid enforcement fallbacks.
+V0 profiles cannot mix semantic and deterministic-fixture evaluators, removing
+any route by which synthetic evidence could become an enforcement fallback.
 
 Profile authoring uses the same constrained YAML 1.2.2 or JSON data model,
 1 MiB source bound, nesting and node limits, RFC 8785 canonicalization, and
@@ -133,6 +143,9 @@ enforce semantic invariants that JSON Schema cannot express: unique evaluator
 and credential-slot IDs, valid references, an acyclic route, no evaluator in
 more than one route position, per-attempt timeouts within the total timeout,
 and confidence routing only through declared capabilities.
+Semantic validation also requires initial backoff not to exceed maximum
+backoff. Instruction-template behavior is always bound by a content digest; an
+optional namespaced ID is descriptive only.
 
 ## Regression suites
 

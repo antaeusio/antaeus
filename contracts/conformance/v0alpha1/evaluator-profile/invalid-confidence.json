@@ -13,7 +13,7 @@
         "protocol": {"id": "io.antaeus.rule-match", "version": "v0alpha1"},
         "requiredCapabilities": ["json-input"],
         "timeoutMs": 1000,
-        "retry": {"maxAttempts": 1},
+        "retry": {"maxAttempts": 1, "retryOn": []},
         "parameters": {"fixtureSet": "quickstart", "fixtureVersion": "v1"}
       }
     ],

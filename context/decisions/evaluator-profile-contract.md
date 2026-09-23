@@ -24,7 +24,10 @@ V0 routing is acyclic: one primary, at most one escalation evaluator, then an
 ordered bounded fallback list. Preserve unresolved evidence after routing is
 exhausted so the deterministic reducer produces failure unless a matched deny
 has higher precedence. Deterministic fixtures are visibly synthetic,
-credential-free, and prohibited from enforcement routes.
+credential-free, and prohibited from enforcement routes. A v0 profile cannot
+mix semantic and deterministic-fixture evaluators. Eligible operational
+failures from either a primary or an invoked escalation continue into the
+ordered fallback list.
 
 Profiles never contain credential values, environment-variable names, hosted
 secret identifiers, or ambient behavior overrides. Adapter-specific parameters
@@ -33,6 +36,9 @@ version. The common schema closes the built-in fixture adapter parameters.
 Implementations additionally enforce relational invariants—unique IDs, valid
 references, acyclicity, route-position uniqueness, deadline consistency, and
 capability-backed confidence—because JSON Schema cannot express the full graph.
+The relational validator also requires initial backoff not to exceed maximum
+backoff. Instruction templates require a content digest; any template ID is an
+optional descriptive label rather than mutable identity.
 
 ## Rationale
 
