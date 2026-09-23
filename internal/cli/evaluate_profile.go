@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -79,21 +78,17 @@ func runEvaluateProfileWith(args []string, stdout, stderr io.Writer, runtime con
 	}
 	resolved, err := resolveEvaluationConfig(runtime, profilePath, bindingsPath)
 	if err != nil {
-		var trust *localconfig.TrustRequiredError
-		if errors.As(err, &trust) {
-			return commandError(stderr, "evaluate-profile", fmt.Errorf("project requires trust; inspect its files and run antaeus config trust --digest %s", trust.Digest))
-		}
-		return configResolutionError(stderr, err)
+		return profileExecutionConfigError(stderr, err)
 	}
 	p, err := resolved.Profile()
 	if err != nil {
-		return configResolutionError(stderr, err)
+		return profileExecutionConfigError(stderr, err)
 	}
 	// This binary deliberately installs no remote adapters. Reject before
 	// preflight, so even a trusted semantic profile cannot read credentials.
 	for _, entry := range p.Spec.Evaluators {
 		if entry.Mode != profile.ModeDeterministicFixture || entry.Adapter != (profile.ComponentIdentity{ID: fixture.AdapterID, Version: fixture.AdapterVersion}) {
-			return commandError(stderr, "evaluate-profile", errors.New("only the deterministic fixture adapter is installed; remote evaluation is unavailable"))
+			return commandError(stderr, "evaluate-profile", errFixtureOnly)
 		}
 	}
 	artifact, err := policy.LoadFile(policyPath)
@@ -132,7 +127,7 @@ func runEvaluateProfileWith(args []string, stdout, stderr io.Writer, runtime con
 	// lookup. Keep the same ownership discipline as credential-bearing callers.
 	credentials, err := resolved.Preflight(runtime.environment)
 	if err != nil {
-		return configResolutionError(stderr, err)
+		return profileExecutionConfigError(stderr, err)
 	}
 	defer credentials.Clear()
 	result, err := runner.Run(context.Background(), runner.Input{
@@ -143,6 +138,19 @@ func runEvaluateProfileWith(args []string, stdout, stderr io.Writer, runtime con
 		return commandError(stderr, "evaluate-profile", err)
 	}
 	return writeJSON(stdout, stderr, "evaluate-profile", result)
+}
+
+var errFixtureOnly = errors.New("only the deterministic fixture adapter is installed; remote evaluation is unavailable")
+
+func profileExecutionConfigError(stderr io.Writer, err error) int {
+	// Valid fixture profiles cannot use credential slots. Never prompt users to
+	// grant lasting trust or provision secrets for a profile we cannot execute.
+	var trust *localconfig.TrustRequiredError
+	var missing *localbinding.MissingCredentialError
+	if errors.As(err, &trust) || errors.As(err, &missing) {
+		err = errFixtureOnly
+	}
+	return commandError(stderr, "evaluate-profile", err)
 }
 
 // Reuse the configuration commands' strict loaders and trust store. Never

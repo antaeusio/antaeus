@@ -36,7 +36,8 @@ input identities. The adapter supports `json-input` and `structured-rule-results
 not `confidence-scores`; confidence routing is therefore rejected. Profile
 deadlines and routing go through the reusable runner, with no remote calls or
 credential reads. Selected semantic profiles are rejected, including trusted
-ones, before credential preflight. Unused bindings are never resolved.
+ones, before credential preflight, without prompting for unusable credentials
+or a trust grant. Unused bindings are never resolved.
 
 Successful execution prints one complete Decision, including the selected
 profile's canonical digest, synthetic fixture metadata, and bounded execution

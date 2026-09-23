@@ -40,7 +40,9 @@ credential-free behavior and do not consume these manifests.
 The separate [`evaluate-profile` command](./profile-execution.md#cli-fixture-profiles)
 uses this selection workflow and the profile runner. Currently it installs only
 the deterministic fixture adapter and never reads credentials; remote profiles
-are rejected before credential preflight, even after project trust is granted.
+are rejected without credential-setup or trust-grant prompts, even if project
+trust was previously granted. Use `config` commands separately when deliberately
+inspecting or managing configuration; execution never grants project trust.
 
 ## Locations and manifest
 
