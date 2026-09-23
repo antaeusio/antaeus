@@ -40,9 +40,19 @@ keep their local build-lock protection even in isolated CI checkouts. New PR
 revisions cancel superseded PR runs; main pushes have distinct concurrency
 groups so they neither cancel running commits nor replace pending commits.
 
+Both toolchain jobs also run pinned `govulncheck` v1.8.0 source analysis including
+test packages, against the current Go vulnerability database. This step may
+download the scanner's separate dependency graph and query `vuln.go.dev`; it
+does not add a runtime dependency or execute the scanned tests. It uses text
+output and symbol-level scanning so reachable findings fail the job, as do
+scanner/download/database errors. There are no exclusions or ignored exit codes.
+Verbose output retains package/module-only findings for review even when the
+symbol gate passes. See [vulnerability scanning](./docs/vulnerability-scanning.md)
+for reproduction, coverage limits and finding dispositions.
+
 This workflow does not publish artifacts or deploy anything. Cross-compilation
-is not native artifact smoke testing. Vulnerability scanning and release
-verification remain separate gates before a release can be published. A passing
+is not native artifact smoke testing. Release verification remains a separate
+gate before a release can be published. A passing
 workflow does not imply that repository branch-protection settings require it.
 
 ## Changes and review
