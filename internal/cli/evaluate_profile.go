@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -153,31 +154,24 @@ func profileExecutionConfigError(stderr io.Writer, err error) int {
 	return commandError(stderr, "evaluate-profile", err)
 }
 
-// Reuse the configuration commands' strict loaders and trust store. Never
-// discover parents, read .env files, or grant transient trust for execution.
+// Reuse the configuration commands' strict loaders. This fixture-only command
+// needs no credential authority: do not read or grant project trust. Remote
+// adapters must be integrated with saved trust before they can be installed.
 func resolveEvaluationConfig(runtime configRuntime, profilePath, bindingsPath string) (*localconfig.Resolved, error) {
 	if err := independentUserConfig(runtime); err != nil {
 		return nil, err
 	}
 	project, err := loadConfigManifest(filepath.Join(runtime.projectDir, ".antaeus", "config.json"), runtime.projectDir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("project configuration: %w", err)
 	}
 	user, err := loadConfigManifest(filepath.Join(runtime.userDir, "config.json"), "")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("user configuration: %w", err)
 	}
 	cli, err := loadConfigLayer(profilePath, bindingsPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("explicit configuration: %w", err)
 	}
-	trusted, err := projectTrusted(runtime, project.Digest())
-	if err != nil {
-		return nil, err
-	}
-	options := localconfig.Options{CLI: cli, Project: project, User: user}
-	if trusted {
-		options.TrustedProjectDigest = project.Digest()
-	}
-	return localconfig.Resolve(options)
+	return localconfig.Resolve(localconfig.Options{CLI: cli, Project: project, User: user})
 }

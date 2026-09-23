@@ -119,8 +119,24 @@ func TestEvaluateProfileSelectionAndNoImplicitDefault(t *testing.T) {
 	// Malformed lower-priority configuration still fails closed.
 	writeConfigTestFile(t, filepath.Join(r.userDir, "config.json"), `{"rawSecret":"NEVER_ECHO_THIS"}`)
 	diagnostic := evaluateProfileCommand(t, r, 1, append(args, "--profile", projectProfile))
-	if strings.Contains(diagnostic, "NEVER_ECHO_THIS") || !strings.Contains(diagnostic, "manifest") {
+	if strings.Contains(diagnostic, "NEVER_ECHO_THIS") || !strings.Contains(diagnostic, "user configuration") {
 		t.Fatal(diagnostic)
+	}
+}
+
+func TestEvaluateProfileFixtureDoesNotConsultTrustStore(t *testing.T) {
+	r := fixtureProfileRuntime(t)
+	copyConfigFixture(t, "evaluator-profile/quickstart-fixture.json", filepath.Join(r.projectDir, "profile.json"))
+	writeConfigTestFile(t, filepath.Join(r.projectDir, ".antaeus", "config.json"), `{"apiVersion":"config.antaeus.io/v0alpha1","kind":"LocalConfiguration","profileFile":"../profile.json"}`)
+	path, _, err := trustMarker(r, projectTestDigest(t, r))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeConfigTestFile(t, path, "corrupt trust marker")
+	evaluateProfileCommand(t, r, 0, profileEvaluationArgs())
+	data, err := os.ReadFile(path)
+	if err != nil || string(data) != "corrupt trust marker" {
+		t.Fatal("execution modified the trust store")
 	}
 }
 

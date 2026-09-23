@@ -38,6 +38,10 @@ deadlines and routing go through the reusable runner, with no remote calls or
 credential reads. Selected semantic profiles are rejected, including trusted
 ones, before credential preflight, without prompting for unusable credentials
 or a trust grant. Unused bindings are never resolved.
+Fixture execution neither consults nor modifies saved trust markers because no
+credential authority is needed; a corrupt marker cannot grant authority or block
+a fixture. Malformed manifests/artifacts and invalid reference combinations still
+fail closed before execution, even for unsupported profiles.
 
 Successful execution prints one complete Decision, including the selected
 profile's canonical digest, synthetic fixture metadata, and bounded execution
