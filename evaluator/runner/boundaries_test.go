@@ -55,7 +55,7 @@ func TestFallbackEligibilityAtEveryTransition(t *testing.T) {
 				t.Fatal(err)
 			}
 			trace := traceOf(t, d)
-			if !reflect.DeepEqual(seen, tt.wantIDs) || trace.Terminal != tt.wantTerminal || len(trace.Attempts) != len(seen) || d.Evaluator.Fallback != (len(seen) > 1) {
+			if !reflect.DeepEqual(seen, tt.wantIDs) || !reflect.DeepEqual(d.Evaluator.Route, tt.wantIDs) || trace.Terminal != tt.wantTerminal || len(trace.Attempts) != len(seen) || d.Evaluator.Fallback != (len(seen) > 1) {
 				t.Fatalf("seen=%v trace=%+v evaluator=%+v", seen, trace, d.Evaluator)
 			}
 			wantOutcome := decision.OutcomeFailure
@@ -66,11 +66,12 @@ func TestFallbackEligibilityAtEveryTransition(t *testing.T) {
 				t.Fatalf("outcome=%s want=%s", d.Outcome, wantOutcome)
 			}
 			for i, attempt := range trace.Attempts {
+				wantCode := []string{tt.primaryCode, tt.fallbackCode, "evaluation.succeeded"}[i]
 				wantRoute := "fallback"
 				if i == 0 {
 					wantRoute = "primary"
 				}
-				if attempt.EvaluatorID != seen[i] || attempt.Route != wantRoute || attempt.Attempt != 1 || !reflect.DeepEqual(attempt.RuleIndexes, []int{0, 1}) {
+				if attempt.Code != wantCode || attempt.EvaluatorID != seen[i] || attempt.Route != wantRoute || attempt.Attempt != 1 || !reflect.DeepEqual(attempt.RuleIndexes, []int{0, 1}) {
 					t.Fatalf("unexpected attempt: %+v", attempt)
 				}
 			}
@@ -117,8 +118,46 @@ func TestRegistryRequiresExactAdapterVersion(t *testing.T) {
 	key.Version = "2.0.0"
 	registry[key] = a
 	d, err := Run(context.Background(), in, registry)
-	if err == nil || d.Kind != "" {
+	if err == nil || err.Error() != "installed adapter parameter validation failed" || d.Kind != "" {
 		t.Fatalf("decision=%+v error=%v", d, err)
+	}
+	// Fixtures skip semantic parameter validation, so exercise the separate
+	// exact routed-identity check, including a dormant fallback.
+	for _, fallbackOnly := range []bool{false, true} {
+		name := "fixture primary"
+		if fallbackOnly {
+			name = "fixture fallback"
+		}
+		t.Run(name, func(t *testing.T) {
+			in := inputFixture(t)
+			p, err := profile.LoadFile("../../contracts/examples/v0alpha1/evaluator-profile/quickstart-fixture.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			key := p.Spec.Evaluators[0].Adapter
+			if fallbackOnly {
+				fallback := p.Spec.Evaluators[0]
+				fallback.ID = "fixture-fallback"
+				fallback.Adapter.Version = "2.0.0"
+				p.Spec.Evaluators = append(p.Spec.Evaluators, fallback)
+				p.Spec.Routing.Fallbacks = []string{fallback.ID}
+				p.Spec.Routing.FallbackOn = []profile.TransientFailure{profile.FailureTimeout}
+			} else {
+				key.Version = "2.0.0"
+			}
+			if err := p.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			in.Profile = p
+			registry := Registry{key: {Mode: profile.ModeDeterministicFixture, Protocol: p.Spec.Evaluators[0].Protocol, Capabilities: p.Spec.Evaluators[0].RequiredCapabilities, FixtureVersion: "v1", Evaluate: func(context.Context, evaluator.Request, Configuration) (evaluator.Result, error) {
+				t.Fatal("wrong routed adapter version accepted")
+				return evaluator.Result{}, nil
+			}}}
+			d, err := Run(context.Background(), in, registry)
+			if err == nil || err.Error() != "routed adapter identity, mode, or protocol is unsupported" || d.Kind != "" {
+				t.Fatalf("decision=%+v error=%v", d, err)
+			}
+		})
 	}
 }
 
@@ -133,7 +172,7 @@ func TestCredentialsAreIsolatedByAdapterAndSlot(t *testing.T) {
 			primary := in.Profile.Spec.Evaluators[0]
 			primary.Retry = profile.RetryPolicy{MaxAttempts: 1, RetryOn: []profile.TransientFailure{}}
 			fallback, unused := primary, primary
-			fallback.ID, unused.ID = "fallback", "unused-fallback"
+			fallback.ID, unused.ID = "fallback", "uninvoked-fallback"
 			if separateAdapter {
 				fallback.Adapter.ID, unused.Adapter.ID = "io.example.second", "io.example.third"
 			} else {
@@ -156,6 +195,7 @@ func TestCredentialsAreIsolatedByAdapterAndSlot(t *testing.T) {
 				bindings.SecretBindings[entry.Adapter.ID][*entry.CredentialSlot] = localbinding.Reference{Source: "environment", Name: names[i]}
 			}
 			reads := map[string]int{}
+			bindings.SecretBindings["io.example.outside"] = map[string]localbinding.Reference{"unused-key": {Source: "environment", Name: "TEST_OUTSIDE_ROUTE_KEY"}}
 			credentials, err := localbinding.Preflight(in.Profile, bindings, localbinding.EnvironmentFunc(func(name string) (string, bool) {
 				reads[name]++
 				for i, expected := range names {
@@ -170,6 +210,9 @@ func TestCredentialsAreIsolatedByAdapterAndSlot(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer credentials.Clear()
+			if _, ok := credentials.Credential("io.example.outside", "unused-key"); ok {
+				t.Fatal("outside-route credential captured")
+			}
 			in.Credentials = credentials
 			var buffers [][]byte
 			var seen []string
@@ -244,6 +287,20 @@ func TestExecutionTraceSchemaRejectsInvalidRecords(t *testing.T) {
 	}
 	traceOf(t, d) // establish that the unmodified baseline conforms
 	schema := traceSchema(t)
+	// Positive controls prove boundary-valid mutations reach schema validation
+	// as JSON values, not unsupported Go slice types rejected by the library.
+	var valid map[string]any
+	if err := json.Unmarshal(d.Extensions[TraceExtension], &valid); err != nil {
+		t.Fatal(err)
+	}
+	validAttempt := valid["attempts"].([]any)[0].(map[string]any)
+	validAttempt["ruleIndexes"] = []any{0, 255}
+	validAttempt["attempt"] = 5
+	validAttempt["revisionAvailable"] = true
+	validAttempt["resolvedRevision"] = "revision-1"
+	if err := schema.Validate(valid); err != nil {
+		t.Fatalf("valid boundary rejected: %v", err)
+	}
 	for _, tt := range []struct {
 		name   string
 		mutate func(map[string]any, map[string]any)
@@ -254,8 +311,14 @@ func TestExecutionTraceSchemaRejectsInvalidRecords(t *testing.T) {
 		{"attempt below limit", func(_, a map[string]any) { a["attempt"] = 0 }},
 		{"unknown attempt code", func(_, a map[string]any) { a["code"] = "evaluation.unknown" }},
 		{"unknown terminal code", func(root, _ map[string]any) { root["terminal"] = "evaluation.unknown" }},
-		{"duplicate indexes", func(_, a map[string]any) { a["ruleIndexes"] = []int{0, 0} }},
-		{"index above limit", func(_, a map[string]any) { a["ruleIndexes"] = []int{256} }},
+		{"duplicate indexes", func(_, a map[string]any) { a["ruleIndexes"] = []any{0, 0} }},
+		{"index above limit", func(_, a map[string]any) { a["ruleIndexes"] = []any{256} }},
+		{"extra root field", func(root, _ map[string]any) { root["message"] = "unrestricted payload" }},
+		{"extra attempt field", func(_, a map[string]any) { a["credential"] = "synthetic secret" }},
+		{"wrong version", func(root, _ map[string]any) { root["version"] = "v99" }},
+		{"unknown route", func(_, a map[string]any) { a["route"] = "unconfigured" }},
+		{"negative latency", func(_, a map[string]any) { a["latencyMs"] = -1 }},
+		{"missing required field", func(_, a map[string]any) { delete(a, "adapterId") }},
 		{"empty attempts", func(root, _ map[string]any) { root["attempts"] = []any{} }},
 		{"attempts above limit", func(root, a map[string]any) {
 			attempts := make([]any, 65)
