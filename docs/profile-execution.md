@@ -139,8 +139,15 @@ For retry number `n` (1 is the first retry), the base delay in milliseconds is
 `min(maxBackoffMs, initialBackoffMs * multiplier^(n-1))`, truncated to an integer.
 The production clock uses equal jitter uniformly over the inclusive interval
 from half that base delay to the full base delay, at nanosecond resolution, and
-clips waiting to the remaining total deadline. Tests inject a clock and jitter
-source. Retries retain identical policy/profile/input identity, correlation ID,
+consumes one jitter draw per contemplated retry. If that delay is greater than
+or equal to the remaining total budget, retries stop without sleeping: preserve
+the last transient failure so an eligible configured fallback can use the time
+left. Without an eligible fallback, return that failure promptly. An already
+expired deadline or cancellation wins over the prior error; neither starts a
+fallback. Otherwise wait normally within the context deadline. This means jitter
+can affect retry-versus-fallback selection near the budget boundary; the trace
+records what actually ran. Tests inject a clock and jitter source.
+Retries retain identical policy/profile/input identity, correlation ID,
 and rule subset. An adapter that supports provider idempotency must derive and
 reuse an appropriate stable key for that evaluator and logical request.
 

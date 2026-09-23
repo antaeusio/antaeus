@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- For planned v0.1.0, retries no longer sleep away the final budget when the next jittered delay leaves no time to retry. Eligible fallbacks may run sooner; without one, the last transient failure returns promptly. This changes Go/CLI execution timing and possibly the recorded route, not published schemas. Cancellation and exhausted deadlines retain precedence.
 - For the planned first minor release v0.1.0, profile-runner Go callers must explicitly set `AllowSyntheticFixtures` for non-enforcement fixture execution. Enforcement still rejects fixtures. The fixture-only CLI opts in internally; its flags/output and published schemas are unchanged. See the [migration note](./docs/profile-execution.md#development-migration-for-the-planned-v010-release). No release has been published.
 - Documented existing adapter panic propagation, deferred cleanup and embedding-host isolation responsibilities; panics do not produce a Decision or completed trace.
 - Tightened the unreleased v0alpha1 evaluator metadata so mode and synthetic status are explicit and deterministic fixtures carry exact set and adapter versions.
