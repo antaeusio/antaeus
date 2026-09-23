@@ -37,7 +37,8 @@ They must produce the exact UTF-8 bytes in `canonical/vendor-onboarding.canonica
 `regression-suite/valid-input-max-depth.json` fixes the maximum inline-input
 nesting boundary. `invalid-input-over-depth.json` exceeds it by one container.
 The other invalid fixtures cover unknown properties and present descriptions
-that are null, empty, or whitespace-only.
+that are null, empty, or whitespace-only across the portable Unicode whitespace
+set, plus a whitespace-only suite version.
 
 ## Policy source parsing
 

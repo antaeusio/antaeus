@@ -203,6 +203,20 @@ func TestParseAppliesStructuralLimitsToEachInput(t *testing.T) {
 	}
 }
 
+func TestParseRejectsPortableUnicodeWhitespaceFixtures(t *testing.T) {
+	for _, name := range []string{
+		"invalid-description-nbsp.json",
+		"invalid-description-nel.json",
+		"invalid-whitespace-version.json",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := LoadFile(conformancePath(name)); err == nil {
+				t.Fatalf("LoadFile(%s) error = nil, want rejection", name)
+			}
+		})
+	}
+}
+
 func loadQuickstartSuite(t *testing.T) Suite {
 	t.Helper()
 	suite, err := LoadFile(contractPath("regression-suite", "quickstart.json"))

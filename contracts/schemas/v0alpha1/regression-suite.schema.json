@@ -49,7 +49,14 @@
           "pattern": "^[a-z][a-z0-9._-]{0,63}$"
         },
         "version": {
-          "$ref": "common.schema.json#/$defs/version"
+          "allOf": [
+            {
+              "$ref": "common.schema.json#/$defs/version"
+            },
+            {
+              "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+            }
+          ]
         }
       },
       "unevaluatedProperties": false
@@ -79,7 +86,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 4096,
-          "pattern": "\\S"
+          "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
         },
         "fixtureCase": {
           "type": "string",
