@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Local profile and credential-reference precedence with immutable snapshots, project-digest trust checks, and redacted source summaries.
 - Initial repository foundation.
 - Go module and thin command foundation with version reporting.
 - Locked local validation and supported-target cross-build entry points.
