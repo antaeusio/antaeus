@@ -78,6 +78,7 @@ type Metadata struct {
 	Synthetic      bool
 	Provider       string
 	Model          string
+	ModelRevision  string
 	RequestID      string
 	FixtureSet     string
 	FixtureVersion string

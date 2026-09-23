@@ -26,7 +26,7 @@ type DecisionInput struct {
 // Decide obtains provider-neutral evidence, attaches policy-authored outcomes,
 // applies deterministic reduction, and returns a validated portable Decision.
 // Adapter and deadline errors remain Go errors at this single-attempt layer; a
-// future profile router owns retry exhaustion and typed failure Decisions.
+// profile runner owns retry exhaustion and typed failure Decisions.
 func Decide(ctx context.Context, adapter Evaluator, input DecisionInput) (decision.Decision, error) {
 	if adapter == nil {
 		return decision.Decision{}, fmt.Errorf("evaluator is required")

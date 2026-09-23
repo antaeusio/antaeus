@@ -135,6 +135,11 @@ func ValidateResult(request Request, result Result) error {
 			return err
 		}
 	}
+	if result.Metadata.ModelRevision != "" {
+		if err := validateNonBlank("model revision", result.Metadata.ModelRevision, 256); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

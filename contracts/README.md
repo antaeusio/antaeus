@@ -112,6 +112,11 @@ and duplicate properties are rejected before typed decoding.
 
 ## Evaluator profiles
 
+The Go [profile runner](../docs/profile-execution.md) executes validated profiles
+and adds `io.antaeus.execution` Decision extensions conforming to
+`execution-trace.schema.json`. It caps the complete evaluation at 64 attempts,
+matching the existing Decision envelope.
+
 Local runners select profiles and credential references using the
 [local configuration precedence rules](../docs/local-configuration.md).
 The Go resolver operates on validated artifacts. The CLI `config` commands load
