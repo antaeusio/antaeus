@@ -81,15 +81,24 @@ func traceOf(t *testing.T, d decision.Decision) Trace {
 	if err := json.Unmarshal(d.Extensions[TraceExtension], &trace); err != nil {
 		t.Fatal(err)
 	}
+	var instance any
+	if err := json.Unmarshal(d.Extensions[TraceExtension], &instance); err != nil {
+		t.Fatal(err)
+	}
+	if err := traceSchema(t).Validate(instance); err != nil {
+		t.Fatal(err)
+	}
+	return trace
+}
+
+func traceSchema(t *testing.T) *jsonschema.Schema {
+	t.Helper()
 	schemaData, err := os.ReadFile("../../contracts/schemas/v0alpha1/execution-trace.schema.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	var schemaDocument, instance any
+	var schemaDocument any
 	if err := json.Unmarshal(schemaData, &schemaDocument); err != nil {
-		t.Fatal(err)
-	}
-	if err := json.Unmarshal(d.Extensions[TraceExtension], &instance); err != nil {
 		t.Fatal(err)
 	}
 	compiler := jsonschema.NewCompiler()
@@ -101,10 +110,7 @@ func traceOf(t *testing.T, d decision.Decision) Trace {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := schema.Validate(instance); err != nil {
-		t.Fatal(err)
-	}
-	return trace
+	return schema
 }
 
 func TestPrimaryDecisionAndCredentialLifetime(t *testing.T) {
