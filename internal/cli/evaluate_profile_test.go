@@ -255,3 +255,25 @@ func TestEvaluateProfileUsageDoesNotEchoValues(t *testing.T) {
 		t.Fatalf("help: exit %d output %s error %s", code, out.String(), diagnostic.String())
 	}
 }
+
+func TestEvaluateProfileRejectsECMABlankFixtureVersion(t *testing.T) {
+	r := fixtureProfileRuntime(t)
+	fixtureData, err := os.ReadFile(contractPath("fixture-set", "quickstart.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	profileData, err := os.ReadFile(contractPath("evaluator-profile", "quickstart-fixture.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixturePath := filepath.Join(r.projectDir, "fixture.json")
+	profilePath := filepath.Join(r.projectDir, "profile.json")
+	writeConfigTestFile(t, fixturePath, strings.Replace(string(fixtureData), `"version": "v1"`, `"version": "\ufeff"`, 1))
+	writeConfigTestFile(t, profilePath, strings.Replace(string(profileData), `"fixtureVersion": "v1"`, `"fixtureVersion": "\ufeff"`, 1))
+	args := profileEvaluationArgs()
+	args[5] = fixturePath
+	diagnostic := evaluateProfileCommand(t, r, 1, append(args, "--profile", profilePath))
+	if !strings.Contains(diagnostic, "invalid installed adapter metadata") {
+		t.Fatal(diagnostic)
+	}
+}

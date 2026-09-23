@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/antaeusio/antaeus/internal/schematest"
+
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
 )
 
@@ -667,6 +669,7 @@ func TestContractExamplesAgainstSchemas(t *testing.T) {
 func newCompiler(t *testing.T) *jsonschema.Compiler {
 	t.Helper()
 	compiler := jsonschema.NewCompiler()
+	compiler.UseRegexpEngine(schematest.CompilePattern)
 	compiler.AssertFormat()
 	for _, name := range []string{
 		"common.schema.json",

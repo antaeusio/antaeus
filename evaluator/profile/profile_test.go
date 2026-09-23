@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/antaeusio/antaeus/internal/schematest"
+
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
 	"go.yaml.in/yaml/v3"
 )
@@ -376,6 +378,7 @@ func TestIntegerSpellingsHaveParity(t *testing.T) {
 
 func TestParserAndSchemaAgreeOnPublishedFixtures(t *testing.T) {
 	compiler := jsonschema.NewCompiler()
+	compiler.UseRegexpEngine(schematest.CompilePattern)
 	compiler.AssertFormat()
 	for _, name := range []string{"common.schema.json", "evaluator-profile.schema.json"} {
 		file, err := os.Open(contractsPath("schemas", "v0alpha1", name))

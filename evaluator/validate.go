@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/antaeusio/antaeus/internal/textvalue"
 )
 
 var (
@@ -98,7 +100,7 @@ func ValidateResult(request Request, result Result) error {
 	if err := validateNonBlank("adapter id", result.Metadata.AdapterID, 128); err != nil {
 		return err
 	}
-	if err := validateNonBlank("adapter version", result.Metadata.AdapterVersion, 128); err != nil {
+	if err := validateExecutionText("adapter version", result.Metadata.AdapterVersion, 128); err != nil {
 		return err
 	}
 	if !result.Metadata.Mode.Valid() {
@@ -114,19 +116,19 @@ func ValidateResult(request Request, result Result) error {
 		if err := validateNonBlank("fixture set", result.Metadata.FixtureSet, 64); err != nil {
 			return err
 		}
-		if err := validateNonBlank("fixture version", result.Metadata.FixtureVersion, 128); err != nil {
+		if err := validateExecutionText("fixture version", result.Metadata.FixtureVersion, 128); err != nil {
 			return err
 		}
 	} else if result.Metadata.FixtureSet != "" || result.Metadata.FixtureVersion != "" {
 		return fmt.Errorf("fixture identity is allowed only for deterministic fixture results")
 	}
 	if result.Metadata.Provider != "" {
-		if err := validateNonBlank("provider", result.Metadata.Provider, 128); err != nil {
+		if err := validateExecutionText("provider", result.Metadata.Provider, 128); err != nil {
 			return err
 		}
 	}
 	if result.Metadata.Model != "" {
-		if err := validateNonBlank("model", result.Metadata.Model, 256); err != nil {
+		if err := validateExecutionText("model", result.Metadata.Model, 256); err != nil {
 			return err
 		}
 	}
@@ -136,7 +138,7 @@ func ValidateResult(request Request, result Result) error {
 		}
 	}
 	if result.Metadata.ModelRevision != "" {
-		if err := validateNonBlank("model revision", result.Metadata.ModelRevision, 256); err != nil {
+		if err := validateExecutionText("model revision", result.Metadata.ModelRevision, 256); err != nil {
 			return err
 		}
 	}
@@ -163,6 +165,13 @@ func validateReasonCodes(codes []string) error {
 func validateNonBlank(name, value string, maxRunes int) error {
 	if !utf8.ValidString(value) || strings.TrimSpace(value) == "" || utf8.RuneCountInString(value) > maxRunes {
 		return fmt.Errorf("%s must contain 1 to %d non-whitespace Unicode code points", name, maxRunes)
+	}
+	return nil
+}
+
+func validateExecutionText(name, value string, maxRunes int) error {
+	if !textvalue.ValidECMAText(value, maxRunes) {
+		return fmt.Errorf("%s must contain 1 to %d Unicode code points including non-whitespace ECMA-262 text", name, maxRunes)
 	}
 	return nil
 }
