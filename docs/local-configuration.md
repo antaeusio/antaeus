@@ -1,10 +1,10 @@
 # Local configuration precedence
 
 `evaluator/localconfig` resolves already-loaded profiles and non-secret binding
-artifacts for local runners. It has no filesystem discovery, environment
-enumeration, network access, or persistent trust store. The existing fixture CLI
-continues to use its documented explicit inputs; it does not yet expose this
-resolver, configuration files, or trust commands.
+artifacts for local runners. The [CLI configuration commands](./cli-configuration.md)
+add manifest discovery, redacted inspection, explicit credential checks, and
+saved project trust. The existing fixture CLI continues to use its documented
+explicit inputs. Configuration checks do not execute evaluators.
 
 ## Selection
 
@@ -107,9 +107,7 @@ digest. Rotating the value behind an unchanged reference changes neither digest.
 Source provenance is reported separately in `Summary`.
 
 Never scan parent directories for `.env` files, automatically load `.env` files,
-or enumerate unrelated process variables. Future CLI integration must define
-its project/user locations and explicit trust/revocation commands before using
-these layers. Raw secret CLI flags are prohibited. Do not expose reference
+or enumerate unrelated process variables. Raw secret CLI flags are prohibited. Do not expose reference
 names, values, paths, or unrestricted profile parameters in ordinary summaries.
 Missing-credential errors may identify evaluator, adapter, slot, and source
 class; the CLI must add remediation guidance without exposing reference names.

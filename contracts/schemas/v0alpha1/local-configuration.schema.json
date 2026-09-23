@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://antaeus.io/contracts/v0alpha1/local-configuration.schema.json",
+  "title": "Antaeus LocalConfiguration v0alpha1",
+  "type": "object",
+  "required": ["apiVersion", "kind"],
+  "properties": {
+    "apiVersion": {"const": "config.antaeus.io/v0alpha1"},
+    "kind": {"const": "LocalConfiguration"},
+    "profileFile": {"$ref": "#/$defs/path"},
+    "bindingsFile": {"$ref": "#/$defs/path"}
+  },
+  "anyOf": [{"required": ["profileFile"]}, {"required": ["bindingsFile"]}],
+  "additionalProperties": false,
+  "$defs": {
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^[^\u0000]+\\.(json|yaml|yml)$"
+    }
+  }
+}

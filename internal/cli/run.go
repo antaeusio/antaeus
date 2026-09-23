@@ -22,6 +22,8 @@ import (
 const usage = `Usage: antaeus <command>
 
 Commands:
+  config inspect|check|trust|revoke
+           Inspect local configuration and manage project credential trust
   validate <policy-file>
            Validate a JSON/YAML policy and print its canonical identity
   evaluate --policy <file> --input <file> --fixture-set <file> --case <name>
@@ -40,6 +42,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	switch args[0] {
+	case "config":
+		return runConfig(args[1:], stdout, stderr)
 	case "validate":
 		return runValidate(args[1:], stdout, stderr)
 	case "evaluate":

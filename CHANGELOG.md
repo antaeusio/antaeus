@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- CLI configuration inspection, credential checks, and project-scoped digest trust/revocation with strict local manifests.
 - Local profile and credential-reference precedence with immutable snapshots, project-digest trust checks, and redacted source summaries.
 - Initial repository foundation.
 - Go module and thin command foundation with version reporting.
