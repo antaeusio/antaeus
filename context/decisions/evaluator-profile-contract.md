@@ -1,0 +1,42 @@
+---
+type: Metatron Decision
+title: Immutable non-secret evaluator profiles
+status: canonical
+scope: evaluator/profile-contract
+confidence: high
+source_refs:
+  - contracts/schemas/v0alpha1/evaluator-profile.schema.json
+  - contracts/examples/v0alpha1/evaluator-profile/quickstart-fixture.json
+  - contracts/README.md
+---
+
+## Pattern
+
+Keep all non-secret evaluator mechanics in an immutable versioned
+`EvaluatorProfile`, separate from policy meaning, deployment selection, runtime
+secret bindings, and secret values. Profiles declare bounded deadlines,
+evaluator adapter and protocol identities, capabilities, retry behavior,
+confidence routing, escalation, operational fallbacks, failure-only terminal
+behavior, and logical credential slots. Confidence affects routing only and
+never synthesizes or replaces allow, review, or deny.
+
+V0 routing is acyclic: one primary, at most one escalation evaluator, then an
+ordered bounded fallback list. Preserve unresolved evidence after routing is
+exhausted so the deterministic reducer produces failure unless a matched deny
+has higher precedence. Deterministic fixtures are visibly synthetic,
+credential-free, and prohibited from enforcement routes.
+
+Profiles never contain credential values, environment-variable names, hosted
+secret identifiers, or ambient behavior overrides. Adapter-specific parameters
+must validate against the schema registered for the exact adapter ID and
+version. The common schema closes the built-in fixture adapter parameters.
+Implementations additionally enforce relational invariants—unique IDs, valid
+references, acyclicity, route-position uniqueness, deadline consistency, and
+capability-backed confidence—because JSON Schema cannot express the full graph.
+
+## Rationale
+
+Separating policy semantics from reproducible evaluation mechanics keeps
+policies portable while making evaluator behavior reviewable and addressable.
+Logical slots let local and hosted runtimes bind secrets without leaking secret
+inventory or values into reusable public artifacts.

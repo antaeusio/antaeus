@@ -8,8 +8,9 @@ The initial version is `v0alpha1`:
 
 - policies use `apiVersion: policy.antaeus.io/v0alpha1` and `kind: Policy`;
 - decision requests use `apiVersion: decision.antaeus.io/v0alpha1` and `kind: DecisionRequest`;
-- decisions use `apiVersion: decision.antaeus.io/v0alpha1` and `kind: Decision`; and
-- regression suites and result sets use `apiVersion: regression.antaeus.io/v0alpha1`.
+- decisions use `apiVersion: decision.antaeus.io/v0alpha1` and `kind: Decision`;
+- regression suites and result sets use `apiVersion: regression.antaeus.io/v0alpha1`; and
+- evaluator profiles use `apiVersion: evaluator.antaeus.io/v0alpha1` and `kind: EvaluatorProfile`.
 
 Published schema versions are immutable. An incompatible structural or semantic change receives a new `apiVersion` and new schema path.
 
@@ -23,6 +24,7 @@ Implementations must reject inputs exceeding any applicable limit before unbound
 | Decision request JSON | 1 MiB |
 | Decision JSON | 1 MiB |
 | Regression suite source | 1 MiB |
+| Evaluator profile source | 1 MiB |
 | JSON/YAML nesting depth | 32 |
 | Aggregate parsed nodes | 10,000 |
 | Rules per policy | 256 |
@@ -104,6 +106,34 @@ Case names are unique within a fixture set, and rule IDs are unique within each
 case. JSON property names are case-sensitive and exact; unknown, case-variant,
 and duplicate properties are rejected before typed decoding.
 
+## Evaluator profiles
+
+`evaluator-profile.schema.json` defines the immutable, non-secret mechanics for
+obtaining evaluator evidence. A profile declares bounded total and per-attempt
+timeouts, credential slot names, evaluator adapter and protocol identities,
+capability requirements, retry behavior, confidence routing, escalation,
+operational fallbacks, and failure-only terminal behavior. Confidence can
+change routing only; it never creates or replaces a policy outcome.
+
+Profiles contain logical credential slot names, never secret values,
+environment-variable names, hosted secret identifiers, or arbitrary endpoint
+overrides. Runtime bindings resolve slots separately. Deterministic fixture
+evaluators cannot declare credentials, providers, models, or instruction
+templates and are never valid enforcement fallbacks.
+
+Profile authoring uses the same constrained YAML 1.2.2 or JSON data model,
+1 MiB source bound, nesting and node limits, RFC 8785 canonicalization, and
+lowercase SHA-256 content identity as policies. A registry version is a label
+for that digest and cannot change profile content identity.
+
+Known objects reject unknown properties. Adapter-specific `parameters` require
+a schema associated with the exact adapter ID and version; the core schema
+closes the built-in fixture adapter parameters. Implementations must also
+enforce semantic invariants that JSON Schema cannot express: unique evaluator
+and credential-slot IDs, valid references, an acyclic route, no evaluator in
+more than one route position, per-attempt timeouts within the total timeout,
+and confidence routing only through declared capabilities.
+
 ## Regression suites
 
 `regression-suite.schema.json` defines named offline checks bound to one exact
@@ -132,4 +162,5 @@ Requests rejected before evaluation use a non-2xx status with RFC 9457 Problem D
 - `examples/v0alpha1/` contains readable valid examples.
 - `examples/v0alpha1/input/` contains canonical local-evaluation inputs bound by fixture digests.
 - `examples/v0alpha1/regression-suite/` and `regression-result-set/` contain a complete offline regression example.
+- `examples/v0alpha1/evaluator-profile/` contains a credential-free deterministic profile.
 - `conformance/v0alpha1/` contains machine-oriented valid, invalid, and canonicalization fixtures.

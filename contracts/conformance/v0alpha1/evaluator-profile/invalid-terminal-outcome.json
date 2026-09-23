@@ -1,0 +1,27 @@
+{
+  "apiVersion": "evaluator.antaeus.io/v0alpha1",
+  "kind": "EvaluatorProfile",
+  "metadata": {"name": "bad-terminal"},
+  "spec": {
+    "totalTimeoutMs": 2000,
+    "credentialSlots": [],
+    "evaluators": [
+      {
+        "id": "fixture-primary",
+        "mode": "deterministic-fixture",
+        "adapter": {"id": "io.antaeus.fixture", "version": "0.1.0"},
+        "protocol": {"id": "io.antaeus.rule-match", "version": "v0alpha1"},
+        "requiredCapabilities": ["json-input"],
+        "timeoutMs": 1000,
+        "retry": {"maxAttempts": 1},
+        "parameters": {"fixtureSet": "quickstart", "fixtureVersion": "v1"}
+      }
+    ],
+    "routing": {
+      "primary": "fixture-primary",
+      "fallbacks": [],
+      "confidence": {"enabled": false},
+      "terminal": {"onIndeterminate": "review", "onFailure": "allow"}
+    }
+  }
+}

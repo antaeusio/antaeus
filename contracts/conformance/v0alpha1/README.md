@@ -32,6 +32,13 @@ They must produce the exact UTF-8 bytes in `canonical/vendor-onboarding.canonica
 - `fixture-set/invalid-bad-digest.json` rejects a non-digest policy identity.
 - `fixture-set/invalid-empty-rule-results.json` rejects a case without exact rule evidence.
 
+## Evaluator profiles
+
+The evaluator-profile fixtures reject unknown fields, outcome-replacing
+terminal behavior, credentials on deterministic fixtures, and incomplete
+confidence routing. Relational routing fixtures will accompany the Go semantic
+validator; JSON Schema alone cannot prove reference integrity or acyclicity.
+
 ## Regression suites
 
 `regression-suite/valid-input-max-depth.json` fixes the maximum inline-input

@@ -1,0 +1,392 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://antaeus.io/contracts/v0alpha1/evaluator-profile.schema.json",
+  "title": "Antaeus EvaluatorProfile v0alpha1",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {
+      "const": "evaluator.antaeus.io/v0alpha1"
+    },
+    "kind": {
+      "const": "EvaluatorProfile"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "spec": {
+      "type": "object",
+      "required": ["totalTimeoutMs", "credentialSlots", "evaluators", "routing"],
+      "properties": {
+        "totalTimeoutMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300000
+        },
+        "credentialSlots": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/credentialSlot"
+          }
+        },
+        "evaluators": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/evaluator"
+          }
+        },
+        "routing": {
+          "$ref": "#/$defs/routing"
+        }
+      },
+      "unevaluatedProperties": false
+    }
+  },
+  "$defs": {
+    "localId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+    },
+    "namespacedId": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$",
+      "maxLength": 128
+    },
+    "nonBlankVersion": {
+      "allOf": [
+        {
+          "$ref": "common.schema.json#/$defs/version"
+        },
+        {
+          "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+        }
+      ]
+    },
+    "credentialSlot": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/localId"
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "componentIdentity": {
+      "type": "object",
+      "required": ["id", "version"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "version": {
+          "$ref": "#/$defs/nonBlankVersion"
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "retry": {
+      "type": "object",
+      "required": ["maxAttempts"],
+      "properties": {
+        "maxAttempts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "initialBackoffMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60000
+        },
+        "maxBackoffMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60000
+        },
+        "multiplier": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "instructionTemplate": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "digest": {
+          "$ref": "common.schema.json#/$defs/digest"
+        }
+      },
+      "oneOf": [
+        {
+          "required": ["id"],
+          "not": {"required": ["digest"]}
+        },
+        {
+          "required": ["digest"],
+          "not": {"required": ["id"]}
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "fixtureParameters": {
+      "type": "object",
+      "required": ["fixtureSet", "fixtureVersion"],
+      "properties": {
+        "fixtureSet": {
+          "$ref": "#/$defs/localId"
+        },
+        "fixtureVersion": {
+          "$ref": "#/$defs/nonBlankVersion"
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "evaluator": {
+      "type": "object",
+      "required": ["id", "mode", "adapter", "protocol", "requiredCapabilities", "timeoutMs", "retry", "parameters"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/localId"
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["semantic", "deterministic-fixture"]
+        },
+        "adapter": {
+          "$ref": "#/$defs/componentIdentity"
+        },
+        "protocol": {
+          "$ref": "#/$defs/componentIdentity"
+        },
+        "requiredCapabilities": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/localId"
+          }
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120000
+        },
+        "retry": {
+          "$ref": "#/$defs/retry"
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+        },
+        "modelRevision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+        },
+        "instructionTemplate": {
+          "$ref": "#/$defs/instructionTemplate"
+        },
+        "credentialSlot": {
+          "$ref": "#/$defs/localId"
+        },
+        "parameters": {
+          "type": "object",
+          "maxProperties": 32
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {"const": "deterministic-fixture"}
+            },
+            "required": ["mode"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {"required": ["provider"]},
+                {"required": ["model"]},
+                {"required": ["modelRevision"]},
+                {"required": ["instructionTemplate"]},
+                {"required": ["credentialSlot"]}
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "adapter": {
+                "properties": {
+                  "id": {"const": "io.antaeus.fixture"}
+                },
+                "required": ["id"]
+              }
+            },
+            "required": ["adapter"]
+          },
+          "then": {
+            "properties": {
+              "mode": {
+                "const": "deterministic-fixture"
+              },
+              "parameters": {
+                "$ref": "#/$defs/fixtureParameters"
+              }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "confidence": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "minimumAccepted": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "onLowConfidence": {
+          "type": "string",
+          "enum": ["indeterminate", "escalate"]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"enabled": {"const": true}},
+            "required": ["enabled"]
+          },
+          "then": {
+            "required": ["minimumAccepted", "onLowConfidence"]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {"required": ["minimumAccepted"]},
+                {"required": ["onLowConfidence"]}
+              ]
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "terminal": {
+      "type": "object",
+      "required": ["onIndeterminate", "onFailure"],
+      "properties": {
+        "onIndeterminate": {"const": "failure"},
+        "onFailure": {"const": "failure"}
+      },
+      "unevaluatedProperties": false
+    },
+    "routing": {
+      "type": "object",
+      "required": ["primary", "fallbacks", "confidence", "terminal"],
+      "properties": {
+        "primary": {
+          "$ref": "#/$defs/localId"
+        },
+        "escalation": {
+          "$ref": "#/$defs/localId"
+        },
+        "fallbacks": {
+          "type": "array",
+          "maxItems": 15,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/localId"
+          }
+        },
+        "fallbackOn": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": ["timeout", "unavailable", "throttled"]
+          }
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        },
+        "terminal": {
+          "$ref": "#/$defs/terminal"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "fallbacks": {"minItems": 1}
+            },
+            "required": ["fallbacks"]
+          },
+          "then": {
+            "required": ["fallbackOn"]
+          },
+          "else": {
+            "not": {"required": ["fallbackOn"]}
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "confidence": {
+                "properties": {
+                  "onLowConfidence": {"const": "escalate"}
+                },
+                "required": ["onLowConfidence"]
+              }
+            },
+            "required": ["confidence"]
+          },
+          "then": {
+            "required": ["escalation"]
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  },
+  "unevaluatedProperties": false
+}
