@@ -79,6 +79,72 @@ func TestPrimaryAndFallbackEligibilityTransitions(t *testing.T) {
 	}
 }
 
+func TestEscalationFailureMustBeEligibleForFallback(t *testing.T) {
+	for _, code := range []string{"evaluator.unavailable", "evaluation.adapter_failed"} {
+		t.Run(code, func(t *testing.T) {
+			in := inputFixture(t)
+			in.Profile.Spec.Routing.FallbackOn = []profile.TransientFailure{profile.FailureTimeout}
+			var seen []string
+			d, err := Run(context.Background(), in, installed(func(_ context.Context, r evaluator.Request, c Configuration) (evaluator.Result, error) {
+				seen = append(seen, c.Evaluator.ID)
+				switch c.Evaluator.ID {
+				case "semantic-primary":
+					out := evidence(r, c, 1)
+					out.RuleResults[0].Status = decision.RuleMatched
+					out.RuleResults[1].Confidence = nil
+					return out, nil
+				case "semantic-escalation":
+					if len(r.Rules) != 1 || r.Rules[0].ID != in.Policy.Spec.Rules[1].ID {
+						t.Fatal("escalation received accepted primary evidence")
+					}
+					return evaluator.Result{}, &evaluator.Error{Code: code, Retryable: true}
+				default:
+					t.Fatal("ineligible escalation failure invoked fallback")
+					return evaluator.Result{}, nil
+				}
+			}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantIDs := []string{"semantic-primary", "semantic-escalation"}
+			trace := traceOf(t, d)
+			if !reflect.DeepEqual(seen, wantIDs) || !reflect.DeepEqual(d.Evaluator.Route, wantIDs) || d.Evaluator.Fallback || len(trace.Attempts) != 2 || trace.Terminal != code {
+				t.Fatalf("route=%v evaluator=%+v trace=%+v", seen, d.Evaluator, trace)
+			}
+			if d.Outcome != decision.OutcomeDeny || d.Failure != nil || d.RuleResults[0].Status != decision.RuleMatched || !reflect.DeepEqual(d.RuleResults[0].ReasonCodes, []string{"test.evidence"}) || d.RuleResults[1].Status != decision.RuleFailed || !reflect.DeepEqual(d.RuleResults[1].ReasonCodes, []string{code}) {
+				t.Fatalf("primary deny or escalation failure lost: %+v", d)
+			}
+			for i, a := range trace.Attempts {
+				wantIndexes, wantCode, wantRoute := []int{0, 1}, "evaluation.succeeded", "primary"
+				if i == 1 {
+					wantIndexes, wantCode, wantRoute = []int{1}, code, "escalation"
+				}
+				if a.EvaluatorID != wantIDs[i] || a.Attempt != 1 || a.Route != wantRoute || a.Code != wantCode || !reflect.DeepEqual(a.RuleIndexes, wantIndexes) {
+					t.Fatalf("unexpected attempt: %+v", a)
+				}
+			}
+		})
+	}
+}
+
+func TestSuccessJustBeforeAttemptDeadlineDoesNotRetry(t *testing.T) {
+	in := inputFixture(t)
+	clock := &fakeTime{current: time.Now().Add(time.Hour)}
+	calls := 0
+	d, err := run(context.Background(), in, installed(func(_ context.Context, r evaluator.Request, c Configuration) (evaluator.Result, error) {
+		calls++
+		clock.current = r.Deadline.Add(-time.Nanosecond)
+		return evidence(r, c, 1), nil
+	}), clock.timing())
+	if err != nil {
+		t.Fatal(err)
+	}
+	trace := traceOf(t, d)
+	if calls != 1 || len(clock.delays) != 0 || len(trace.Attempts) != 1 || trace.Terminal != "completed" || trace.Attempts[0].Code != "evaluation.succeeded" || trace.Attempts[0].Attempt != 1 || d.Evaluator.Fallback || d.Outcome != decision.Outcome(in.Policy.Spec.DefaultOutcome) {
+		t.Fatalf("calls=%d delays=%v decision=%+v trace=%+v", calls, clock.delays, d, trace)
+	}
+}
+
 func TestLateAttemptSuccessIsTracedAsTimeoutBeforeRetry(t *testing.T) {
 	in := inputFixture(t)
 	// Keep fake deadlines ahead of the real context clock, even on a busy host.
@@ -157,6 +223,25 @@ func TestRegistryRequiresExactAdapterVersion(t *testing.T) {
 			d, err := Run(context.Background(), in, registry)
 			if err == nil || err.Error() != "routed adapter identity, mode, or protocol is unsupported" || d.Kind != "" {
 				t.Fatalf("decision=%+v error=%v", d, err)
+			}
+			// Change only registry version coverage: the same mode, protocol and
+			// capabilities must now reach evaluation, including the dormant route.
+			adapter := registry[key]
+			calls := 0
+			adapter.Evaluate = func(context.Context, evaluator.Request, Configuration) (evaluator.Result, error) {
+				calls++
+				return evaluator.Result{}, &evaluator.Error{Code: "evaluation.adapter_failed"}
+			}
+			registry = Registry{}
+			for _, entry := range p.Spec.Evaluators {
+				registry[entry.Adapter] = adapter
+			}
+			d, err = Run(context.Background(), in, registry)
+			if err != nil || calls != 1 {
+				t.Fatalf("matching versions did not reach evaluation: calls=%d error=%v", calls, err)
+			}
+			if traceOf(t, d).Terminal != "evaluation.adapter_failed" {
+				t.Fatal("matching versions failed before the adapter result")
 			}
 		})
 	}
@@ -339,6 +424,12 @@ func TestExecutionTraceSchemaRejectsInvalidRecords(t *testing.T) {
 	validAttempt["attempt"] = 5
 	validAttempt["revisionAvailable"] = true
 	validAttempt["resolvedRevision"] = "revision-1"
+	validAttempt["latencyMs"] = 0
+	attempts := make([]any, 64)
+	for i := range attempts {
+		attempts[i] = validAttempt
+	}
+	valid["attempts"] = attempts
 	if err := schema.Validate(valid); err != nil {
 		t.Fatalf("valid boundary rejected: %v", err)
 	}
