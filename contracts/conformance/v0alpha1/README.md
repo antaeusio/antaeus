@@ -26,6 +26,26 @@ They must produce the exact UTF-8 bytes in `canonical/vendor-onboarding.canonica
 
 `reduction/cases.json` contains one policy plus ordered rule-result inputs and expected reduced outputs. Implementations must reproduce the specified outcome, required reason codes, and unresolved-rule failure exactly. The cases cover every precedence step, including matched deny over unresolved evidence and unresolved evidence over matched review.
 
+## Profile-runner failure assembly
+
+`runner/failure-mapping.json` adds runner-level cases without changing the
+deterministic reduction fixtures. Its `policy` path is relative to that fixture
+file. Each `cases` entry supplies final rule evidence in policy order (attach
+the corresponding rule ID and, only for matched rules, its policy outcome),
+the trace terminal and expected outcome, exact ordered top-level reasons and
+optional failure object. Reduce first, then enrich only operational failures.
+These are final-assembly cases, not adapter routing scripts; they cover mixed
+unresolved evidence, resolved rules, deny precedence and all operational codes.
+
+`callerDeadlines` entries exercise execution: start a fake clock, set the caller
+deadline to `callerBudgetMs` after start (shorter than the profile total timeout),
+and configure primary throttling retries with two attempts and fixed
+`retryDelayMs` backoff/jitter, with no fallbacks. The adapter advances that clock
+by `adapterElapsedMs`, then returns retryable `evaluator.throttled`. Exactly one
+attempt and no sleeps must occur. Compare the final core fields to `expected`
+and trace terminal to `expected.failure.code`. Unexpired futile waits retain
+transient classification; actual expiry is a non-retryable deadline failure.
+
 ## Invalid fixture sets
 
 - `fixture-set/invalid-unknown-property.json` fails closed on an unknown rule-result property.

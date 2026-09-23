@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -231,6 +232,10 @@ func TestEvaluateProfileAdapterFailureIsDecision(t *testing.T) {
 		t.Fatal(err)
 	}
 	if d.Outcome != decision.OutcomeFailure || d.Failure == nil || strings.Contains(output, "NEVER_INCLUDE_RAW_INPUT") {
+		t.Fatal(output)
+	}
+	if *d.Failure != (decision.Failure{Code: "evaluation.adapter_failed", Stage: "evaluation", Retryable: false}) ||
+		!reflect.DeepEqual(d.ReasonCodes, []string{"evaluation.unresolved_rule", "evaluation.adapter_failed"}) {
 		t.Fatal(output)
 	}
 }
