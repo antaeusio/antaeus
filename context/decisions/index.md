@@ -8,3 +8,4 @@
 | `local-fixture-cli` | canonical | Local fixture CLI execution |  | 0 | 0 |
 | `policy-decision-contract` | canonical | Portable policy and decision contract |  | 0 | 0 |
 | `policy-source-loading` | canonical | Constrained policy source loading |  | 0 | 0 |
+| `portable-regression-suite` | canonical | Portable deterministic regression suites |  | 0 | 0 |
