@@ -2,6 +2,7 @@ package contracttest
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -195,6 +196,94 @@ func TestEvaluatorProfileSchemaAcceptsConfidenceWithoutEscalation(t *testing.T) 
 	}
 }
 
+func TestLocalSecretBindingsSchemaRejectsInvalidCombinations(t *testing.T) {
+	schema, err := newCompiler(t).Compile(schemaBase + "local-secret-bindings.schema.json")
+	if err != nil {
+		t.Fatalf("compile local secret bindings schema: %v", err)
+	}
+	validData, err := os.ReadFile(contractsPath(filepath.Join("examples", "v0alpha1", "local-secret-bindings", "development.json")))
+	if err != nil {
+		t.Fatalf("read local secret bindings: %v", err)
+	}
+	tests := []struct {
+		name   string
+		mutate func(map[string]any)
+	}{
+		{name: "empty bindings", mutate: func(document map[string]any) { document["secretBindings"] = map[string]any{} }},
+		{name: "too many adapters", mutate: func(document map[string]any) {
+			bindings := make(map[string]any, 17)
+			for i := 0; i < 17; i++ {
+				bindings[fmt.Sprintf("io.example.adapter%d", i)] = oneSlotBinding()
+			}
+			document["secretBindings"] = bindings
+		}},
+		{name: "too many slots", mutate: func(document map[string]any) {
+			slots := make(map[string]any, 17)
+			for i := 0; i < 17; i++ {
+				slots[fmt.Sprintf("slot-%d", i)] = environmentReference()
+			}
+			document["secretBindings"] = map[string]any{"io.example.semantic": slots}
+		}},
+		{name: "invalid adapter ID", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"semantic": oneSlotBinding()}
+		}},
+		{name: "fixture adapter", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"io.antaeus.fixture": oneSlotBinding()}
+		}},
+		{name: "invalid slot ID", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"io.example.semantic": map[string]any{"Provider": environmentReference()}}
+		}},
+		{name: "missing reference name", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"io.example.semantic": map[string]any{"provider-api-key": map[string]any{"source": "environment"}}}
+		}},
+		{name: "wrong API version", mutate: func(document map[string]any) { document["apiVersion"] = "config.antaeus.io/v1" }},
+		{name: "wrong kind", mutate: func(document map[string]any) { document["kind"] = "SecretBindings" }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var document map[string]any
+			if err := json.Unmarshal(validData, &document); err != nil {
+				t.Fatalf("decode local secret bindings: %v", err)
+			}
+			test.mutate(document)
+			if err := schema.Validate(document); err == nil {
+				t.Fatal("schema Validate() error = nil, want rejection")
+			}
+		})
+	}
+}
+
+func TestLocalSecretBindingsSchemaAcceptsPublishedLimits(t *testing.T) {
+	schema, err := newCompiler(t).Compile(schemaBase + "local-secret-bindings.schema.json")
+	if err != nil {
+		t.Fatalf("compile local secret bindings schema: %v", err)
+	}
+	bindings := make(map[string]any, 16)
+	for adapter := 0; adapter < 16; adapter++ {
+		slots := make(map[string]any, 16)
+		for slot := 0; slot < 16; slot++ {
+			slots[fmt.Sprintf("slot-%d", slot)] = environmentReference()
+		}
+		bindings[fmt.Sprintf("io.example.adapter%d", adapter)] = slots
+	}
+	document := map[string]any{
+		"apiVersion":     "config.antaeus.io/v0alpha1",
+		"kind":           "LocalSecretBindings",
+		"secretBindings": bindings,
+	}
+	if err := schema.Validate(document); err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+}
+
+func oneSlotBinding() map[string]any {
+	return map[string]any{"provider-api-key": environmentReference()}
+}
+
+func environmentReference() map[string]any {
+	return map[string]any{"source": "environment", "name": "EXAMPLE_API_KEY"}
+}
+
 const schemaBase = "https://antaeus.io/contracts/v0alpha1/"
 
 func TestContractExamplesAgainstSchemas(t *testing.T) {
@@ -300,6 +389,30 @@ func TestContractExamplesAgainstSchemas(t *testing.T) {
 			name:     "local secret bindings empty adapter",
 			schema:   "local-secret-bindings.schema.json",
 			instance: filepath.Join("conformance", "v0alpha1", "local-secret-bindings", "invalid-empty-adapter.json"),
+			valid:    false,
+		},
+		{
+			name:     "local secret bindings dotenv path",
+			schema:   "local-secret-bindings.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "local-secret-bindings", "invalid-dotenv-path.json"),
+			valid:    false,
+		},
+		{
+			name:     "local secret bindings hosted identifier",
+			schema:   "local-secret-bindings.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "local-secret-bindings", "invalid-hosted-identifier.json"),
+			valid:    false,
+		},
+		{
+			name:     "local secret bindings behavior override",
+			schema:   "local-secret-bindings.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "local-secret-bindings", "invalid-behavior-override.json"),
+			valid:    false,
+		},
+		{
+			name:     "local secret bindings dotenv source",
+			schema:   "local-secret-bindings.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "local-secret-bindings", "invalid-dotenv-source.json"),
 			valid:    false,
 		},
 		{

@@ -1,0 +1,12 @@
+{
+  "apiVersion": "config.antaeus.io/v0alpha1",
+  "kind": "LocalSecretBindings",
+  "secretBindings": {
+    "io.example.semantic": {
+      "provider-api-key": {
+        "source": "dotenv",
+        "name": "EXAMPLE_API_KEY"
+      }
+    }
+  }
+}

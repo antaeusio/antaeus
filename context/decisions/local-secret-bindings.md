@@ -22,6 +22,10 @@ hosted secret identifier, or evaluator behavior override.
 Resolve only references required by the selected profile. Read a referenced
 variable from the existing process environment as late as possible, and do not
 scan parent directories, load `.env` files, or inspect unrelated variables.
+Load a bindings artifact only from an explicit path; do not discover it through
+a directory walk. Treat an unbound required slot and an unset or empty variable
+as the same pre-evaluation missing-credential configuration error, without
+retry or fallback.
 Ordinary output and logs may identify the adapter, slot, and source class, but
 must redact the environment-variable name and value.
 

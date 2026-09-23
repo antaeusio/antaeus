@@ -176,8 +176,22 @@ The variable name is configuration metadata, not a credential value, but may
 still reveal sensitive inventory. Normal output identifies only the adapter,
 slot, and source class. It does not print the variable name or value. Runtimes
 resolve only slots required by the selected profile, read the named variable
-from the existing process environment, and do not discover `.env` files or
-inspect unrelated environment variables.
+from the existing process environment, and do not discover `.env` files,
+inspect unrelated environment variables, or walk directories to discover a
+bindings artifact. Local bindings are loaded only from an explicitly supplied
+path.
+
+An unbound required slot and an unset or empty referenced variable are the same
+pre-evaluation missing-credential configuration error. They are not retried,
+do not trigger evaluator fallback, and never print the reference name or a
+candidate value. Bindings for the deterministic fixture adapter are invalid.
+
+Local secret bindings use the same constrained JSON or YAML authoring rules,
+1 MiB source limit, nesting and aggregate-node bounds, duplicate-key rejection,
+and exact property names as evaluator profiles. Adapter keys intentionally name
+the adapter ID rather than a profile or adapter version; the selected immutable
+adapter version defines its supported slots, and the runtime validates every
+binding against that contract before resolving a reference.
 
 ## Regression suites
 
