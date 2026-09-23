@@ -37,12 +37,15 @@ optional failure object. Reduce first, then enrich only operational failures.
 These are final-assembly cases, not adapter routing scripts; they cover mixed
 unresolved evidence, resolved rules, deny precedence and all operational codes.
 
-`callerDeadlines` entries exercise execution: start a fake clock, set the caller
+`callerDeadlines` entries use the same policy and the fixture's relative `profile`
+path (2000 ms primary attempt timeout, 10000 ms total timeout). Preserve that
+profile except for the explicit retry/fallback overrides below. Start a fake clock, set the caller
 deadline to `callerBudgetMs` after start (shorter than the profile total timeout),
 and configure primary throttling retries with two attempts and fixed
 `retryDelayMs` backoff/jitter, with no fallbacks. The adapter advances that clock
 by `adapterElapsedMs`, then returns retryable `evaluator.throttled`. Exactly one
-attempt and no sleeps must occur. Compare the final core fields to `expected`
+attempt and no sleeps must occur: a delay at least as long as the remaining
+budget is futile, including exact equality. Compare the final core fields to `expected`
 and trace terminal to `expected.failure.code`. Unexpired futile waits retain
 transient classification; actual expiry is a non-retryable deadline failure.
 

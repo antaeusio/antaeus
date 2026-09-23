@@ -46,8 +46,9 @@ func TestFailureMappingConformance(t *testing.T) {
 		t.Fatal(err)
 	}
 	var fixtures struct {
-		Policy string `json:"policy"`
-		Cases  []struct {
+		Policy  string `json:"policy"`
+		Profile string `json:"profile"`
+		Cases   []struct {
 			Name     string                `json:"name"`
 			Terminal string                `json:"terminal"`
 			Rules    []decision.RuleResult `json:"rules"`
@@ -89,6 +90,11 @@ func TestFailureMappingConformance(t *testing.T) {
 	for _, tt := range fixtures.CallerDeadlines {
 		t.Run(tt.Name, func(t *testing.T) {
 			in := inputFixture(t)
+			in.Policy = p
+			in.Profile, err = profile.LoadFile(filepath.Join(filepath.Dir(path), fixtures.Profile))
+			if err != nil {
+				t.Fatal(err)
+			}
 			in.Profile.Spec.Routing.Fallbacks = []string{}
 			in.Profile.Spec.Routing.FallbackOn = nil
 			in.Profile.Spec.Evaluators[0].Retry = profile.RetryPolicy{MaxAttempts: 2, RetryOn: []profile.TransientFailure{profile.FailureThrottled}, InitialBackoffMS: &tt.RetryDelayMS, MaxBackoffMS: &tt.RetryDelayMS, Multiplier: new(1.0)}

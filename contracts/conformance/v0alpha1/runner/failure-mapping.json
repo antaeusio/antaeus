@@ -1,5 +1,6 @@
 {
   "policy": "../../../examples/v0alpha1/policy/vendor-onboarding.json",
+  "profile": "../../../examples/v0alpha1/evaluator-profile/semantic-routing.json",
   "cases": [
     {"name":"timeout", "terminal":"evaluator.timeout", "rules":[{"status":"failed","reasonCodes":["evaluator.timeout"]},{"status":"failed","reasonCodes":["evaluator.timeout"]}], "expected":{"outcome":"failure","reasonCodes":["evaluation.unresolved_rule","evaluator.timeout"],"failure":{"code":"evaluator.timeout","stage":"evaluation","retryable":true}}},
     {"name":"unavailable", "terminal":"evaluator.unavailable", "rules":[{"status":"failed","reasonCodes":["evaluator.unavailable"]},{"status":"failed","reasonCodes":["evaluator.unavailable"]}], "expected":{"outcome":"failure","reasonCodes":["evaluation.unresolved_rule","evaluator.unavailable"],"failure":{"code":"evaluator.unavailable","stage":"evaluation","retryable":true}}},
