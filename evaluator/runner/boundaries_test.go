@@ -14,7 +14,7 @@ import (
 	"github.com/antaeusio/antaeus/evaluator/profile"
 )
 
-func TestFallbackEligibilityAtEveryTransition(t *testing.T) {
+func TestPrimaryAndFallbackEligibilityTransitions(t *testing.T) {
 	for _, tt := range []struct {
 		name, primaryCode, fallbackCode string
 		on                              []profile.TransientFailure
@@ -180,6 +180,10 @@ func TestCredentialsAreIsolatedByAdapterAndSlot(t *testing.T) {
 				in.Profile.Spec.CredentialSlots = append(in.Profile.Spec.CredentialSlots, profile.CredentialSlot{Name: "second-key"}, profile.CredentialSlot{Name: "third-key"})
 			}
 			in.Profile.Spec.Evaluators = []profile.Evaluator{primary, fallback, unused}
+			outside := primary
+			outside.ID, outside.Adapter.ID, outside.CredentialSlot = "outside-route", "io.example.outside", new("unused-key")
+			in.Profile.Spec.Evaluators = append(in.Profile.Spec.Evaluators, outside)
+			in.Profile.Spec.CredentialSlots = append(in.Profile.Spec.CredentialSlots, profile.CredentialSlot{Name: "unused-key"})
 			in.Profile.Spec.Routing.Escalation = nil
 			in.Profile.Spec.Routing.Confidence = profile.Confidence{Enabled: false}
 			in.Profile.Spec.Routing.Fallbacks = []string{fallback.ID, unused.ID}
@@ -274,6 +278,42 @@ func TestCredentialsAreIsolatedByAdapterAndSlot(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRetryGetsFreshCredentialAfterPriorBufferMutationAndClear(t *testing.T) {
+	in := inputFixture(t)
+	clock := &fakeTime{current: time.Now().Add(time.Hour)}
+	var buffers [][]byte
+	calls := 0
+	d, err := run(context.Background(), in, installed(func(_ context.Context, r evaluator.Request, c Configuration) (evaluator.Result, error) {
+		calls++
+		if string(c.Credential) != "PRIVATE_TOKEN" {
+			t.Fatal("retry did not receive the original captured credential")
+		}
+		for _, prior := range buffers {
+			if !bytes.Equal(prior, make([]byte, len(prior))) {
+				t.Fatal("prior attempt buffer was not cleared before retry")
+			}
+		}
+		buffers = append(buffers, c.Credential)
+		c.Credential[0] = 'X'
+		if calls == 1 {
+			return evaluator.Result{}, &evaluator.Error{Code: "evaluator.throttled", Retryable: true}
+		}
+		return evidence(r, c, 1), nil
+	}), clock.timing())
+	if err != nil {
+		t.Fatal(err)
+	}
+	trace := traceOf(t, d)
+	if calls != 2 || len(buffers) != 2 || trace.Terminal != "completed" || len(trace.Attempts) != 2 {
+		t.Fatalf("calls=%d trace=%+v", calls, trace)
+	}
+	for _, held := range buffers {
+		if !bytes.Equal(held, make([]byte, len(held))) {
+			t.Fatal("final attempt retained credential bytes")
+		}
 	}
 }
 
