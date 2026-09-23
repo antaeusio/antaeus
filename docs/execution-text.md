@@ -47,9 +47,16 @@ Adapter/fixture versions invalid at the result boundary are rejected by runner
 preflight before acceptance, even when an authored profile's distinct version
 rule permits them. `evaluator.ValidateResult`, `decision.Decision.Validate` and
 the single-attempt `evaluator.Decide` path share the affected execution metadata
-checks; this is **not** limited to `runner.Run`. The fixture-only CLI can surface
-those validation changes for unusual fixture versions, although it has no remote
-model adapter. Consumers should supply meaningful versions/model labels and not
+checks; this is **not** limited to `runner.Run`. The Go `regression.Run` API and
+legacy `antaeus evaluate` and `antaeus test` commands are also affected. A fixture
+set with a U+FEFF-only version still loads under its existing authoring rules,
+but its adapter subsequently fails result validation with `fixture.mapping_invalid`
+when called by `evaluator.Decide`: no Decision is returned. With a matching suite
+fixture identity, `regression.Run` aborts the suite without a result set, and both legacy
+commands exit 1 with stderr diagnostics and no stdout. `evaluate-profile` instead
+rejects that fixture version during preflight, also with exit 1 and no stdout.
+Ordinary quickstart fixtures remain unchanged; no CLI command has a remote model
+adapter yet. Consumers should supply meaningful versions/model labels and not
 rely on a particular language's treatment of blank text. No release is claimed.
 
 ## Conformance checks
