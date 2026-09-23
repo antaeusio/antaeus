@@ -363,6 +363,7 @@ func (x *execution) invoke(ctx context.Context, id, route string, indexes []int)
 			return failedRules(rules, code), code
 		}
 		remaining := x.request.Deadline.Sub(x.time.now())
+		// The clock may advance between stopped and this budget measurement.
 		if remaining <= 0 {
 			return failedRules(rules, "evaluation.deadline_exceeded"), "evaluation.deadline_exceeded"
 		}

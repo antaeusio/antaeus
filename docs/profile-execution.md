@@ -108,6 +108,19 @@ unchanged. Published portable schemas and policy/profile identities are unchange
 This is a documented first-minor development change, not a patch backport or a
 claim that v0.1.0 has been released.
 
+Retry-budget handling also changes in this minor release. Previously a retry
+delay at least as long as the remaining budget slept until the deadline and
+ended with `evaluation.deadline_exceeded`. It now skips that futile wait and may
+invoke an eligible fallback while time remains. Successful fallback evidence can
+therefore produce a real `allow`, `review` or `deny` where the old runner returned
+`failure`; the reducer and policy meaning are unchanged. Without a successful
+recovery, the last transient code (for example `evaluator.timeout`) can replace
+the old deadline code in trace terminal and failed-rule reasons. The generic
+core failure mapping is unchanged by this retry change. Go and CLI consumers
+must not assume that this budget boundary always returns failure or a deadline
+code; inspect the actual outcome, evidence and trace. No provider may run beyond
+the total/caller deadline, and an already expired or cancelled run still stops.
+
 Calls are synchronous. Adapters must honor context cancellation and return
 promptly; the runner does not detach goroutines or forcibly stop an uncooperative
 implementation. Each attempt's context and request carry the earlier of its
