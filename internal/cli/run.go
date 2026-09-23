@@ -28,6 +28,8 @@ Commands:
            Validate a JSON/YAML policy and print its canonical identity
   evaluate --policy <file> --input <file> --fixture-set <file> --case <name>
            Execute one exact synthetic fixture case and print a Decision
+  evaluate-profile --policy <file> --input <file> --fixture-set <file> --case <name>
+           Execute a selected fixture profile (see evaluate-profile --help)
   test --policy <file> --suite <file> --fixture-set <file>
            Run an exact synthetic regression suite and print its result set
   version  Print version information
@@ -48,6 +50,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runValidate(args[1:], stdout, stderr)
 	case "evaluate":
 		return runEvaluate(args[1:], stdout, stderr)
+	case "evaluate-profile":
+		return runEvaluateProfile(args[1:], stdout, stderr)
 	case "test":
 		return runTest(args[1:], stdout, stderr)
 	case "help", "-h", "--help":
