@@ -37,6 +37,10 @@ flags do not exist. An explicit profile using project-provided bindings still
 needs project trust; overriding both selections does not grant lasting trust.
 The existing fixture `evaluate` and `test` commands retain their explicit,
 credential-free behavior and do not consume these manifests.
+The separate [`evaluate-profile` command](./profile-execution.md#cli-fixture-profiles)
+uses this selection workflow and the profile runner. Currently it installs only
+the deterministic fixture adapter and never reads credentials; remote profiles
+are rejected before credential preflight, even after project trust is granted.
 
 ## Locations and manifest
 

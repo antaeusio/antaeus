@@ -3,8 +3,51 @@
 `evaluator/runner.Run` accepts a policy, an immutable evaluator profile, canonical
 input, correlation ID, already-preflighted credentials, and an installed adapter
 registry keyed by exact adapter ID/version. It returns a validated Decision with
-a bounded execution trace. The CLI configuration commands remain inspection and
-credential checks; they do not yet invoke this runner or a remote provider.
+a bounded execution trace. The CLI's `evaluate-profile` command connects local
+configuration selection to this runner for the installed deterministic fixture
+adapter. Configuration commands remain inspection and credential checks; no CLI
+command invokes a remote provider yet.
+
+## CLI fixture profiles
+
+After building the development binary with `scripts/build`, run from the
+repository root:
+
+```sh
+.tmp/bin/antaeus evaluate-profile \
+  --profile contracts/examples/v0alpha1/evaluator-profile/quickstart-fixture.json \
+  --policy contracts/examples/v0alpha1/policy/vendor-onboarding.yaml \
+  --input contracts/examples/v0alpha1/input/aggregate-analytics.json \
+  --fixture-set contracts/examples/v0alpha1/fixture-set/quickstart.json \
+  --case aggregate-analytics
+```
+
+Profile and reference-only bindings selection follows the same explicit CLI,
+current-project, and OS-user precedence as [configuration commands](./cli-configuration.md).
+Use `--profile` and optionally `--bindings`, or select artifacts through those
+manifests. There is no implicit profile default, parent-directory search, `.env`
+loading, or raw-secret flag. Malformed lower-priority configuration still fails
+closed. Existing `evaluate` and `test` commands do not consume these manifests.
+
+Only `io.antaeus.fixture@0.1.0`, using `io.antaeus.rule-match@v0alpha1`, is
+installed. All profile entries must use it and name the supplied fixture set's
+exact name and version. The fixture case must match the policy and canonical
+input identities. The adapter supports `json-input` and `structured-rule-results`,
+not `confidence-scores`; confidence routing is therefore rejected. Profile
+deadlines and routing go through the reusable runner, with no remote calls or
+credential reads. Selected semantic profiles are rejected, including trusted
+ones, before credential preflight. Unused bindings are never resolved.
+
+Successful execution prints one complete Decision, including the selected
+profile's canonical digest, synthetic fixture metadata, and bounded execution
+trace. Local artifacts do not invent registry version labels. All Decision
+outcomes (allow, review, deny, failure) exit 0; inspect `outcome`, not just the
+exit code. Invalid arguments exit 64; loading, configuration, pre-acceptance,
+and output errors exit 1 with diagnostics only on stderr. In contrast to the
+older single-attempt command, an adapter failure after profile-runner acceptance
+(for example, an input digest mismatch) produces a typed failure Decision.
+Fixture output is synthetic test evidence, never semantic inference or an
+enforcement fallback.
 
 Before calling `Run`, use the local configuration trust/selection and preflight
 workflow, or an approved deployment's explicit bindings. The runner never reads

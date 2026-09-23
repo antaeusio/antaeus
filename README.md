@@ -32,6 +32,11 @@ Provider credentials, customer data, hosted-service implementation, billing, and
 
 The Go module is `github.com/antaeusio/antaeus`. Development requires Go 1.26.0 or newer; Go 1.27.1 is the preferred toolchain. The current command exposes help and version information plus policy validation, deterministic local fixture evaluation, and portable offline regression suites; no semantic evaluator or release artifact exists yet.
 
+Use [`evaluate-profile`](./docs/profile-execution.md#cli-fixture-profiles) to run
+the installed synthetic fixture through an explicitly selected evaluator profile,
+with configuration precedence and a bounded execution trace. Remote adapters are
+not installed, and this path reads no credentials.
+
 The language-neutral [portable contracts](./contracts/README.md) contain the authoritative JSON Schemas, OpenAPI description, examples, and conformance fixtures. The public `policy` package strictly loads constrained YAML 1.2 or JSON before validation, canonicalization, and digesting; `decision` implements typed invariants and deterministic reduction. The `evaluator` package defines normalized evidence exchange and can assemble a validated Decision from one evaluation, while `evaluator/fixture` provides an exact, network-free synthetic adapter. The `regression` package runs identity-bound named cases through that same path; see the [local fixture quickstart](./docs/quickstart.md).
 
 Run checks and build the development command through the repository-owned build lock:
