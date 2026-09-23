@@ -239,7 +239,7 @@ func TestCredentialsAreIsolatedByAdapterAndSlot(t *testing.T) {
 				return evidence(r, c, 1), nil
 			}
 			registry := Registry{}
-			for _, entry := range entries {
+			for _, entry := range in.Profile.Spec.Evaluators {
 				registry[entry.Adapter] = Adapter{Mode: profile.ModeSemantic, Protocol: entry.Protocol, Capabilities: entry.RequiredCapabilities, Parameters: validator(func(json.RawMessage) error { return nil }), Evaluate: fn}
 			}
 			d, err := Run(context.Background(), in, registry)
