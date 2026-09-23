@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"math"
 	"reflect"
 	"testing"
@@ -113,6 +114,12 @@ func TestConfigurationCopiesPreserveValidatedValuesAndIsolateMutation(t *testing
 	if calls != 2 || d.Outcome != decision.Outcome(in.Policy.Spec.DefaultOutcome) || d.Evaluator.ProfileDigest != wantDigest || !reflect.DeepEqual(clock.delays, []time.Duration{100 * time.Millisecond}) {
 		t.Fatalf("calls=%d decision=%+v delays=%v", calls, d, clock.delays)
 	}
+	if d.Evaluator.Adapter != entry.Adapter.ID || d.Evaluator.AdapterVersion != entry.Adapter.Version || d.Evaluator.Provider != *entry.Provider || d.Evaluator.Model != *entry.Model || d.Evaluator.Mode != decision.EvaluatorModeSemantic || d.Evaluator.Synthetic == nil || *d.Evaluator.Synthetic {
+		t.Fatalf("configuration mutation escaped into Decision metadata: %+v", d.Evaluator)
+	}
+	if d.Evaluator.Attempts != 2 || d.Evaluator.Fallback || !reflect.DeepEqual(d.Evaluator.Route, []string{entry.ID}) {
+		t.Fatalf("configuration mutation changed Decision routing: %+v", d.Evaluator)
+	}
 	trace := traceOf(t, d)
 	if len(trace.Attempts) != 2 || trace.Terminal != "completed" {
 		t.Fatal(trace)
@@ -140,6 +147,14 @@ func TestNonJSONParametersFailBeforeValidationOrExecution(t *testing.T) {
 		{"invalid number", json.Number("not-a-number")},
 		{"overflow", json.Number("1e400")},
 		{"unsafe integer", json.Number("9007199254740992")},
+		{"negative unsafe integer", json.Number("-9007199254740992")},
+		{"unsafe exponent", json.Number("9.007199254740992e15")},
+		{"negative unsafe exponent", json.Number("-9.007199254740992e15")},
+		{"fraction rounds to unsafe integer", json.Number("9007199254740991.5")},
+		{"negative fraction rounds to unsafe integer", json.Number("-9007199254740991.5")},
+		{"float64 unsafe integer", float64(9007199254740992)},
+		{"signed unsafe integer", int64(-9007199254740992)},
+		{"unsigned unsafe integer", uint64(9007199254740992)},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			in := inputFixture(t)
@@ -158,6 +173,62 @@ func TestNonJSONParametersFailBeforeValidationOrExecution(t *testing.T) {
 			d, err := Run(context.Background(), in, registry)
 			if err == nil || d.Kind != "" {
 				t.Fatalf("decision=%+v error=%v", d, err)
+			}
+			var validation *profile.ValidationError
+			if !errors.As(err, &validation) || validation.Path != "$.spec.evaluators[0].parameters" || validation.Code != "parameters.invalid" {
+				t.Fatalf("wrong preflight rejection: %v", err)
+			}
+		})
+	}
+}
+
+func TestValidParameterNumbersReachValidationAndExecution(t *testing.T) {
+	for _, tt := range []struct {
+		name, canonical string
+		value           any
+	}{
+		{"safe positive exponent", "9007199254740991", json.Number("9.007199254740991e15")},
+		{"safe negative exponent", "-9007199254740991", json.Number("-9.007199254740991e15")},
+		{"safe positive fraction", "9007199254740991", json.Number("9007199254740991.0")},
+		{"safe negative fraction", "-9007199254740991", json.Number("-9007199254740991.0")},
+		{"safe signed integer", "-9007199254740991", int64(-9007199254740991)},
+		{"safe unsigned integer", "9007199254740991", uint64(9007199254740991)},
+		{"safe float64", "9007199254740991", float64(9007199254740991)},
+		{"rounded fraction", "0.1", json.Number("0.10000000000000001")},
+		{"negative zero", "0", json.Number("-0")},
+		{"subnormal", "5e-324", json.Number("5e-324")},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			in := inputFixture(t)
+			in.Profile.Spec.Evaluators[0].Parameters = map[string]any{"number": tt.value}
+			want := `{"number":` + tt.canonical + `}`
+			calls, validations, numericValidations := 0, 0, 0
+			registry := installed(func(_ context.Context, r evaluator.Request, c Configuration) (evaluator.Result, error) {
+				calls++
+				if validations != len(in.Profile.Spec.Evaluators) || numericValidations != 1 {
+					t.Fatal("execution preceded complete parameter validation")
+				}
+				// Compare canonical values, not the Go numeric dynamic type.
+				if c.Evaluator.ID != "semantic-primary" || string(canonicalConfiguration(t, c.Evaluator.Parameters)) != want {
+					t.Fatalf("wrong executed parameters: %+v", c.Evaluator)
+				}
+				return evidence(r, c, 1), nil
+			})
+			key := in.Profile.Spec.Evaluators[0].Adapter
+			a := registry[key]
+			a.Parameters = validator(func(data json.RawMessage) error {
+				validations++
+				if string(data) == want {
+					numericValidations++
+				} else if string(data) != "{}" {
+					t.Fatalf("wrong canonical validator bytes: %s", data)
+				}
+				return nil
+			})
+			registry[key] = a
+			d, err := Run(context.Background(), in, registry)
+			if err != nil || calls != 1 || validations != len(in.Profile.Spec.Evaluators) || numericValidations != 1 || d.Kind != decision.KindDecision || d.Outcome != decision.Outcome(in.Policy.Spec.DefaultOutcome) {
+				t.Fatalf("calls=%d validations=%d numeric=%d decision=%+v error=%v", calls, validations, numericValidations, d, err)
 			}
 		})
 	}
