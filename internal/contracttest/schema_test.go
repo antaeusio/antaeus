@@ -132,6 +132,24 @@ func TestContractExamplesAgainstSchemas(t *testing.T) {
 			valid:    true,
 		},
 		{
+			name:     "quickstart regression suite",
+			schema:   "regression-suite.schema.json",
+			instance: filepath.Join("examples", "v0alpha1", "regression-suite", "quickstart.json"),
+			valid:    true,
+		},
+		{
+			name:     "passed regression result set",
+			schema:   "regression-result-set.schema.json",
+			instance: filepath.Join("examples", "v0alpha1", "regression-result-set", "quickstart-passed.json"),
+			valid:    true,
+		},
+		{
+			name:     "regression suite unknown property",
+			schema:   "regression-suite.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "regression-suite", "invalid-unknown-property.json"),
+			valid:    false,
+		},
+		{
 			name:     "fixture set unknown property",
 			schema:   "fixture-set.schema.json",
 			instance: filepath.Join("conformance", "v0alpha1", "fixture-set", "invalid-unknown-property.json"),
@@ -203,6 +221,8 @@ func newCompiler(t *testing.T) *jsonschema.Compiler {
 		"decision-request.schema.json",
 		"decision.schema.json",
 		"fixture-set.schema.json",
+		"regression-suite.schema.json",
+		"regression-result-set.schema.json",
 		"problem.schema.json",
 	} {
 		path := contractsPath(filepath.Join("schemas", "v0alpha1", name))

@@ -32,6 +32,12 @@ func TestRun(t *testing.T) {
 			wantStderr: "evaluate requires --policy, --input, --fixture-set, --case",
 		},
 		{
+			name:       "test requires flags",
+			args:       []string{"test"},
+			wantCode:   64,
+			wantStderr: "test requires --policy, --suite, --fixture-set",
+		},
+		{
 			name:       "evaluate rejects unknown flag",
 			args:       []string{"evaluate", "--unknown"},
 			wantCode:   64,
@@ -140,6 +146,57 @@ func TestRunEvaluateQuickstartFixture(t *testing.T) {
 	}
 	if got.Evaluator == nil || got.Evaluator.Synthetic == nil || !*got.Evaluator.Synthetic || got.Evaluator.FixtureSet == nil || *got.Evaluator.FixtureSet != "quickstart" {
 		t.Fatalf("Decision.Evaluator = %#v, want quickstart synthetic fixture", got.Evaluator)
+	}
+}
+
+func TestRunQuickstartRegressionSuite(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	args := []string{
+		"test",
+		"--policy", contractPath("policy", "vendor-onboarding.yaml"),
+		"--suite", contractPath("regression-suite", "quickstart.json"),
+		"--fixture-set", contractPath("fixture-set", "quickstart.json"),
+	}
+	if got := Run(args, &stdout, &stderr); got != 0 {
+		t.Fatalf("Run() = %d, stderr = %q", got, stderr.String())
+	}
+	var got struct {
+		Passed  bool `json:"passed"`
+		Results []struct {
+			Status string `json:"status"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("decode stdout: %v", err)
+	}
+	if !got.Passed || len(got.Results) != 1 || got.Results[0].Status != "passed" {
+		t.Fatalf("result = %#v, want passed suite", got)
+	}
+}
+
+func TestRunRegressionMismatchReturnsResultAndFailure(t *testing.T) {
+	source, err := os.ReadFile(contractPath("regression-suite", "quickstart.json"))
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	suitePath := writeCLIFile(t, "mismatch.json", strings.Replace(string(source), `"outcome": "review"`, `"outcome": "allow"`, 1))
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	args := []string{
+		"test",
+		"--policy", contractPath("policy", "vendor-onboarding.yaml"),
+		"--suite", suitePath,
+		"--fixture-set", contractPath("fixture-set", "quickstart.json"),
+	}
+	if got := Run(args, &stdout, &stderr); got != 1 {
+		t.Fatalf("Run() = %d, want 1", got)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	if !strings.Contains(stdout.String(), `"passed":false`) || !strings.Contains(stdout.String(), `"status":"failed"`) {
+		t.Fatalf("stdout = %q, want failed machine-readable result", stdout.String())
 	}
 }
 

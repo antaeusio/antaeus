@@ -7,8 +7,9 @@ This directory is the language-neutral source of truth for Antaeus policy and de
 The initial version is `v0alpha1`:
 
 - policies use `apiVersion: policy.antaeus.io/v0alpha1` and `kind: Policy`;
-- decision requests use `apiVersion: decision.antaeus.io/v0alpha1` and `kind: DecisionRequest`; and
-- decisions use `apiVersion: decision.antaeus.io/v0alpha1` and `kind: Decision`.
+- decision requests use `apiVersion: decision.antaeus.io/v0alpha1` and `kind: DecisionRequest`;
+- decisions use `apiVersion: decision.antaeus.io/v0alpha1` and `kind: Decision`; and
+- regression suites and result sets use `apiVersion: regression.antaeus.io/v0alpha1`.
 
 Published schema versions are immutable. An incompatible structural or semantic change receives a new `apiVersion` and new schema path.
 
@@ -21,9 +22,11 @@ Implementations must reject inputs exceeding any applicable limit before unbound
 | Policy source | 1 MiB |
 | Decision request JSON | 1 MiB |
 | Decision JSON | 1 MiB |
+| Regression suite source | 1 MiB |
 | JSON/YAML nesting depth | 32 |
 | Aggregate parsed nodes | 10,000 |
 | Rules per policy | 256 |
+| Cases per fixture or regression suite | 256 |
 | Policy or rule description | 4,096 Unicode code points |
 | Rule condition (`when`) | 16,384 Unicode code points |
 | Decision message | 4,096 Unicode code points |
@@ -96,6 +99,20 @@ Case names are unique within a fixture set, and rule IDs are unique within each
 case. JSON property names are case-sensitive and exact; unknown, case-variant,
 and duplicate properties are rejected before typed decoding.
 
+## Regression suites
+
+`regression-suite.schema.json` defines named offline checks bound to one exact
+policy digest and fixture-set version. Each case contains one inline JSON
+object, selects one fixture case, and expects an exact terminal outcome and
+ordered top-level reason codes. Inputs use the same strict parsing limits and
+RFC 8785 canonicalization as local evaluation.
+
+`regression-result-set.schema.json` records the expectation and complete actual
+Decision for every case. Expectation mismatches set the case status to `failed`
+and the aggregate `passed` field to `false`; configuration and evaluation errors
+do not produce a partial result set. These fixtures remain synthetic and
+credential-free.
+
 Requests rejected before evaluation use a non-2xx status with RFC 9457 Problem Details (`application/problem+json`). Policy `deny` and `review` outcomes are not transport errors.
 
 ## Layout
@@ -104,4 +121,5 @@ Requests rejected before evaluation use a non-2xx status with RFC 9457 Problem D
 - `openapi/v0alpha1/openapi.yaml` describes the portable synchronous HTTP operation.
 - `examples/v0alpha1/` contains readable valid examples.
 - `examples/v0alpha1/input/` contains canonical local-evaluation inputs bound by fixture digests.
+- `examples/v0alpha1/regression-suite/` and `regression-result-set/` contain a complete offline regression example.
 - `conformance/v0alpha1/` contains machine-oriented valid, invalid, and canonicalization fixtures.
