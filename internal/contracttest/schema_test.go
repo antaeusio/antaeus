@@ -150,6 +150,18 @@ func TestContractExamplesAgainstSchemas(t *testing.T) {
 			valid:    false,
 		},
 		{
+			name:     "regression suite empty description",
+			schema:   "regression-suite.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "regression-suite", "invalid-empty-description.json"),
+			valid:    false,
+		},
+		{
+			name:     "regression suite whitespace description",
+			schema:   "regression-suite.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "regression-suite", "invalid-whitespace-description.json"),
+			valid:    false,
+		},
+		{
 			name:     "fixture set unknown property",
 			schema:   "fixture-set.schema.json",
 			instance: filepath.Join("conformance", "v0alpha1", "fixture-set", "invalid-unknown-property.json"),

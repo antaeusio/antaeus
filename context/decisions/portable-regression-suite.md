@@ -15,7 +15,8 @@ source_refs:
 ## Pattern
 
 Represent offline regression checks as a versioned `RegressionSuite` bound to
-one exact policy name and digest plus one exact fixture-set name and version.
+one content-addressed policy name and digest plus one declared fixture-set name
+and version.
 Each uniquely named case carries an inline JSON object, selects an explicit
 fixture case, and declares the exact terminal outcome and ordered top-level
 reason codes expected from deterministic reduction. Strictly validate and RFC
@@ -38,7 +39,9 @@ and do not demonstrate semantic evaluator quality.
 
 ## Rationale
 
-Exact identity binding prevents a suite from silently exercising different
-policy or fixture content. Preserving complete Decisions makes failures
-auditable and keeps regression behavior language-neutral without inventing a
-second evaluation path.
+The policy digest prevents a suite from silently exercising different policy
+content. Suite and fixture-set name/version pairs are declared version labels,
+not content hashes; publishers must issue a new version when either resource
+changes. Preserving complete Decisions makes failures auditable and keeps
+regression behavior language-neutral without inventing a second evaluation
+path.

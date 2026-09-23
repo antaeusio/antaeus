@@ -163,6 +163,8 @@ func TestParseRejectsStrictnessViolations(t *testing.T) {
 		{name: "case variant root", source: strings.Replace(string(valid), `"kind": "RegressionSuite"`, `"KIND": "RegressionSuite"`, 1), want: `unknown property "KIND"`},
 		{name: "case variant case", source: strings.Replace(string(valid), `"fixtureCase": "aggregate-analytics"`, `"FixtureCase": "aggregate-analytics"`, 1), want: `unknown property "FixtureCase"`},
 		{name: "case variant duplicate", source: strings.Replace(string(valid), `"input": {`, `"Input": {}, "input": {`, 1), want: `unknown property "Input"`},
+		{name: "empty description", source: strings.Replace(string(valid), `"description": "A complete deterministic fixture check for the documented quickstart input."`, `"description": ""`, 1), want: "description"},
+		{name: "whitespace description", source: strings.Replace(string(valid), `"description": "A complete deterministic fixture check for the documented quickstart input."`, `"description": "   "`, 1), want: "description"},
 		{name: "array input", source: strings.Replace(string(valid), "\"input\": {\n        \"description\": \"Processes aggregate product events.\",\n        \"serviceCategory\": \"analytics\"\n      }", `"input": []`, 1), want: "JSON object"},
 		{name: "duplicate case", source: "", want: "duplicated"},
 	}

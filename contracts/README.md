@@ -107,6 +107,10 @@ object, selects one fixture case, and expects an exact terminal outcome and
 ordered top-level reason codes. Inputs use the same strict parsing limits and
 RFC 8785 canonicalization as local evaluation.
 
+Policy identity is content-addressed. Regression-suite and fixture-set
+name/version pairs are declared labels rather than content hashes, so a
+publisher must issue a new version whenever either resource changes.
+
 `regression-result-set.schema.json` records the expectation and complete actual
 Decision for every case. Expectation mismatches set the case status to `failed`
 and the aggregate `passed` field to `false`; configuration and evaluation errors

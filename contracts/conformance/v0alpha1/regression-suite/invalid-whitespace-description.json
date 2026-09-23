@@ -1,0 +1,19 @@
+{
+  "apiVersion": "regression.antaeus.io/v0alpha1",
+  "kind": "RegressionSuite",
+  "metadata": {"name": "quickstart", "version": "v1"},
+  "policy": {
+    "name": "vendor-onboarding",
+    "digest": "sha256:2378b5a1806bb11c618bd3a78122e773ec93bdfc45b751a18887d40f4ea536a2"
+  },
+  "fixtureSet": {"name": "quickstart", "version": "v1"},
+  "cases": [
+    {
+      "name": "whitespace-description",
+      "description": "   ",
+      "fixtureCase": "aggregate-analytics",
+      "input": {},
+      "expect": {"outcome": "review", "reasonCodes": ["policy.default_outcome"]}
+    }
+  ]
+}

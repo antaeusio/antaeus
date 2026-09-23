@@ -78,7 +78,8 @@
         "description": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 4096
+          "maxLength": 4096,
+          "pattern": "\\S"
         },
         "fixtureCase": {
           "type": "string",

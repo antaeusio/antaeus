@@ -41,7 +41,7 @@ type PolicyIdentity struct {
 // Case is one named canonical input and exact terminal expectation.
 type Case struct {
 	Name        string          `json:"name"`
-	Description string          `json:"description,omitempty"`
+	Description *string         `json:"description,omitempty"`
 	FixtureCase string          `json:"fixtureCase"`
 	Input       json.RawMessage `json:"input"`
 	Expect      Expectation     `json:"expect"`

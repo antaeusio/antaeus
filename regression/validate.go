@@ -50,7 +50,7 @@ func (s Suite) Validate() error {
 			return fmt.Errorf("case name %q is duplicated", testCase.Name)
 		}
 		seen[testCase.Name] = struct{}{}
-		if testCase.Description != "" && (!utf8.ValidString(testCase.Description) || strings.TrimSpace(testCase.Description) == "" || utf8.RuneCountInString(testCase.Description) > MaxDescription) {
+		if testCase.Description != nil && (!utf8.ValidString(*testCase.Description) || strings.TrimSpace(*testCase.Description) == "" || utf8.RuneCountInString(*testCase.Description) > MaxDescription) {
 			return fmt.Errorf("case %q description must contain 1 to %d non-whitespace Unicode code points", testCase.Name, MaxDescription)
 		}
 		if !namePattern.MatchString(testCase.FixtureCase) {
