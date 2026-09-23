@@ -391,6 +391,7 @@ func TestGlobalAttemptLimit(t *testing.T) {
 	if calls != 64 || d.Evaluator.Attempts != 64 || traceOf(t, d).Terminal != "evaluation.attempt_limit" {
 		t.Fatalf("calls=%d trace=%+v", calls, traceOf(t, d))
 	}
+	assertDecisionFailure(t, d, "evaluation.attempt_limit", false)
 }
 
 func TestRegistryFixtureCannotEnforce(t *testing.T) {

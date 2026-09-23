@@ -487,6 +487,7 @@ func (x *execution) decide(evidence []evaluator.RuleResult) (decision.Decision, 
 	if err != nil {
 		return decision.Decision{}, err
 	}
+	reduction = operationalFailure(reduction, rules, x.trace.Terminal)
 	trace, err := json.Marshal(x.trace)
 	if err != nil {
 		return decision.Decision{}, err
@@ -502,6 +503,31 @@ func (x *execution) decide(evidence []evaluator.RuleResult) (decision.Decision, 
 		return decision.Decision{}, err
 	}
 	return d, nil
+}
+
+// operationalFailure enriches a failure without changing policy reduction.
+// Retryability classifies all unresolved evidence, not just the last attempt.
+func operationalFailure(reduction decision.Reduction, rules []decision.RuleResult, terminal string) decision.Reduction {
+	if reduction.Outcome != decision.OutcomeFailure {
+		return reduction
+	}
+	switch terminal {
+	case "evaluator.timeout", "evaluator.unavailable", "evaluator.throttled",
+		"evaluation.deadline_exceeded", "evaluation.cancelled", "evaluation.attempt_limit",
+		"evaluation.adapter_failed", "evaluation.invalid_result":
+	default:
+		return reduction
+	}
+	retryable := transient(terminal) != ""
+	for _, rule := range rules {
+		if rule.Status == decision.RuleIndeterminate ||
+			(rule.Status == decision.RuleFailed && (len(rule.ReasonCodes) != 1 || rule.ReasonCodes[0] != terminal)) {
+			retryable = false
+		}
+	}
+	reduction.Failure = &decision.Failure{Code: terminal, Stage: "evaluation", Retryable: retryable}
+	reduction.ReasonCodes = []string{"evaluation.unresolved_rule", terminal}
+	return reduction
 }
 
 func value(s *string) string {

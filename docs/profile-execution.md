@@ -88,6 +88,29 @@ reducer determines the outcome; an already accepted matched deny still outranks
 unresolved rules. No failure synthesizes a policy outcome or invokes an
 unconfigured evaluator.
 
+For a failure outcome with an operational trace terminal, the runner enriches
+the reducer's generic failure: `failure.code` is that terminal code, `stage`
+remains `evaluation`, and top-level `reasonCodes` are exactly
+`["evaluation.unresolved_rule", terminalCode]` in that order. Supported terminal
+codes are `evaluator.timeout`, `evaluator.unavailable`, `evaluator.throttled`,
+`evaluation.deadline_exceeded`, `evaluation.cancelled`, `evaluation.attempt_limit`,
+`evaluation.adapter_failed`, and `evaluation.invalid_result`.
+
+Only the first three transient codes can be retryable, and only when every
+unresolved rule is `failed` with exactly that same code as its sole reason.
+Any indeterminate rule, different failed cause or additional failed reason makes
+the overall failure non-retryable. Resolved rules do not disqualify it. Ordinary
+unresolved evidence without an operational terminal keeps the generic failure
+and single `evaluation.unresolved_rule` top-level reason. Deny retains precedence
+and never gains a failure object; per-rule evidence and the trace preserve the
+details of mixed failures.
+
+Retryability classifies evidence; it is not permission to retry automatically.
+Callers still own deadlines, idempotency, retry limits, costs and side effects.
+An unexpired caller deadline too short for the next wait can leave a retryable
+transient failure; an actually expired deadline or observed cancellation is
+non-retryable. Neither allows the current invocation to exceed its deadline.
+
 Programming panics are an explicit exception: adapter panics propagate after
 deferred credential cleanup and attempt/total context cancellation. They return
 no Decision or completed trace, even if cancellation or a deadline is also
@@ -102,9 +125,9 @@ distinct quarantine signal and cannot be treated as an ordinary retryable error.
 Go callers intentionally executing fixtures must add `AllowSyntheticFixtures:
 true` to `runner.Input`; callers relying on the previous zero-value permission
 now receive a pre-acceptance error. `Enforcement: true` always prohibits fixtures.
-No change is needed for semantic profiles. The existing fixture-only CLI retains
-its flags, outputs and exit classes, and the legacy `evaluate`/`test` paths are
-unchanged. Published portable schemas and policy/profile identities are unchanged.
+No opt-in change is needed for semantic profiles. The fixture-only CLI retains
+its flags and exit classes, and the legacy `evaluate`/`test` paths are unchanged.
+Published portable schemas and policy/profile identities are unchanged.
 This is a documented first-minor development change, not a patch backport or a
 claim that v0.1.0 has been released.
 
@@ -116,10 +139,24 @@ therefore produce a real `allow`, `review` or `deny` where the old runner return
 `failure`; the reducer and policy meaning are unchanged. Without a successful
 recovery, the last transient code (for example `evaluator.timeout`) can replace
 the old deadline code in trace terminal and failed-rule reasons. The generic
-core failure mapping is unchanged by this retry change. Go and CLI consumers
+core failure mapping is a separate change described below. Go and CLI consumers
 must not assume that this budget boundary always returns failure or a deadline
 code; inspect the actual outcome, evidence and trace. No provider may run beyond
 the total/caller deadline, and an already expired or cancelled run still stops.
+
+Operational failure metadata also changes in the planned v0.1.0 release for
+both Go `runner.Run` and CLI `evaluate-profile`. Previously every reduced failure
+used `failure.code: evaluation.unresolved_rule`, `retryable: false`, and one
+top-level reason. Operational failures now use the mapping above, including
+the additional terminal reason and conditional transient retryability. For
+example, an accepted fixture input-identity mismatch now returns
+`failure.code: evaluation.adapter_failed` with both reasons and remains
+non-retryable. Consumers matching only the old generic code or exact reason
+array must migrate; do not infer automatic retry permission from the new flag.
+Non-operational unresolved failures, policy judgments, the standalone reducer,
+legacy `evaluate`/`test`, and regression execution are unchanged. This uses the
+portable Decision contract's existing allowance for operational failure details;
+no published schema, trace version or extension-key binding changes.
 
 Calls are synchronous. Adapters must honor context cancellation and return
 promptly; the runner does not detach goroutines or forcibly stop an uncooperative
