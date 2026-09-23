@@ -41,6 +41,11 @@ typed evaluation.
 
 YAML authoring is restricted to one UTF-8 YAML 1.2.2 document representing the JSON data model. Duplicate or non-string keys, directives, custom tags, anchors, aliases, merge keys, multiple documents, invalid Unicode, non-finite numbers, and values outside these limits are rejected. To avoid legacy parser-dependent folding, YAML source line breaks must be LF or CRLF; bare CR and U+0085, U+2028, or U+2029 are rejected anywhere in YAML source, including quoted scalars. JSON input rejects duplicate keys, unpaired Unicode surrogate escapes, and trailing documents.
 
+For a `RegressionSuite`, the source-size and case-count limits apply to the
+suite envelope. Nesting depth and parsed-node limits apply independently to
+each inline `input`, measured from that input object's root; the fixed suite
+envelope does not consume either input budget.
+
 Conformance fixtures define portable accept/reject behavior, not a portable
 error taxonomy. The Go `policy.ParseError.Code` values use the `source.*`
 namespace and are specific to the Go API.

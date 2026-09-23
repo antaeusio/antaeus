@@ -83,6 +83,9 @@ func validateExactSuiteKeys(data []byte) error {
 			if err != nil {
 				return err
 			}
+			if description, exists := caseObject["description"]; exists && bytes.Equal(bytes.TrimSpace(description), []byte("null")) {
+				return fmt.Errorf("decode case %d: description must be a string when present", index)
+			}
 			if encodedExpectation, exists := caseObject["expect"]; exists {
 				if _, err := exactjson.DecodeObject(encodedExpectation, fmt.Sprintf("case %d expectation", index), []string{"outcome", "reasonCodes"}); err != nil {
 					return err

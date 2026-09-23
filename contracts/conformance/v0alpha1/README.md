@@ -32,6 +32,13 @@ They must produce the exact UTF-8 bytes in `canonical/vendor-onboarding.canonica
 - `fixture-set/invalid-bad-digest.json` rejects a non-digest policy identity.
 - `fixture-set/invalid-empty-rule-results.json` rejects a case without exact rule evidence.
 
+## Regression suites
+
+`regression-suite/valid-input-max-depth.json` fixes the maximum inline-input
+nesting boundary. `invalid-input-over-depth.json` exceeds it by one container.
+The other invalid fixtures cover unknown properties and present descriptions
+that are null, empty, or whitespace-only.
+
 ## Policy source parsing
 
 `policy-source/valid-core-scalars.yaml` confirms YAML 1.2 core-schema behavior

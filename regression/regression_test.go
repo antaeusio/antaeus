@@ -165,6 +165,7 @@ func TestParseRejectsStrictnessViolations(t *testing.T) {
 		{name: "case variant duplicate", source: strings.Replace(string(valid), `"input": {`, `"Input": {}, "input": {`, 1), want: `unknown property "Input"`},
 		{name: "empty description", source: strings.Replace(string(valid), `"description": "A complete deterministic fixture check for the documented quickstart input."`, `"description": ""`, 1), want: "description"},
 		{name: "whitespace description", source: strings.Replace(string(valid), `"description": "A complete deterministic fixture check for the documented quickstart input."`, `"description": "   "`, 1), want: "description"},
+		{name: "null description", source: strings.Replace(string(valid), `"description": "A complete deterministic fixture check for the documented quickstart input."`, `"description": null`, 1), want: "description must be a string"},
 		{name: "array input", source: strings.Replace(string(valid), "\"input\": {\n        \"description\": \"Processes aggregate product events.\",\n        \"serviceCategory\": \"analytics\"\n      }", `"input": []`, 1), want: "JSON object"},
 		{name: "duplicate case", source: "", want: "duplicated"},
 	}
@@ -192,14 +193,13 @@ func TestParseRejectsStrictnessViolations(t *testing.T) {
 }
 
 func TestParseAppliesStructuralLimitsToEachInput(t *testing.T) {
-	suite := loadQuickstartSuite(t)
-	suite.Cases[0].Input = json.RawMessage(`{"a":` + strings.Repeat("[", policy.MaxNestingDepth-1) + "null" + strings.Repeat("]", policy.MaxNestingDepth-1) + `}`)
-	encoded, err := json.Marshal(suite)
-	if err != nil {
-		t.Fatalf("Marshal() error = %v", err)
+	validPath := conformancePath("valid-input-max-depth.json")
+	if _, err := LoadFile(validPath); err != nil {
+		t.Fatalf("LoadFile(%s) error = %v", validPath, err)
 	}
-	if _, err := Parse(encoded); err != nil {
-		t.Fatalf("Parse() exact per-input depth error = %v", err)
+	invalidPath := conformancePath("invalid-input-over-depth.json")
+	if _, err := LoadFile(invalidPath); err == nil || !strings.Contains(err.Error(), "nesting") {
+		t.Fatalf("LoadFile(%s) error = %v, want nesting rejection", invalidPath, err)
 	}
 }
 
@@ -214,4 +214,8 @@ func loadQuickstartSuite(t *testing.T) Suite {
 
 func contractPath(kind, name string) string {
 	return filepath.Join("..", "contracts", "examples", "v0alpha1", kind, name)
+}
+
+func conformancePath(name string) string {
+	return filepath.Join("..", "contracts", "conformance", "v0alpha1", "regression-suite", name)
 }

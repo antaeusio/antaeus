@@ -20,7 +20,9 @@ and version.
 Each uniquely named case carries an inline JSON object, selects an explicit
 fixture case, and declares the exact terminal outcome and ordered top-level
 reason codes expected from deterministic reduction. Strictly validate and RFC
-8785-canonicalize every input before evaluation.
+8785-canonicalize every input before evaluation. Apply nesting-depth and
+parsed-node limits independently to each inline input, measured from that
+input object's root; the suite envelope does not consume the input budget.
 
 Run every case through the same provider-neutral single-attempt evaluator path
 and shared fixture profile as local evaluation. The exact UTF-8 profile

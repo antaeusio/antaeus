@@ -162,6 +162,18 @@ func TestContractExamplesAgainstSchemas(t *testing.T) {
 			valid:    false,
 		},
 		{
+			name:     "regression suite null description",
+			schema:   "regression-suite.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "regression-suite", "invalid-null-description.json"),
+			valid:    false,
+		},
+		{
+			name:     "regression suite input at maximum depth",
+			schema:   "regression-suite.schema.json",
+			instance: filepath.Join("conformance", "v0alpha1", "regression-suite", "valid-input-max-depth.json"),
+			valid:    true,
+		},
+		{
 			name:     "fixture set unknown property",
 			schema:   "fixture-set.schema.json",
 			instance: filepath.Join("conformance", "v0alpha1", "fixture-set", "invalid-unknown-property.json"),
