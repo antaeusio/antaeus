@@ -1,0 +1,19 @@
+{
+  "version": "v0alpha1",
+  "attempts": [{
+    "evaluatorId": "semantic-primary",
+    "adapterId": "io.example.semantic",
+    "adapterVersion": "1.0.0",
+    "route": "primary",
+    "attempt": 1,
+    "ruleIndexes": [0, 1],
+    "code": "evaluation.succeeded",
+    "latencyMs": 12,
+    "provider": "example",
+    "requestedModel": "model-1",
+    "requestedRevision": "2026-09-01",
+    "resolvedModel": "model-1",
+    "revisionAvailable": false
+  }],
+  "terminal": "completed"
+}

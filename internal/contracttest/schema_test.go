@@ -375,6 +375,12 @@ func TestContractExamplesAgainstSchemas(t *testing.T) {
 			valid:    true,
 		},
 		{
+			name:     "profile execution trace",
+			schema:   "execution-trace.schema.json",
+			instance: filepath.Join("examples", "v0alpha1", "execution-trace", "primary.json"),
+			valid:    true,
+		},
+		{
 			name:     "local configuration example",
 			schema:   "local-configuration.schema.json",
 			instance: filepath.Join("examples", "v0alpha1", "local-configuration", "development.json"),
@@ -671,6 +677,7 @@ func newCompiler(t *testing.T) *jsonschema.Compiler {
 		"evaluator-profile.schema.json",
 		"local-secret-bindings.schema.json",
 		"local-configuration.schema.json",
+		"execution-trace.schema.json",
 		"regression-suite.schema.json",
 		"regression-result-set.schema.json",
 		"problem.schema.json",

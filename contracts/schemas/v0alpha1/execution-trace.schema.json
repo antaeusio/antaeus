@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://antaeus.io/contracts/v0alpha1/execution-trace.schema.json",
+  "title": "Antaeus profile execution trace v0alpha1",
+  "type": "object",
+  "required": ["version", "attempts", "terminal"],
+  "properties": {
+    "version": {"const": "v0alpha1"},
+    "attempts": {"type": "array", "minItems": 1, "maxItems": 64, "items": {"$ref": "#/$defs/attempt"}},
+    "terminal": {"enum": ["completed", "evaluation.unresolved_rule", "evaluator.timeout", "evaluator.unavailable", "evaluator.throttled", "evaluation.adapter_failed", "evaluation.invalid_result", "evaluation.deadline_exceeded", "evaluation.cancelled", "evaluation.attempt_limit"]}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "text": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": ".*\\S.*"},
+    "attempt": {
+      "type": "object",
+      "required": ["evaluatorId", "adapterId", "adapterVersion", "route", "attempt", "ruleIndexes", "code", "latencyMs", "revisionAvailable"],
+      "properties": {
+        "evaluatorId": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{0,63}$"},
+        "adapterId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "adapterVersion": {"type": "string", "minLength": 1, "maxLength": 128},
+        "route": {"enum": ["primary", "escalation", "fallback"]},
+        "attempt": {"type": "integer", "minimum": 1, "maximum": 5},
+        "ruleIndexes": {"type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": {"type": "integer", "minimum": 0, "maximum": 255}},
+        "code": {"enum": ["evaluation.succeeded", "evaluator.timeout", "evaluator.unavailable", "evaluator.throttled", "evaluation.adapter_failed", "evaluation.invalid_result", "evaluation.deadline_exceeded", "evaluation.cancelled"]},
+        "latencyMs": {"type": "integer", "minimum": 0},
+        "provider": {"$ref": "#/$defs/text", "maxLength": 128},
+        "requestedModel": {"$ref": "#/$defs/text"},
+        "requestedRevision": {"$ref": "#/$defs/text"},
+        "resolvedModel": {"$ref": "#/$defs/text"},
+        "resolvedRevision": {"$ref": "#/$defs/text"},
+        "revisionAvailable": {"type": "boolean"}
+      },
+      "additionalProperties": false,
+      "allOf": [{
+        "if": {"properties": {"revisionAvailable": {"const": true}}},
+        "then": {"required": ["resolvedRevision"]},
+        "else": {"not": {"required": ["resolvedRevision"]}}
+      }]
+    }
+  }
+}
