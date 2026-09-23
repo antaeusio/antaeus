@@ -34,8 +34,8 @@ The stable decision outcomes are `allow`, `review`, `deny`, and `failure`. Publi
 
 Every pull request containing meaningful logic must receive an independent review from a newly spawned, context-fresh session using a different model family from the author.
 
-- If Codex authored the logic, request review from Claude Opus 5.
-- If Claude Opus authored the logic, request review from Sol.
+- If Codex authored the logic, request review from Claude Opus 5.5.
+- If Claude Opus 5.5 authored the logic, request review from Sol.
 - For another authoring model, use a different model family selected by the human owner.
 - A fresh reviewer receives the requirement, complete diff, relevant tests, and repository instructions, but not the author's hidden reasoning or conclusions.
 - Record the authoring model and reviewing model in the pull-request description.
