@@ -70,6 +70,13 @@ jobs:
           test "$(command -v shellcheck)" = "$SHELLCHECK_EXPECTED_PATH"
           shellcheck --version | grep -Fx 'version: 0.11.0'
           scripts/check
+      - name: Reachable vulnerability scan including tests
+        env:
+          GOFLAGS: '-mod=readonly'
+        run: |
+          scripts/with-build-lock go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 \
+            -format text -scan symbol -test -show verbose,version \
+            -db https://vuln.go.dev ./...
       - name: Race tests on Linux amd64
         if: matrix.go == '1.27.1'
         env:
