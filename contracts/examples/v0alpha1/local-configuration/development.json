@@ -1,0 +1,6 @@
+{
+  "apiVersion": "config.antaeus.io/v0alpha1",
+  "kind": "LocalConfiguration",
+  "profileFile": "../evaluator-profile/semantic-routing.json",
+  "bindingsFile": "../local-secret-bindings/development.json"
+}

@@ -330,6 +330,35 @@ func environmentReference() map[string]any {
 
 const schemaBase = "https://antaeus.io/contracts/v0alpha1/"
 
+func TestLocalConfigurationSchema(t *testing.T) {
+	schema, err := newCompiler(t).Compile(schemaBase + "local-configuration.schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		value any
+		valid bool
+	}{
+		{nil, false}, {"profile.json", true}, {"../profile.yaml", true},
+		{"", false}, {".env", false}, {"secret.txt", false}, {123, false},
+		{"bad\x00.json", false}, {strings.Repeat("a", 4092) + ".json", false},
+	} {
+		document := map[string]any{"apiVersion": "config.antaeus.io/v0alpha1", "kind": "LocalConfiguration", "profileFile": test.value}
+		if err := schema.Validate(document); (err == nil) != test.valid {
+			t.Fatalf("value %v: %v", test.value, err)
+		}
+	}
+	for _, document := range []map[string]any{
+		{"apiVersion": "config.antaeus.io/v0alpha1", "kind": "LocalConfiguration"},
+		{"apiVersion": "config.antaeus.io/v0alpha1", "kind": "LocalConfiguration", "profileFile": "profile.json", "trusted": true},
+		{"apiVersion": "config.antaeus.io/v0alpha1", "kind": "LocalConfiguration", "profileFile": "profile.json", "secret": "value"},
+	} {
+		if schema.Validate(document) == nil {
+			t.Fatal("invalid manifest accepted")
+		}
+	}
+}
+
 func TestContractExamplesAgainstSchemas(t *testing.T) {
 	compiler := newCompiler(t)
 
@@ -343,6 +372,12 @@ func TestContractExamplesAgainstSchemas(t *testing.T) {
 			name:     "policy example",
 			schema:   "policy.schema.json",
 			instance: filepath.Join("examples", "v0alpha1", "policy", "vendor-onboarding.json"),
+			valid:    true,
+		},
+		{
+			name:     "local configuration example",
+			schema:   "local-configuration.schema.json",
+			instance: filepath.Join("examples", "v0alpha1", "local-configuration", "development.json"),
 			valid:    true,
 		},
 		{
@@ -635,6 +670,7 @@ func newCompiler(t *testing.T) *jsonschema.Compiler {
 		"fixture-set.schema.json",
 		"evaluator-profile.schema.json",
 		"local-secret-bindings.schema.json",
+		"local-configuration.schema.json",
 		"regression-suite.schema.json",
 		"regression-result-set.schema.json",
 		"problem.schema.json",

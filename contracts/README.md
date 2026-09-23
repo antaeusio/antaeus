@@ -11,7 +11,8 @@ The initial version is `v0alpha1`:
 - decisions use `apiVersion: decision.antaeus.io/v0alpha1` and `kind: Decision`;
 - regression suites and result sets use `apiVersion: regression.antaeus.io/v0alpha1`; and
 - evaluator profiles use `apiVersion: evaluator.antaeus.io/v0alpha1` and `kind: EvaluatorProfile`; and
-- local secret bindings use `apiVersion: config.antaeus.io/v0alpha1` and `kind: LocalSecretBindings`.
+- local secret bindings use `apiVersion: config.antaeus.io/v0alpha1` and `kind: LocalSecretBindings`; and
+- local configuration manifests use `apiVersion: config.antaeus.io/v0alpha1` and `kind: LocalConfiguration`.
 
 Published schema versions are immutable. An incompatible structural or semantic change receives a new `apiVersion` and new schema path.
 
@@ -27,6 +28,7 @@ Implementations must reject inputs exceeding any applicable limit before unbound
 | Regression suite source | 1 MiB |
 | Evaluator profile source | 1 MiB |
 | Local secret bindings source | 1 MiB |
+| Local configuration manifest JSON | 16 KiB |
 | JSON/YAML nesting depth | 32 |
 | Aggregate parsed nodes | 10,000 |
 | Rules per policy | 256 |
@@ -112,8 +114,9 @@ and duplicate properties are rejected before typed decoding.
 
 Local runners select profiles and credential references using the
 [local configuration precedence rules](../docs/local-configuration.md).
-The Go resolver operates on validated artifacts; CLI discovery and persistent
-project trust are not yet implemented.
+The Go resolver operates on validated artifacts. The CLI `config` commands load
+strict manifests, inspect redacted selections, manage project-digest trust, and
+check selected environment references without executing evaluators.
 
 `evaluator-profile.schema.json` defines the immutable, non-secret mechanics for
 obtaining evaluator evidence. A profile declares bounded total and per-attempt
