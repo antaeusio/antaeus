@@ -64,6 +64,11 @@ parameters. Before executing any semantic profile, call
 `Artifact.ValidateParameters` with a validator registered for each exact
 adapter ID and version; loading for inspection does not imply that an installed
 adapter accepts its parameter object.
+Normalize accepted numeric spellings to their RFC 8785 binary64 representation
+before typed validation. Reject non-finite values and integers outside the
+interoperable IEEE-754 safe range so distinct parameter values cannot collapse
+to one digest. Adapter validators receive the exact JCS-canonical parameter
+bytes covered by profile identity.
 
 ## Rationale
 

@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/antaeusio/antaeus/internal/strictsource"
@@ -245,7 +246,13 @@ func objectAt(value any, path string, allowed ...string) (map[string]any, error)
 	for _, key := range allowed {
 		allowedSet[key] = struct{}{}
 	}
-	for key, child := range object {
+	keys := make([]string, 0, len(object))
+	for key := range object {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		child := object[key]
 		if _, exists := allowedSet[key]; !exists {
 			return nil, parseError("source.schema", fmt.Sprintf("%s contains unknown property %q", path, key), 0, 0)
 		}

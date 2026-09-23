@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/big"
 	"regexp"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 
+	"github.com/gowebpki/jcs"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -62,12 +64,80 @@ func Decode(source []byte, format Format, maxBytes int, subject string) ([]byte,
 		if err := validateJSONDocument(source, subject); err != nil {
 			return nil, err
 		}
-		return source, nil
+		return normalizeJSONDocument(source)
 	case FormatYAML:
 		return decodeYAMLDocument(source, subject)
 	default:
 		return nil, parseError("source.format", fmt.Sprintf("unsupported %s format %q", subject, format), 0, 0)
 	}
+}
+
+var maxSafeInteger = big.NewInt(9_007_199_254_740_991)
+
+// NormalizeNumber returns the RFC 8785 representation of one accepted JSON
+// number. Integers outside the interoperable IEEE-754 safe range are rejected.
+func NormalizeNumber(value string) (string, error) {
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil || math.IsNaN(parsed) || math.IsInf(parsed, 0) {
+		return "", parseError("source.number", "number must be finite and representable as IEEE-754 binary64", 0, 0)
+	}
+	rational, ok := new(big.Rat).SetString(value)
+	if !ok {
+		return "", parseError("source.number", "number is invalid", 0, 0)
+	}
+	if rational.IsInt() {
+		magnitude := new(big.Int).Abs(new(big.Int).Set(rational.Num()))
+		if magnitude.Cmp(maxSafeInteger) > 0 {
+			return "", parseError("source.number", "integer exceeds the interoperable IEEE-754 safe range", 0, 0)
+		}
+	}
+	canonical, err := jcs.Transform([]byte(value))
+	if err != nil {
+		return "", parseError("source.number", "number cannot be canonicalized", 0, 0)
+	}
+	return string(canonical), nil
+}
+
+func normalizeJSONDocument(source []byte) ([]byte, error) {
+	decoder := json.NewDecoder(bytes.NewReader(source))
+	decoder.UseNumber()
+	var document any
+	if err := decoder.Decode(&document); err != nil {
+		return nil, parseError("source.syntax", boundedMessage(err.Error()), 0, 0)
+	}
+	if err := normalizeNumbers(&document); err != nil {
+		return nil, err
+	}
+	encoded, err := json.Marshal(document)
+	if err != nil {
+		return nil, parseError("source.syntax", boundedMessage(err.Error()), 0, 0)
+	}
+	return encoded, nil
+}
+
+func normalizeNumbers(value *any) error {
+	switch typed := (*value).(type) {
+	case json.Number:
+		canonical, err := NormalizeNumber(string(typed))
+		if err != nil {
+			return err
+		}
+		*value = json.Number(canonical)
+	case map[string]any:
+		for key, child := range typed {
+			if err := normalizeNumbers(&child); err != nil {
+				return err
+			}
+			typed[key] = child
+		}
+	case []any:
+		for index := range typed {
+			if err := normalizeNumbers(&typed[index]); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // NewError constructs a bounded source error for a contract-specific decoder.
@@ -237,7 +307,7 @@ func decodeYAMLDocument(source []byte, subject string) ([]byte, error) {
 	if err != nil {
 		return nil, parseError("source.syntax", boundedMessage(err.Error()), 0, 0)
 	}
-	return data, nil
+	return normalizeJSONDocument(data)
 }
 
 func yamlNodeValue(node *yaml.Node, containerDepth int, nodes *int, sourceLines [][]byte) (any, error) {

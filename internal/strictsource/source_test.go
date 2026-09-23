@@ -78,6 +78,45 @@ func TestDecodeParameters(t *testing.T) {
 	})
 }
 
+func TestDecodeNormalizesPortableNumbers(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		source string
+		format Format
+		want   string
+	}{
+		{name: "JSON integral decimal", source: `{"value":1000.0}`, format: FormatJSON, want: `{"value":1000}`},
+		{name: "JSON integral exponent", source: `{"value":1e3}`, format: FormatJSON, want: `{"value":1000}`},
+		{name: "YAML integral decimal", source: "value: 1000.0\n", format: FormatYAML, want: `{"value":1000}`},
+		{name: "decimal", source: `{"value":0.1}`, format: FormatJSON, want: `{"value":0.1}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := Decode([]byte(test.source), test.format, 1024, "test")
+			if err != nil {
+				t.Fatalf("Decode() error = %v", err)
+			}
+			if string(got) != test.want {
+				t.Fatalf("Decode() = %s, want %s", got, test.want)
+			}
+		})
+	}
+}
+
+func TestDecodeRejectsNonPortableNumbers(t *testing.T) {
+	for _, source := range []string{
+		`{"value":1e400}`,
+		`{"value":9007199254740993}`,
+		"value: 9007199254740993\n",
+	} {
+		format := FormatJSON
+		if strings.HasPrefix(source, "value:") {
+			format = FormatYAML
+		}
+		_, err := Decode([]byte(source), format, 1024, "test")
+		assertErrorCode(t, err, "source.number")
+	}
+}
+
 func assertErrorCode(t *testing.T, err error, want string) {
 	t.Helper()
 	var sourceErr *Error

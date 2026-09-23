@@ -5,8 +5,13 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/antaeusio/antaeus/internal/strictsource"
+	"github.com/gowebpki/jcs"
 )
 
 var (
@@ -22,6 +27,11 @@ type ValidationError struct {
 	Path    string
 	Code    string
 	Message string
+	Cause   error
+}
+
+func (e *ValidationError) Unwrap() error {
+	return e.Cause
 }
 
 func (e *ValidationError) Error() string {
@@ -87,7 +97,7 @@ func (a Artifact) Validate() error {
 
 // ValidateParameters validates semantic parameter objects against the exact
 // adapter ID and version. It is required before executing a semantic profile.
-func (a Artifact) ValidateParameters(validator ParameterValidator) error {
+func (a Artifact) ValidateParameters(registry ParameterRegistry) error {
 	if err := a.Validate(); err != nil {
 		return err
 	}
@@ -101,19 +111,23 @@ func (a Artifact) ValidateParameters(validator ParameterValidator) error {
 	if !hasSemantic {
 		return nil
 	}
-	if validator == nil {
+	if registry == nil {
 		return invalid("$.spec.evaluators", "adapter_schema.missing", "semantic profiles require an adapter parameter validator")
 	}
 	for i, evaluator := range a.Spec.Evaluators {
 		if evaluator.Mode != ModeSemantic {
 			continue
 		}
-		encoded, err := json.Marshal(evaluator.Parameters)
+		validator, exists := registry.ValidatorFor(evaluator.Adapter)
+		if !exists {
+			return invalid(fmt.Sprintf("$.spec.evaluators[%d].adapter", i), "adapter_schema.missing", fmt.Sprintf("no parameter validator is registered for %s@%s", evaluator.Adapter.ID, evaluator.Adapter.Version))
+		}
+		encoded, err := canonicalParameters(evaluator.Parameters)
 		if err != nil {
 			return invalid(fmt.Sprintf("$.spec.evaluators[%d].parameters", i), "parameters.invalid", err.Error())
 		}
-		if err := validator.ValidateParameters(evaluator.Adapter, encoded); err != nil {
-			return invalid(fmt.Sprintf("$.spec.evaluators[%d].parameters", i), "parameters.adapter_invalid", err.Error())
+		if err := validator.ValidateParameters(encoded); err != nil {
+			return invalidCause(fmt.Sprintf("$.spec.evaluators[%d].parameters", i), "parameters.adapter_invalid", err)
 		}
 	}
 	return nil
@@ -155,9 +169,15 @@ func validateEvaluator(path string, evaluator Evaluator, totalTimeout int, slots
 	if evaluator.Provider != nil && !providerPattern.MatchString(*evaluator.Provider) {
 		return invalid(path+".provider", "provider.invalid", "must be a lowercase provider identifier")
 	}
-	for field, value := range map[string]*string{"model": evaluator.Model, "modelRevision": evaluator.ModelRevision} {
-		if value != nil && (!modelPattern.MatchString(*value) || strings.Contains(*value, "://")) {
-			return invalid(path+"."+field, "model.invalid", "must be a bounded model identifier, not a URL")
+	for _, field := range []struct {
+		name  string
+		value *string
+	}{
+		{name: "model", value: evaluator.Model},
+		{name: "modelRevision", value: evaluator.ModelRevision},
+	} {
+		if field.value != nil && (!modelPattern.MatchString(*field.value) || strings.Contains(*field.value, "://")) {
+			return invalid(path+"."+field.name, "model.invalid", "must be a bounded model identifier, not a URL")
 		}
 	}
 	if evaluator.InstructionTemplate != nil {
@@ -178,6 +198,9 @@ func validateEvaluator(path string, evaluator Evaluator, totalTimeout int, slots
 	}
 	if evaluator.Parameters == nil || len(evaluator.Parameters) > MaxParameters {
 		return invalid(path+".parameters", "parameters.invalid", fmt.Sprintf("must be an object with at most %d properties", MaxParameters))
+	}
+	if err := validateParameterData(evaluator.Parameters); err != nil {
+		return invalid(path+".parameters", "parameters.invalid", err.Error())
 	}
 	if evaluator.Mode == ModeDeterministicFixture {
 		return validateFixtureEvaluator(path, evaluator)
@@ -279,7 +302,7 @@ func validateRouting(routing Routing, evaluators map[string]Evaluator) error {
 		}
 		seenFailures[failure] = struct{}{}
 	}
-	if err := validateConfidence(routing, evaluators, positions); err != nil {
+	if err := validateConfidence(routing, evaluators); err != nil {
 		return err
 	}
 	if routing.Terminal.OnIndeterminate != "failure" || routing.Terminal.OnFailure != "failure" {
@@ -288,7 +311,7 @@ func validateRouting(routing Routing, evaluators map[string]Evaluator) error {
 	return nil
 }
 
-func validateConfidence(routing Routing, evaluators map[string]Evaluator, positions map[string]string) error {
+func validateConfidence(routing Routing, evaluators map[string]Evaluator) error {
 	confidence := routing.Confidence
 	if !confidence.Enabled {
 		if confidence.MinimumAccepted != nil || confidence.OnLowConfidence != nil || routing.Escalation != nil {
@@ -308,9 +331,16 @@ func validateConfidence(routing Routing, evaluators map[string]Evaluator, positi
 	if *confidence.OnLowConfidence != LowConfidenceEscalate && routing.Escalation != nil {
 		return invalid("$.spec.routing.escalation", "escalation.unused", "must be omitted unless low confidence escalates")
 	}
-	for id, path := range positions {
-		if !hasCapability(evaluators[id], "confidence-scores") {
-			return invalid(path, "confidence.capability_missing", "every routed evaluator must declare confidence-scores")
+	routes := []struct{ id, path string }{{routing.Primary, "$.spec.routing.primary"}}
+	if routing.Escalation != nil {
+		routes = append(routes, struct{ id, path string }{*routing.Escalation, "$.spec.routing.escalation"})
+	}
+	for i, id := range routing.Fallbacks {
+		routes = append(routes, struct{ id, path string }{id, fmt.Sprintf("$.spec.routing.fallbacks[%d]", i)})
+	}
+	for _, route := range routes {
+		if !hasCapability(evaluators[route.id], "confidence-scores") {
+			return invalid(route.path, "confidence.capability_missing", "every routed evaluator must declare confidence-scores")
 		}
 	}
 	return nil
@@ -372,5 +402,128 @@ func (f TransientFailure) valid() bool {
 }
 
 func invalid(path, code, message string) *ValidationError {
-	return &ValidationError{Path: path, Code: code, Message: message}
+	return &ValidationError{Path: path, Code: code, Message: boundedMessage(message)}
+}
+
+func invalidCause(path, code string, cause error) *ValidationError {
+	return &ValidationError{Path: path, Code: code, Message: boundedMessage(cause.Error()), Cause: cause}
+}
+
+func boundedMessage(message string) string {
+	const max = 512
+	if len(message) <= max {
+		return message
+	}
+	return message[:max-3] + "..."
+}
+
+func canonicalParameters(parameters map[string]any) (json.RawMessage, error) {
+	encoded, err := json.Marshal(parameters)
+	if err != nil {
+		return nil, err
+	}
+	canonical, err := jcs.Transform(encoded)
+	if err != nil {
+		return nil, err
+	}
+	return canonical, nil
+}
+
+func validateParameterData(parameters map[string]any) error {
+	nodes := 0
+	return validateJSONValue(parameters, 0, &nodes)
+}
+
+func validateJSONValue(value any, depth int, nodes *int) error {
+	*nodes++
+	if *nodes > MaxParsedNodes {
+		return fmt.Errorf("must not exceed %d parsed nodes", MaxParsedNodes)
+	}
+	switch typed := value.(type) {
+	case nil, bool:
+		return nil
+	case string:
+		if !utf8.ValidString(typed) {
+			return fmt.Errorf("contains invalid UTF-8")
+		}
+		return nil
+	case json.Number:
+		_, err := strictsource.NormalizeNumber(string(typed))
+		return err
+	case float64:
+		_, err := strictsource.NormalizeNumber(strconv.FormatFloat(typed, 'g', -1, 64))
+		return err
+	case float32:
+		_, err := strictsource.NormalizeNumber(strconv.FormatFloat(float64(typed), 'g', -1, 32))
+		return err
+	case int:
+		return validateInteger(int64(typed))
+	case int8:
+		return validateInteger(int64(typed))
+	case int16:
+		return validateInteger(int64(typed))
+	case int32:
+		return validateInteger(int64(typed))
+	case int64:
+		return validateInteger(typed)
+	case uint:
+		return validateUnsigned(uint64(typed))
+	case uint8:
+		return nil
+	case uint16:
+		return nil
+	case uint32:
+		return nil
+	case uint64:
+		return validateUnsigned(typed)
+	case map[string]any:
+		depth++
+		if depth > MaxNestingDepth {
+			return fmt.Errorf("nesting must not exceed %d containers", MaxNestingDepth)
+		}
+		keys := make([]string, 0, len(typed))
+		for key := range typed {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			if !utf8.ValidString(key) {
+				return fmt.Errorf("contains an invalid UTF-8 object key")
+			}
+			*nodes++
+			if err := validateJSONValue(typed[key], depth, nodes); err != nil {
+				return err
+			}
+		}
+		return nil
+	case []any:
+		depth++
+		if depth > MaxNestingDepth {
+			return fmt.Errorf("nesting must not exceed %d containers", MaxNestingDepth)
+		}
+		for _, child := range typed {
+			if err := validateJSONValue(child, depth, nodes); err != nil {
+				return err
+			}
+		}
+		return nil
+	default:
+		return fmt.Errorf("contains non-JSON value of type %T", value)
+	}
+}
+
+func validateInteger(value int64) error {
+	const maxSafe = int64(9_007_199_254_740_991)
+	if value < -maxSafe || value > maxSafe {
+		return fmt.Errorf("integer exceeds the interoperable IEEE-754 safe range")
+	}
+	return nil
+}
+
+func validateUnsigned(value uint64) error {
+	const maxSafe = uint64(9_007_199_254_740_991)
+	if value > maxSafe {
+		return fmt.Errorf("integer exceeds the interoperable IEEE-754 safe range")
+	}
+	return nil
 }

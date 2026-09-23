@@ -43,6 +43,8 @@ cannot prove reference integrity or acyclicity.
 The valid semantic example exercises explicit retry backoff, confidence-based
 escalation, credential slots, a digest-bound instruction template, and an
 operational fallback.
+Parser-level fixtures also reject non-finite binary64 values and integers
+outside the interoperable IEEE-754 safe range before structural validation.
 
 ## Local secret bindings
 

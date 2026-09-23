@@ -119,9 +119,23 @@ type Terminal struct {
 	OnFailure       string `json:"onFailure"`
 }
 
-// ParameterValidator validates one semantic adapter's versioned parameter
-// object. Execution must not begin until every routed semantic evaluator has
-// passed an exact adapter/version validator.
+// ParameterValidator validates one semantic adapter's JCS-canonical parameter
+// object.
 type ParameterValidator interface {
-	ValidateParameters(adapter ComponentIdentity, parameters json.RawMessage) error
+	ValidateParameters(parameters json.RawMessage) error
+}
+
+// ParameterRegistry resolves validators by exact adapter ID and version.
+// Execution must not begin until every semantic evaluator has a registered
+// validator and its parameters pass validation.
+type ParameterRegistry interface {
+	ValidatorFor(adapter ComponentIdentity) (ParameterValidator, bool)
+}
+
+// ParameterValidators is an exact adapter/version validator registry.
+type ParameterValidators map[ComponentIdentity]ParameterValidator
+
+func (v ParameterValidators) ValidatorFor(adapter ComponentIdentity) (ParameterValidator, bool) {
+	validator, exists := v[adapter]
+	return validator, exists && validator != nil
 }
