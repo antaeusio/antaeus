@@ -46,7 +46,9 @@ Run the same synthetic fixture through the portable regression contract:
 ```
 
 This command prints a `RegressionResultSet`. A matching suite exits zero;
-expectation mismatches still print the complete result set and exit one.
+expectation mismatches still print the complete result set and exit two.
+Configuration, loading, evaluator, and output errors exit one without a result
+set.
 
 An identity mismatch is an error. To add a local case, canonicalize the intended
 input, record its SHA-256 digest and the policy digest in a FixtureSet, then

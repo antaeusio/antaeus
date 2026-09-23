@@ -24,15 +24,12 @@ func CanonicalObject(source []byte) (json.RawMessage, error) {
 	if len(source) > evaluator.MaxInputBytes {
 		return nil, fmt.Errorf("must not exceed %d bytes", evaluator.MaxInputBytes)
 	}
-	if !utf8.Valid(source) {
-		return nil, fmt.Errorf("must contain valid UTF-8")
+	if err := ValidateUnicode(source); err != nil {
+		return nil, err
 	}
 	input := bytes.Trim(source, " \t\r\n")
 	if len(input) == 0 {
 		return nil, fmt.Errorf("must contain one JSON object")
-	}
-	if err := validateUnicodeEscapes(input); err != nil {
-		return nil, err
 	}
 	decoder := json.NewDecoder(bytes.NewReader(input))
 	decoder.UseNumber()
@@ -56,6 +53,14 @@ func CanonicalObject(source []byte) (json.RawMessage, error) {
 		return nil, fmt.Errorf("canonicalize JSON: %w", err)
 	}
 	return json.RawMessage(canonical), nil
+}
+
+// ValidateUnicode rejects invalid UTF-8 and unpaired JSON surrogate escapes.
+func ValidateUnicode(source []byte) error {
+	if !utf8.Valid(source) {
+		return fmt.Errorf("must contain valid UTF-8")
+	}
+	return validateUnicodeEscapes(source)
 }
 
 func validateValue(decoder *json.Decoder, containerDepth int, nodes *int) (json.Delim, error) {

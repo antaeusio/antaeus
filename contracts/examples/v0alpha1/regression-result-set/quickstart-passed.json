@@ -45,7 +45,7 @@
         ],
         "reasonCodes": ["policy.default_outcome"],
         "evaluator": {
-          "profileDigest": "sha256:b10200864cb409eba5daa4b4dd790fc644719548067ae155a296d680a0317b5c",
+          "profileDigest": "sha256:0956d00418fadb9d1dd95aed13f5e0499093d47ae9d2550ac1cb8da611c0545f",
           "profileVersion": "v0alpha1",
           "adapter": "io.antaeus.fixture",
           "adapterVersion": "0.1.0",

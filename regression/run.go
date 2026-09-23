@@ -2,13 +2,13 @@ package regression
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"time"
 
 	"github.com/antaeusio/antaeus/decision"
 	"github.com/antaeusio/antaeus/evaluator"
 	"github.com/antaeusio/antaeus/evaluator/fixture"
+	"github.com/antaeusio/antaeus/internal/fixtureprofile"
 	"github.com/antaeusio/antaeus/internal/jsonvalue"
 	"github.com/antaeusio/antaeus/policy"
 )
@@ -65,8 +65,8 @@ func Run(ctx context.Context, artifact policy.Artifact, set fixture.Set, suite S
 			CanonicalInput: input,
 			Deadline:       time.Now().Add(caseTimeout),
 			CorrelationID:  fmt.Sprintf("regression-%d", index+1),
-			ProfileDigest:  profileDigest(),
-			ProfileVersion: ProfileVersion,
+			ProfileDigest:  fixtureprofile.Digest(),
+			ProfileVersion: fixtureprofile.Version,
 		})
 		if err != nil {
 			return ResultSet{}, fmt.Errorf("evaluate case %q: %w", testCase.Name, err)
@@ -88,9 +88,4 @@ func Run(ctx context.Context, artifact policy.Artifact, set fixture.Set, suite S
 		})
 	}
 	return result, nil
-}
-
-func profileDigest() string {
-	digest := sha256.Sum256([]byte(profilePreimage))
-	return fmt.Sprintf("sha256:%x", digest)
 }

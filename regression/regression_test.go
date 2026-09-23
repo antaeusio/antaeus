@@ -10,6 +10,7 @@ import (
 
 	"github.com/antaeusio/antaeus/decision"
 	"github.com/antaeusio/antaeus/evaluator/fixture"
+	"github.com/antaeusio/antaeus/internal/fixtureprofile"
 	"github.com/antaeusio/antaeus/policy"
 )
 
@@ -37,8 +38,8 @@ func TestRunQuickstartSuite(t *testing.T) {
 	if result.Results[0].Decision.Evaluator == nil || result.Results[0].Decision.Evaluator.Synthetic == nil || !*result.Results[0].Decision.Evaluator.Synthetic {
 		t.Fatalf("Decision.Evaluator = %#v, want synthetic fixture", result.Results[0].Decision.Evaluator)
 	}
-	if got := profileDigest(); got != "sha256:b10200864cb409eba5daa4b4dd790fc644719548067ae155a296d680a0317b5c" {
-		t.Fatalf("profileDigest() = %q", got)
+	if got := fixtureprofile.Digest(); got != "sha256:0956d00418fadb9d1dd95aed13f5e0499093d47ae9d2550ac1cb8da611c0545f" {
+		t.Fatalf("fixtureprofile.Digest() = %q", got)
 	}
 }
 
@@ -97,6 +98,56 @@ func TestRunRejectsIdentityMismatches(t *testing.T) {
 	}
 }
 
+func TestRunRejectsOperationalErrors(t *testing.T) {
+	artifact, err := policy.LoadFile(contractPath("policy", "vendor-onboarding.yaml"))
+	if err != nil {
+		t.Fatalf("LoadFile(policy) error = %v", err)
+	}
+	set, err := fixture.LoadFile(contractPath("fixture-set", "quickstart.json"))
+	if err != nil {
+		t.Fatalf("LoadFile(fixture) error = %v", err)
+	}
+	tests := []struct {
+		name    string
+		context func() context.Context
+		mutate  func(*Suite)
+		want    string
+	}{
+		{
+			name:    "missing fixture case",
+			context: context.Background,
+			mutate:  func(s *Suite) { s.Cases[0].FixtureCase = "missing" },
+			want:    "fixture.case_missing",
+		},
+		{
+			name: "cancelled context",
+			context: func() context.Context {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				return ctx
+			},
+			mutate: func(*Suite) {},
+			want:   "context canceled",
+		},
+		{
+			name:    "invalid inline input",
+			context: context.Background,
+			mutate:  func(s *Suite) { s.Cases[0].Input = json.RawMessage(`[]`) },
+			want:    "JSON object",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			suite := loadQuickstartSuite(t)
+			test.mutate(&suite)
+			_, err := Run(test.context(), artifact, set, suite)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("Run() error = %v, want %q", err, test.want)
+			}
+		})
+	}
+}
+
 func TestParseRejectsStrictnessViolations(t *testing.T) {
 	valid, err := os.ReadFile(contractPath("regression-suite", "quickstart.json"))
 	if err != nil {
@@ -107,8 +158,11 @@ func TestParseRejectsStrictnessViolations(t *testing.T) {
 		source string
 		want   string
 	}{
-		{name: "unknown property", source: strings.Replace(string(valid), `"kind": "RegressionSuite"`, `"kind": "RegressionSuite", "unknown": true`, 1), want: "unknown field"},
-		{name: "duplicate property", source: strings.Replace(string(valid), `"kind": "RegressionSuite"`, `"kind": "RegressionSuite", "kind": "RegressionSuite"`, 1), want: "duplicate object key"},
+		{name: "unknown property", source: strings.Replace(string(valid), `"kind": "RegressionSuite"`, `"kind": "RegressionSuite", "unknown": true`, 1), want: "unknown property"},
+		{name: "duplicate property", source: strings.Replace(string(valid), `"kind": "RegressionSuite"`, `"kind": "RegressionSuite", "kind": "RegressionSuite"`, 1), want: "duplicate property"},
+		{name: "case variant root", source: strings.Replace(string(valid), `"kind": "RegressionSuite"`, `"KIND": "RegressionSuite"`, 1), want: `unknown property "KIND"`},
+		{name: "case variant case", source: strings.Replace(string(valid), `"fixtureCase": "aggregate-analytics"`, `"FixtureCase": "aggregate-analytics"`, 1), want: `unknown property "FixtureCase"`},
+		{name: "case variant duplicate", source: strings.Replace(string(valid), `"input": {`, `"Input": {}, "input": {`, 1), want: `unknown property "Input"`},
 		{name: "array input", source: strings.Replace(string(valid), "\"input\": {\n        \"description\": \"Processes aggregate product events.\",\n        \"serviceCategory\": \"analytics\"\n      }", `"input": []`, 1), want: "JSON object"},
 		{name: "duplicate case", source: "", want: "duplicated"},
 	}
@@ -132,6 +186,18 @@ func TestParseRejectsStrictnessViolations(t *testing.T) {
 				t.Fatalf("Parse() error = %v, want %q", err, test.want)
 			}
 		})
+	}
+}
+
+func TestParseAppliesStructuralLimitsToEachInput(t *testing.T) {
+	suite := loadQuickstartSuite(t)
+	suite.Cases[0].Input = json.RawMessage(`{"a":` + strings.Repeat("[", policy.MaxNestingDepth-1) + "null" + strings.Repeat("]", policy.MaxNestingDepth-1) + `}`)
+	encoded, err := json.Marshal(suite)
+	if err != nil {
+		t.Fatalf("Marshal() error = %v", err)
+	}
+	if _, err := Parse(encoded); err != nil {
+		t.Fatalf("Parse() exact per-input depth error = %v", err)
 	}
 }
 

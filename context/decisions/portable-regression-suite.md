@@ -22,11 +22,15 @@ reason codes expected from deterministic reduction. Strictly validate and RFC
 8785-canonicalize every input before evaluation.
 
 Run every case through the same provider-neutral single-attempt evaluator path
-as local evaluation. Emit a complete `RegressionResultSet` containing the
+and shared fixture profile as local evaluation. The exact UTF-8 profile
+preimage is `antaeus.local.fixture/v0alpha1`. Emit a complete
+`RegressionResultSet` containing the
 expected value and actual validated Decision for every case. Expectation
 mismatches are data: mark the case and aggregate result failed while preserving
 the actual Decision. Invalid identities, missing fixtures, malformed inputs,
 cancellation, and evaluator errors abort the run as operational errors.
+The CLI exits 0 for a passing suite, 2 for expectation mismatches after printing
+the complete result set, and 1 for operational errors without a result set.
 
 Regression suites and result sets are portable public contracts. Fixture-backed
 results remain visibly synthetic, perform no network or credential discovery,

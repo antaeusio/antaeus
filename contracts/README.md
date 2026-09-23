@@ -111,7 +111,8 @@ RFC 8785 canonicalization as local evaluation.
 Decision for every case. Expectation mismatches set the case status to `failed`
 and the aggregate `passed` field to `false`; configuration and evaluation errors
 do not produce a partial result set. These fixtures remain synthetic and
-credential-free.
+credential-free. Regression and single-case local evaluation share the fixture
+profile whose exact UTF-8 preimage is `antaeus.local.fixture/v0alpha1`.
 
 Requests rejected before evaluation use a non-2xx status with RFC 9457 Problem Details (`application/problem+json`). Policy `deny` and `review` outcomes are not transport errors.
 

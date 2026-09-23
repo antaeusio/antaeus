@@ -4,7 +4,6 @@ package cli
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -15,6 +14,7 @@ import (
 	"github.com/antaeusio/antaeus/evaluator"
 	"github.com/antaeusio/antaeus/evaluator/fixture"
 	"github.com/antaeusio/antaeus/internal/buildinfo"
+	"github.com/antaeusio/antaeus/internal/fixtureprofile"
 	"github.com/antaeusio/antaeus/policy"
 	"github.com/antaeusio/antaeus/regression"
 )
@@ -31,11 +31,6 @@ Commands:
   version  Print version information
   help     Print this help
 `
-
-const (
-	localFixtureProfilePreimage = "antaeus.local.fixture/v0alpha1"
-	localFixtureProfileVersion  = "v0alpha1"
-)
 
 // Run executes the command and returns a process exit code.
 func Run(args []string, stdout, stderr io.Writer) int {
@@ -136,8 +131,8 @@ func runEvaluate(args []string, stdout, stderr io.Writer) int {
 		CanonicalInput: input,
 		Deadline:       time.Now().Add(30 * time.Second),
 		CorrelationID:  "cli-fixture-" + *caseName,
-		ProfileDigest:  localFixtureProfileDigest(),
-		ProfileVersion: localFixtureProfileVersion,
+		ProfileDigest:  fixtureprofile.Digest(),
+		ProfileVersion: fixtureprofile.Version,
 	})
 	if err != nil {
 		return commandError(stderr, "evaluate", err)
@@ -190,14 +185,9 @@ func runTest(args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	if !result.Passed {
-		return 1
+		return 2
 	}
 	return 0
-}
-
-func localFixtureProfileDigest() string {
-	digest := sha256.Sum256([]byte(localFixtureProfilePreimage))
-	return fmt.Sprintf("sha256:%x", digest)
 }
 
 func requiredFlags(ordered []string, values map[string]string) string {

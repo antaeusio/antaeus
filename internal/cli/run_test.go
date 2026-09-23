@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/antaeusio/antaeus/decision"
+	"github.com/antaeusio/antaeus/internal/fixtureprofile"
 )
 
 func TestRun(t *testing.T) {
@@ -106,8 +107,8 @@ func TestRun(t *testing.T) {
 
 func TestLocalFixtureProfileDigestHasDocumentedPreimage(t *testing.T) {
 	const want = "sha256:0956d00418fadb9d1dd95aed13f5e0499093d47ae9d2550ac1cb8da611c0545f"
-	if got := localFixtureProfileDigest(); got != want {
-		t.Fatalf("localFixtureProfileDigest() = %q, want %q", got, want)
+	if got := fixtureprofile.Digest(); got != want {
+		t.Fatalf("fixtureprofile.Digest() = %q, want %q", got, want)
 	}
 }
 
@@ -189,14 +190,39 @@ func TestRunRegressionMismatchReturnsResultAndFailure(t *testing.T) {
 		"--suite", suitePath,
 		"--fixture-set", contractPath("fixture-set", "quickstart.json"),
 	}
-	if got := Run(args, &stdout, &stderr); got != 1 {
-		t.Fatalf("Run() = %d, want 1", got)
+	if got := Run(args, &stdout, &stderr); got != 2 {
+		t.Fatalf("Run() = %d, want 2", got)
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
 	if !strings.Contains(stdout.String(), `"passed":false`) || !strings.Contains(stdout.String(), `"status":"failed"`) {
 		t.Fatalf("stdout = %q, want failed machine-readable result", stdout.String())
+	}
+}
+
+func TestRunRegressionOperationalErrorReturnsNoResult(t *testing.T) {
+	source, err := os.ReadFile(contractPath("regression-suite", "quickstart.json"))
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	suitePath := writeCLIFile(t, "missing-fixture.json", strings.Replace(string(source), `"fixtureCase": "aggregate-analytics"`, `"fixtureCase": "missing"`, 1))
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	args := []string{
+		"test",
+		"--policy", contractPath("policy", "vendor-onboarding.yaml"),
+		"--suite", suitePath,
+		"--fixture-set", contractPath("fixture-set", "quickstart.json"),
+	}
+	if got := Run(args, &stdout, &stderr); got != 1 {
+		t.Fatalf("Run() = %d, want 1", got)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "fixture.case_missing") {
+		t.Fatalf("stderr = %q, want fixture.case_missing", stderr.String())
 	}
 }
 

@@ -8,14 +8,12 @@ import (
 )
 
 const (
-	APIVersion      = "regression.antaeus.io/v0alpha1"
-	KindSuite       = "RegressionSuite"
-	KindResultSet   = "RegressionResultSet"
-	MaxCases        = 256
-	MaxSourceBytes  = 1 << 20
-	MaxDescription  = 4096
-	ProfileVersion  = "v0alpha1"
-	profilePreimage = "antaeus.regression.fixture/v0alpha1"
+	APIVersion     = "regression.antaeus.io/v0alpha1"
+	KindSuite      = "RegressionSuite"
+	KindResultSet  = "RegressionResultSet"
+	MaxCases       = 256
+	MaxSourceBytes = 1 << 20
+	MaxDescription = 4096
 )
 
 // Suite binds named inputs and expectations to exact policy and fixture identities.
