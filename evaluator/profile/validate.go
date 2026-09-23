@@ -1,6 +1,7 @@
 package profile
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -123,7 +124,7 @@ func (a Artifact) ValidateParameters(registry ParameterRegistry) error {
 			continue
 		}
 		validator, exists := registry.ValidatorFor(evaluator.Adapter)
-		if !exists {
+		if !exists || validator == nil {
 			return invalid(fmt.Sprintf("$.spec.evaluators[%d].adapter", i), "adapter_schema.missing", fmt.Sprintf("no parameter validator is registered for %s@%s", evaluator.Adapter.ID, evaluator.Adapter.Version))
 		}
 		encoded, err := canonicalParameters(evaluator.Parameters)
@@ -439,16 +440,27 @@ func validateParameterData(parameters map[string]any) error {
 }
 
 func validateEncodedArtifact(artifact Artifact) error {
-	encoded, err := json.Marshal(artifact)
-	if err != nil {
+	var buffer bytes.Buffer
+	encoder := json.NewEncoder(&buffer)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(artifact); err != nil {
 		return invalid("$", "source.schema", err.Error())
 	}
-	if _, err := strictsource.Decode(encoded, strictsource.FormatJSON, MaxSourceBytes, "evaluator profile"); err != nil {
+	encoded := bytes.TrimSuffix(buffer.Bytes(), []byte{'\n'})
+	normalized, err := strictsource.Decode(encoded, strictsource.FormatJSON, len(encoded), "evaluator profile")
+	if err != nil {
 		var sourceErr *strictsource.Error
 		if errors.As(err, &sourceErr) {
 			return invalid("$", sourceErr.Code, sourceErr.Message)
 		}
 		return invalid("$", "source.schema", err.Error())
+	}
+	canonical, err := jcs.Transform(normalized)
+	if err != nil {
+		return invalid("$", "source.number", err.Error())
+	}
+	if len(canonical) > MaxSourceBytes {
+		return invalid("$", "source.too_large", fmt.Sprintf("canonical evaluator profile must not exceed %d bytes", MaxSourceBytes))
 	}
 	return nil
 }

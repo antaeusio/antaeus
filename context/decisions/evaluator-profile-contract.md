@@ -64,6 +64,9 @@ parameters. Before executing any semantic profile, call
 `Artifact.ValidateParameters` with a validator registered for each exact
 adapter ID and version; loading for inspection does not imply that an installed
 adapter accepts its parameter object.
+Both authored source and the JCS-canonical profile representation are bounded
+to 1 MiB. Programmatically constructed profiles measure the canonical form,
+not Go's implementation-specific HTML-escaped JSON encoding.
 Normalize accepted numeric spellings to their RFC 8785 binary64 representation
 before typed validation. Reject non-finite values and integers outside the
 interoperable IEEE-754 safe range after binary64 conversion so out-of-range

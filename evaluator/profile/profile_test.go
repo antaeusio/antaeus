@@ -222,6 +222,13 @@ func TestValidateParameters(t *testing.T) {
 		}
 	})
 
+	t.Run("nil validator fails closed", func(t *testing.T) {
+		err := semantic.ValidateParameters(nilValidatorRegistry{})
+		if got := contractErrorCode(err); got != "adapter_schema.missing" {
+			t.Fatalf("error = %v (code %q)", err, got)
+		}
+	})
+
 	t.Run("validator rejection is bounded and wrapped", func(t *testing.T) {
 		cause := errors.New(strings.Repeat("rejected", 100))
 		rejecting := ParameterValidators{
@@ -319,6 +326,35 @@ func TestProgrammaticProfileHonorsWholeDocumentLimits(t *testing.T) {
 	}
 }
 
+func TestHTMLHeavyProfileUsesCanonicalSize(t *testing.T) {
+	artifact := mustParseExample(t, "semantic-routing.json")
+	artifact.Spec.Evaluators[0].Parameters = map[string]any{"content": strings.Repeat("<&", 100_000)}
+	var buffer bytes.Buffer
+	encoder := json.NewEncoder(&buffer)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(artifact); err != nil {
+		t.Fatal(err)
+	}
+	source := bytes.TrimSuffix(buffer.Bytes(), []byte{'\n'})
+	if len(source) >= MaxSourceBytes {
+		t.Fatalf("test source size = %d, want below %d", len(source), MaxSourceBytes)
+	}
+	parsed, err := Parse(source, FormatJSON)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	canonical, err := parsed.CanonicalJSON()
+	if err != nil {
+		t.Fatalf("CanonicalJSON() error = %v", err)
+	}
+	if len(canonical) >= MaxSourceBytes {
+		t.Fatalf("canonical size = %d, want below %d", len(canonical), MaxSourceBytes)
+	}
+	if _, err := Parse(canonical, FormatJSON); err != nil {
+		t.Fatalf("Parse(canonical) error = %v", err)
+	}
+}
+
 func TestIntegerSpellingsHaveParity(t *testing.T) {
 	source := string(readContract(t, "examples", "v0alpha1", "evaluator-profile", "quickstart-fixture.json"))
 	jsonSource := strings.Replace(source, `"totalTimeoutMs": 2000`, `"totalTimeoutMs": 2e3`, 1)
@@ -368,6 +404,8 @@ func TestParserAndSchemaAgreeOnPublishedFixtures(t *testing.T) {
 			t.Fatalf("parser rejected valid %s: %v", name, err)
 		}
 	}
+	// Numeric portability fixtures are intentionally excluded: JSON Schema
+	// cannot express the RFC 8785 binary64 safe-range rule enforced by Parse.
 	for _, name := range []string{
 		"invalid-confidence.json",
 		"invalid-fixture-adapter.json",
@@ -479,6 +517,12 @@ type parameterValidatorFunc func(json.RawMessage) error
 
 func (f parameterValidatorFunc) ValidateParameters(parameters json.RawMessage) error {
 	return f(parameters)
+}
+
+type nilValidatorRegistry struct{}
+
+func (nilValidatorRegistry) ValidatorFor(ComponentIdentity) (ParameterValidator, bool) {
+	return nil, true
 }
 
 func mustParseExample(t *testing.T, name string) Artifact {

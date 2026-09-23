@@ -105,16 +105,21 @@ func TestDecodeNormalizesPortableNumbers(t *testing.T) {
 func TestDecodeRejectsNonPortableNumbers(t *testing.T) {
 	for _, source := range []string{
 		`{"value":1e400}`,
+		`{"value":1e-400}`,
 		`{"value":9007199254740993}`,
 		`{"value":9007199254740993.5}`,
 		"value: 9007199254740993\n",
 		"value: 9007199254740993.5\n",
+		"value: 1.0e-400\n",
 	} {
 		format := FormatJSON
 		if strings.HasPrefix(source, "value:") {
 			format = FormatYAML
 		}
 		_, err := Decode([]byte(source), format, 1024, "test")
+		if err == nil {
+			t.Fatalf("Decode(%q) error = nil, want source.number", source)
+		}
 		assertErrorCode(t, err, "source.number")
 	}
 }

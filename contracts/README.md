@@ -150,7 +150,9 @@ any route by which synthetic evidence could become an enforcement fallback.
 Profile authoring uses the same constrained YAML 1.2.2 or JSON data model,
 1 MiB source bound, nesting and node limits, RFC 8785 canonicalization, and
 lowercase SHA-256 content identity as policies. A registry version is a label
-for that digest and cannot change profile content identity.
+for that digest and cannot change profile content identity. The JCS-canonical
+profile representation is also bounded to 1 MiB so profiles constructed through
+the Go API obey a representation-independent size limit.
 
 Profile numbers use the RFC 8785 IEEE-754 binary64 data model. JSON and YAML
 spellings that represent the same number normalize to the same JCS value before

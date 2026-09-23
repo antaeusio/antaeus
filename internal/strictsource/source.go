@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/big"
 	"regexp"
 	"strconv"
 	"strings"
@@ -77,6 +78,12 @@ func NormalizeNumber(value string) (string, error) {
 	parsed, err := strconv.ParseFloat(value, 64)
 	if err != nil || math.IsNaN(parsed) || math.IsInf(parsed, 0) {
 		return "", parseError("source.number", "number must be finite and representable as IEEE-754 binary64", 0, 0)
+	}
+	if parsed == 0 {
+		rational, ok := new(big.Rat).SetString(value)
+		if !ok || rational.Sign() != 0 {
+			return "", parseError("source.number", "nonzero number must not underflow to zero", 0, 0)
+		}
 	}
 	const maxSafeInteger = float64(9_007_199_254_740_991)
 	if math.Abs(parsed) > maxSafeInteger {
@@ -412,10 +419,11 @@ func yamlScalarValue(node *yaml.Node, sourceLines [][]byte) (any, error) {
 			}
 			return integer, nil
 		}
-		number, err := strconv.ParseFloat(value, 64)
-		if err != nil || math.IsInf(number, 0) || math.IsNaN(number) {
-			return nil, parseError("source.number", "YAML number must be finite and representable as JSON", node.Line, node.Column)
+		canonical, err := NormalizeNumber(value)
+		if err != nil {
+			return nil, parseError("source.number", err.Error(), node.Line, node.Column)
 		}
+		number, _ := strconv.ParseFloat(canonical, 64)
 		return number, nil
 	default:
 		return nil, parseError("source.tag", "custom and non-JSON YAML tags are not supported", node.Line, node.Column)
