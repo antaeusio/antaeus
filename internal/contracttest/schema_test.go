@@ -123,6 +123,17 @@ func TestEvaluatorProfileSchemaRejectsInvalidCombinations(t *testing.T) {
 		{name: "retry class without retry", mutate: func(_ map[string]any, evaluator, _ map[string]any) {
 			evaluator["retry"].(map[string]any)["retryOn"] = []any{"timeout"}
 		}},
+		{name: "backoff without retry", mutate: func(_ map[string]any, evaluator, _ map[string]any) {
+			retry := evaluator["retry"].(map[string]any)
+			retry["initialBackoffMs"] = float64(100)
+			retry["maxBackoffMs"] = float64(1000)
+			retry["multiplier"] = float64(2)
+		}},
+		{name: "retry missing schedule", mutate: func(_ map[string]any, evaluator, _ map[string]any) {
+			retry := evaluator["retry"].(map[string]any)
+			retry["maxAttempts"] = float64(2)
+			retry["retryOn"] = []any{"timeout"}
+		}},
 		{name: "unsafe provider", mutate: func(_ map[string]any, evaluator, _ map[string]any) {
 			semantic(evaluator)
 			evaluator["provider"] = "https://internal.invalid"
@@ -223,6 +234,12 @@ func TestContractExamplesAgainstSchemas(t *testing.T) {
 			name:     "quickstart evaluator profile",
 			schema:   "evaluator-profile.schema.json",
 			instance: filepath.Join("examples", "v0alpha1", "evaluator-profile", "quickstart-fixture.json"),
+			valid:    true,
+		},
+		{
+			name:     "semantic routing evaluator profile",
+			schema:   "evaluator-profile.schema.json",
+			instance: filepath.Join("examples", "v0alpha1", "evaluator-profile", "semantic-routing.json"),
 			valid:    true,
 		},
 		{

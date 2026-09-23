@@ -37,8 +37,12 @@ They must produce the exact UTF-8 bytes in `canonical/vendor-onboarding.canonica
 The evaluator-profile fixtures reject unknown fields, outcome-replacing
 terminal behavior, credentials on deterministic fixtures, and incomplete
 confidence routing. They also reject adapters masquerading as deterministic
-fixtures and profiles that mix semantic with synthetic evaluators. Relational routing fixtures will accompany the Go semantic
-validator; JSON Schema alone cannot prove reference integrity or acyclicity.
+fixtures and profiles that mix semantic with synthetic evaluators. Relational
+routing fixtures will accompany the Go semantic validator; JSON Schema alone
+cannot prove reference integrity or acyclicity.
+The valid semantic example exercises explicit retry backoff, confidence-based
+escalation, credential slots, a digest-bound instruction template, and an
+operational fallback.
 
 ## Regression suites
 

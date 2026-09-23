@@ -117,11 +117,20 @@ change routing only; it never creates or replaces a policy outcome.
 
 Retries and fallbacks name only `timeout`, `unavailable`, and `throttled` as
 eligible transient classes. `maxAttempts` includes the first attempt; one
-attempt has an empty `retryOn` list, while multiple attempts require at least
-one class. An invoked escalation that ends in an eligible operational failure
-continues into the configured fallback list. Invalid input, unsupported
+attempt has an empty `retryOn` list and no backoff fields, while multiple
+attempts require at least one class plus explicit initial backoff, maximum
+backoff, and multiplier values. An invoked escalation that ends in an eligible
+operational failure continues into the configured fallback list. Invalid input, unsupported
 capability, malformed configuration, missing or rejected credentials, and
 deterministic request failures are not retryable.
+
+V0 reserves `json-input`, `structured-rule-results`, and `confidence-scores`
+as capability IDs. Confidence routing requires `confidence-scores` on the
+primary and, when configured, the escalation evaluator. The threshold applies
+independently to each rule result; missing confidence is treated as below the
+threshold. Only primary evidence can trigger escalation. Low or missing
+confidence from escalation or fallback evidence remains `indeterminate` and
+never triggers another escalation.
 
 Profiles contain logical credential slot names, never secret values,
 environment-variable names, hosted secret identifiers, or arbitrary endpoint

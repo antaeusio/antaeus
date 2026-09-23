@@ -40,6 +40,7 @@
         "credentialSlots": {
           "type": "array",
           "maxItems": 16,
+          "uniqueItems": true,
           "items": {
             "$ref": "#/$defs/credentialSlot"
           }
@@ -166,10 +167,18 @@
             "required": ["maxAttempts"]
           },
           "then": {
-            "properties": {"retryOn": {"maxItems": 0}}
+            "properties": {"retryOn": {"maxItems": 0}},
+            "not": {
+              "anyOf": [
+                {"required": ["initialBackoffMs"]},
+                {"required": ["maxBackoffMs"]},
+                {"required": ["multiplier"]}
+              ]
+            }
           },
           "else": {
-            "properties": {"retryOn": {"minItems": 1}}
+            "properties": {"retryOn": {"minItems": 1}},
+            "required": ["initialBackoffMs", "maxBackoffMs", "multiplier"]
           }
         }
       ],

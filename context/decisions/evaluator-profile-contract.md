@@ -7,6 +7,7 @@ confidence: high
 source_refs:
   - contracts/schemas/v0alpha1/evaluator-profile.schema.json
   - contracts/examples/v0alpha1/evaluator-profile/quickstart-fixture.json
+  - contracts/examples/v0alpha1/evaluator-profile/semantic-routing.json
   - contracts/README.md
 ---
 
@@ -28,6 +29,13 @@ credential-free, and prohibited from enforcement routes. A v0 profile cannot
 mix semantic and deterministic-fixture evaluators. Eligible operational
 failures from either a primary or an invoked escalation continue into the
 ordered fallback list.
+
+Reserve `json-input`, `structured-rule-results`, and `confidence-scores` as v0
+capability IDs. Confidence thresholds apply per rule, missing confidence counts
+as below threshold, and only primary evidence can trigger the one escalation.
+The primary and escalation must declare `confidence-scores`. Low or missing
+confidence from escalation or fallback evidence remains indeterminate and
+cannot recurse into another escalation.
 
 Profiles never contain credential values, environment-variable names, hosted
 secret identifiers, or ambient behavior overrides. Adapter-specific parameters
