@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
@@ -236,6 +237,21 @@ func TestLocalSecretBindingsSchemaRejectsInvalidCombinations(t *testing.T) {
 		{name: "missing reference name", mutate: func(document map[string]any) {
 			document["secretBindings"] = map[string]any{"io.example.semantic": map[string]any{"provider-api-key": map[string]any{"source": "environment"}}}
 		}},
+		{name: "empty reference name", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"io.example.semantic": map[string]any{"provider-api-key": map[string]any{"source": "environment", "name": ""}}}
+		}},
+		{name: "reference name starts with digit", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"io.example.semantic": map[string]any{"provider-api-key": map[string]any{"source": "environment", "name": "1EXAMPLE_API_KEY"}}}
+		}},
+		{name: "reference name too long", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"io.example.semantic": map[string]any{"provider-api-key": map[string]any{"source": "environment", "name": "K" + strings.Repeat("A", 128)}}}
+		}},
+		{name: "adapter ID too long", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"io." + strings.Repeat("a", 126): oneSlotBinding()}
+		}},
+		{name: "bare string reference", mutate: func(document map[string]any) {
+			document["secretBindings"] = map[string]any{"io.example.semantic": map[string]any{"provider-api-key": "EXAMPLE_API_KEY"}}
+		}},
 		{name: "wrong API version", mutate: func(document map[string]any) { document["apiVersion"] = "config.antaeus.io/v1" }},
 		{name: "wrong kind", mutate: func(document map[string]any) { document["kind"] = "SecretBindings" }},
 	}
@@ -270,6 +286,28 @@ func TestLocalSecretBindingsSchemaAcceptsPublishedLimits(t *testing.T) {
 		"apiVersion":     "config.antaeus.io/v0alpha1",
 		"kind":           "LocalSecretBindings",
 		"secretBindings": bindings,
+	}
+	if err := schema.Validate(document); err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+}
+
+func TestLocalSecretBindingsSchemaAcceptsIdentifierLimits(t *testing.T) {
+	schema, err := newCompiler(t).Compile(schemaBase + "local-secret-bindings.schema.json")
+	if err != nil {
+		t.Fatalf("compile local secret bindings schema: %v", err)
+	}
+	document := map[string]any{
+		"apiVersion": "config.antaeus.io/v0alpha1",
+		"kind":       "LocalSecretBindings",
+		"secretBindings": map[string]any{
+			"io." + strings.Repeat("a", 125): map[string]any{
+				"provider-api-key": map[string]any{
+					"source": "environment",
+					"name":   "K" + strings.Repeat("A", 127),
+				},
+			},
+		},
 	}
 	if err := schema.Validate(document); err != nil {
 		t.Fatalf("Validate() error = %v", err)

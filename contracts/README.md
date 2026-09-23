@@ -181,17 +181,25 @@ inspect unrelated environment variables, or walk directories to discover a
 bindings artifact. Local bindings are loaded only from an explicitly supplied
 path.
 
-An unbound required slot and an unset or empty referenced variable are the same
+An unbound slot referenced by an evaluator in the selected profile's configured
+route, and an unset or zero-length referenced variable, are the same
 pre-evaluation missing-credential configuration error. They are not retried,
 do not trigger evaluator fallback, and never print the reference name or a
-candidate value. Bindings for the deterministic fixture adapter are invalid.
+candidate value. Environment values are passed to the selected adapter as
+exact bytes; whitespace is not trimmed, and a whitespace-only non-empty value
+is therefore not treated as missing. Bindings for the deterministic fixture
+adapter are invalid.
 
 Local secret bindings use the same constrained JSON or YAML authoring rules,
 1 MiB source limit, nesting and aggregate-node bounds, duplicate-key rejection,
 and exact property names as evaluator profiles. Adapter keys intentionally name
-the adapter ID rather than a profile or adapter version; the selected immutable
-adapter version defines its supported slots, and the runtime validates every
-binding against that contract before resolving a reference.
+the adapter ID rather than a profile or adapter version. For the selected
+profile, a usable binding is the tuple of a configured route evaluator's
+adapter ID and that evaluator's `credentialSlot`, which must also appear in the
+profile's `credentialSlots`. Bindings for adapters or slots not referenced by
+the selected profile's configured route are ignored and never resolved.
+Within the syntactic pattern, v0 does not restrict which process environment
+variable may be referenced.
 
 ## Regression suites
 
