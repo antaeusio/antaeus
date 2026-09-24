@@ -31,14 +31,15 @@ manifests. There is no implicit profile default, parent-directory search, `.env`
 loading, or raw-secret flag. Malformed lower-priority configuration still fails
 closed. Existing `evaluate` and `test` commands do not consume these manifests.
 
-Two adapters are installed, both using `io.antaeus.rule-match@v0alpha1`: the
+Three adapters are installed, all using `io.antaeus.rule-match@v0alpha1`: the
 synthetic `io.antaeus.fixture@0.1.0` and the semantic
-[`io.antaeus.openai@0.1.0`](./openai-adapter.md). Every profile entry must use
-the same one of them. Fixture profiles require `--fixture-set` and `--case`,
+[`io.antaeus.openai@0.1.0`](./openai-adapter.md) and
+[`io.antaeus.systemone@0.1.0`](./systemone-adapter.md). Fixture profiles use only
+the fixture adapter; semantic profiles may combine the two semantic adapters. Fixture profiles require `--fixture-set` and `--case`,
 must name the supplied fixture set's exact name and version, and the case must
 match the policy and canonical input identities. Semantic profiles reject those
-flags. Neither adapter supports `confidence-scores`, so confidence routing is
-rejected. Profile deadlines and routing go through the reusable runner. Fixture
+flags. Only the System One adapter reports `confidence-scores`, so confidence
+routing is available only on routes made entirely of System One evaluators. Profile deadlines and routing go through the reusable runner. Fixture
 runs make no remote calls or credential reads. Profiles using any other adapter
 are rejected, including trusted ones, before credential preflight, without
 prompting for unusable credentials or a trust grant. Unused bindings are never

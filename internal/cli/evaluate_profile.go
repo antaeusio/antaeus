@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 
 	"github.com/antaeusio/antaeus/adapters/openai"
+	"github.com/antaeusio/antaeus/adapters/systemone"
 	"github.com/antaeusio/antaeus/evaluator"
 	"github.com/antaeusio/antaeus/evaluator/fixture"
 	"github.com/antaeusio/antaeus/evaluator/localbinding"
@@ -38,9 +39,16 @@ Installed adapters:
                             environment (see docs/openai-adapter.md). Project-supplied
                             configuration that reads credentials requires
                             antaeus config trust first.
+  io.antaeus.systemone@0.1.0 experimental System One evaluator for a self-hosted
+                            Contrastive Language Model (CLM) server named by the
+                            profile's endpoint parameter. Returns confidence scores.
+                            An optional API key is read from the slot clm-api-key
+                            (see docs/systemone-adapter.md).
 
-A profile must use only one of these adapters. Confidence routing is not supported
-by either installed adapter.
+Fixture profiles use only the fixture adapter. Semantic profiles may combine the
+OpenAI and System One adapters, for example CLM with an OpenAI fallback.
+Confidence routing requires every routed evaluator to report confidence, which
+only the System One adapter does.
 `
 
 func runEvaluateProfile(args []string, stdout, stderr io.Writer) int {
@@ -138,7 +146,7 @@ func runEvaluateProfileWith(args []string, stdout, stderr io.Writer, runtime con
 		}
 		correlationID = "cli-fixture-" + caseName
 	} else {
-		registry = runner.Registry{openai.Identity: runtime.openAIAdapter()}
+		registry = runner.Registry{openai.Identity: runtime.openAIAdapter(), systemone.Identity: runtime.systemOneAdapter()}
 		correlationID, err = randomCorrelationID()
 		if err != nil {
 			return commandError(stderr, "evaluate-profile", err)
@@ -169,14 +177,15 @@ type profileKind int
 const (
 	unsupportedProfile profileKind = iota
 	fixtureProfile
-	openAIProfile
+	semanticProfile
 )
 
 var errAdapterNotInstalled = errors.New("the selected profile uses an evaluator adapter that is not installed; installed adapters are " +
-	fixture.AdapterID + "@" + fixture.AdapterVersion + " and " + openai.AdapterID + "@" + openai.AdapterVersion)
+	fixture.AdapterID + "@" + fixture.AdapterVersion + ", " + openai.AdapterID + "@" + openai.AdapterVersion + ", and " +
+	systemone.AdapterID + "@" + systemone.AdapterVersion)
 
-// classifyProfile accepts a profile only when every evaluator uses the same
-// installed adapter family and, for OpenAI, the adapter's required fields.
+// classifyProfile accepts a fixture-only profile or a semantic profile whose
+// evaluators all use installed semantic adapters with valid required fields.
 func classifyProfile(p profile.Artifact) (profileKind, error) {
 	fixtureIdentity := profile.ComponentIdentity{ID: fixture.AdapterID, Version: fixture.AdapterVersion}
 	kind := unsupportedProfile
@@ -189,7 +198,12 @@ func classifyProfile(p profile.Artifact) (profileKind, error) {
 			if err := openai.ValidateEvaluator(entry); err != nil {
 				return unsupportedProfile, fmt.Errorf("evaluator %q: %w", entry.ID, err)
 			}
-			next = openAIProfile
+			next = semanticProfile
+		case entry.Mode == profile.ModeSemantic && entry.Adapter == systemone.Identity:
+			if err := systemone.ValidateEvaluator(entry); err != nil {
+				return unsupportedProfile, fmt.Errorf("evaluator %q: %w", entry.ID, err)
+			}
+			next = semanticProfile
 		}
 		if next == unsupportedProfile || (kind != unsupportedProfile && kind != next) {
 			return unsupportedProfile, errAdapterNotInstalled
@@ -202,12 +216,14 @@ func classifyProfile(p profile.Artifact) (profileKind, error) {
 	return kind, nil
 }
 
-// resolveExecutionProfile selects configuration without consulting saved trust
-// unless selection itself requires credential authority from the project. Only
-// then, and only for an installed semantic profile, is saved trust read. It
-// never grants trust or prompts for credentials a profile cannot use.
+// resolveExecutionProfile selects configuration and reads saved trust only for
+// installed semantic profiles that depend on project configuration. Semantic
+// profiles send input over the network, so project-supplied configuration needs
+// saved trust whether or not it reads credentials; fixture profiles never do.
+// It never grants trust or prompts for credentials a profile cannot use.
 func resolveExecutionProfile(runtime configRuntime, profilePath, bindingsPath string) (*localconfig.Resolved, profile.Artifact, profileKind, error) {
 	resolved, err := resolveEvaluationConfig(runtime, profilePath, bindingsPath, "")
+	trustVerified := false
 	var trust *localconfig.TrustRequiredError
 	var missing *localbinding.MissingCredentialError
 	switch {
@@ -225,11 +241,11 @@ func resolveExecutionProfile(runtime configRuntime, profilePath, bindingsPath st
 		if profileErr != nil {
 			return nil, profile.Artifact{}, unsupportedProfile, profileErr
 		}
-		if kind, classifyErr := classifyProfile(p); classifyErr != nil || kind != openAIProfile {
+		if kind, classifyErr := classifyProfile(p); classifyErr != nil || kind != semanticProfile {
 			if classifyErr != nil && classifyErr != errAdapterNotInstalled {
 				// An installed adapter with invalid fields: report that without
 				// prompting for trust in a profile that cannot run.
-				return nil, profile.Artifact{}, unsupportedProfile, errors.New("project-selected OpenAI profile is invalid; validate it with --profile before trusting the project")
+				return nil, profile.Artifact{}, unsupportedProfile, errors.New("project-selected semantic profile is invalid; validate it with --profile before trusting the project")
 			}
 			return nil, profile.Artifact{}, unsupportedProfile, errAdapterNotInstalled
 		}
@@ -238,9 +254,10 @@ func resolveExecutionProfile(runtime configRuntime, profilePath, bindingsPath st
 			return nil, profile.Artifact{}, unsupportedProfile, fmt.Errorf("trust store: %w", trustErr)
 		}
 		if !trusted {
-			return nil, profile.Artifact{}, unsupportedProfile, fmt.Errorf("project configuration reads credentials and requires trust; review it with antaeus config inspect, then run antaeus config trust --digest %s", trust.Digest)
+			return nil, profile.Artifact{}, unsupportedProfile, untrustedProjectError(trust.Digest)
 		}
 		resolved, err = inspected, nil
+		trustVerified = true
 	}
 	if err != nil {
 		return nil, profile.Artifact{}, unsupportedProfile, err
@@ -253,13 +270,32 @@ func resolveExecutionProfile(runtime configRuntime, profilePath, bindingsPath st
 	if err != nil {
 		return nil, profile.Artifact{}, unsupportedProfile, err
 	}
+	// A credential-free semantic profile (for example a self-hosted endpoint)
+	// still sends input to a location the project chose.
+	if digest := resolved.Summary().ProjectDigest; kind == semanticProfile && digest != "" && !trustVerified {
+		trusted, trustErr := projectTrusted(runtime, digest)
+		if trustErr != nil {
+			return nil, profile.Artifact{}, unsupportedProfile, fmt.Errorf("trust store: %w", trustErr)
+		}
+		if !trusted {
+			return nil, profile.Artifact{}, unsupportedProfile, untrustedProjectError(digest)
+		}
+	}
 	return resolved, p, kind, nil
+}
+
+func untrustedProjectError(digest string) error {
+	return fmt.Errorf("project configuration selects a semantic evaluator and requires trust; review it with antaeus config inspect, then run antaeus config trust --digest %s", digest)
 }
 
 func credentialError(err error) error {
 	var missing *localbinding.MissingCredentialError
 	if errors.As(err, &missing) {
-		return fmt.Errorf("%w; set the referenced environment variable (see docs/openai-adapter.md for the adapter default) or configure a reference with --bindings", missing)
+		guide := "docs/openai-adapter.md"
+		if missing.AdapterID == systemone.AdapterID {
+			guide = "docs/systemone-adapter.md"
+		}
+		return fmt.Errorf("%w; set the referenced environment variable (see %s for the adapter default) or configure a reference with --bindings", missing, guide)
 	}
 	return err
 }
@@ -275,7 +311,10 @@ func randomCorrelationID() (string, error) {
 // installedDefaults are the documented credential references of installed
 // adapters, keyed by exact adapter identity. Explicit bindings still win.
 func installedDefaults() map[profile.ComponentIdentity]map[string]localbinding.Reference {
-	return map[profile.ComponentIdentity]map[string]localbinding.Reference{openai.Identity: openai.DefaultReferences()}
+	return map[profile.ComponentIdentity]map[string]localbinding.Reference{
+		openai.Identity:    openai.DefaultReferences(),
+		systemone.Identity: systemone.DefaultReferences(),
+	}
 }
 
 // Reuse the configuration commands' strict loaders. trustedDigest is empty

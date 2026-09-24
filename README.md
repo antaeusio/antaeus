@@ -55,8 +55,9 @@ and every attempt.
 - **Failure is a real outcome.** Timeouts, refusals, malformed model output,
   and unresolved rules become an explicit `failure`, never a silent `allow`.
 - **Provider-neutral.** Evaluators plug in behind one interface: a
-  credential-free deterministic fixture today, OpenAI with your own key, and
-  more to come. Retries, deadlines, fallbacks, and traces live in a separate
+  credential-free deterministic fixture, OpenAI with your own key, and a
+  self-hosted open-weights [CLM](./docs/systemone-adapter.md) model that returns
+  confidence scores. Retries, deadlines, fallbacks, and traces live in a separate
   evaluator profile.
 - **Testable.** Named regression cases run offline and credential-free, so
   policy changes can be reviewed like code.
@@ -176,6 +177,7 @@ code.
 | [Writing policies](./docs/policy-authoring.md) | Policy fields, syntax, and digest identity |
 | [Reading a Decision](./docs/decisions.md) | Outcomes, failures, and fallback boundaries |
 | [OpenAI evaluator](./docs/openai-adapter.md) | Setup, request boundary, failures, and data handling |
+| [System One evaluator (CLM)](./docs/systemone-adapter.md) | Self-hosted CLM, confidence gating, and fallback profiles |
 | [Profile execution](./docs/profile-execution.md) | Retries, deadlines, routing, and traces |
 | [CLI configuration](./docs/cli-configuration.md) | Profile selection, credential bindings, and project trust |
 | [Evaluator adapters](./docs/evaluator-adapters.md) | Embedding in Go and writing an adapter |
