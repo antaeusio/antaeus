@@ -145,15 +145,15 @@ func TestEvaluateProfileRejectsRemoteWithoutReadingCredentials(t *testing.T) {
 	r := configFixture(t) // environment lookup fails the test
 	args := profileEvaluationArgs()
 	digest := projectTestDigest(t, r)
-	if diagnostic := evaluateProfileCommand(t, r, 1, args); !strings.Contains(diagnostic, "only the deterministic fixture adapter is installed") || strings.Contains(diagnostic, "config trust") {
+	if diagnostic := evaluateProfileCommand(t, r, 1, args); !strings.Contains(diagnostic, "adapter that is not installed") || strings.Contains(diagnostic, "config trust") {
 		t.Fatal(diagnostic)
 	}
 	configCommand(t, r, 0, "trust", "--digest", digest)
-	if diagnostic := evaluateProfileCommand(t, r, 1, args); !strings.Contains(diagnostic, "only the deterministic fixture adapter is installed") {
+	if diagnostic := evaluateProfileCommand(t, r, 1, args); !strings.Contains(diagnostic, "adapter that is not installed") {
 		t.Fatal(diagnostic)
 	}
 	// Explicit semantic selections cannot bypass the installed-adapter boundary.
-	if diagnostic := evaluateProfileCommand(t, r, 1, append(args, "--profile", filepath.Join(r.projectDir, "profile.json"), "--bindings", filepath.Join(r.projectDir, "bindings.json"))); !strings.Contains(diagnostic, "only the deterministic fixture adapter is installed") {
+	if diagnostic := evaluateProfileCommand(t, r, 1, append(args, "--profile", filepath.Join(r.projectDir, "profile.json"), "--bindings", filepath.Join(r.projectDir, "bindings.json"))); !strings.Contains(diagnostic, "adapter that is not installed") {
 		t.Fatal(diagnostic)
 	}
 	// An explicit fixture remains credential-free even when unused project
@@ -166,7 +166,7 @@ func TestEvaluateProfileDoesNotRequestUnusableCredentialsOrTrust(t *testing.T) {
 	r := fixtureProfileRuntime(t)
 	args := append(profileEvaluationArgs(), "--profile", contractPath("evaluator-profile", "semantic-routing.json"))
 	diagnostic := evaluateProfileCommand(t, r, 1, args)
-	if !strings.Contains(diagnostic, "antaeus: evaluate-profile: only the deterministic fixture adapter is installed") || strings.Contains(diagnostic, "configure a reference") {
+	if !strings.Contains(diagnostic, "antaeus: evaluate-profile: the selected profile uses an evaluator adapter that is not installed") || strings.Contains(diagnostic, "configure a reference") {
 		t.Fatal(diagnostic)
 	}
 	// Credential-free semantic profiles also stop at the installed boundary.
@@ -189,7 +189,7 @@ func TestEvaluateProfileDoesNotRequestUnusableCredentialsOrTrust(t *testing.T) {
 	writeConfigTestFile(t, filepath.Join(r.projectDir, "profile.json"), string(data))
 	writeConfigTestFile(t, filepath.Join(r.projectDir, ".antaeus", "config.json"), `{"apiVersion":"config.antaeus.io/v0alpha1","kind":"LocalConfiguration","profileFile":"../profile.json"}`)
 	diagnostic = evaluateProfileCommand(t, r, 1, profileEvaluationArgs())
-	if !strings.Contains(diagnostic, "only the deterministic fixture adapter is installed") || strings.Contains(diagnostic, "config trust") {
+	if !strings.Contains(diagnostic, "adapter that is not installed") || strings.Contains(diagnostic, "config trust") {
 		t.Fatal(diagnostic)
 	}
 	if _, err := os.Stat(filepath.Join(r.userDir, "trust")); !os.IsNotExist(err) {
@@ -251,7 +251,7 @@ func TestEvaluateProfileUsageDoesNotEchoValues(t *testing.T) {
 		}
 	}
 	var out, diagnostic bytes.Buffer
-	if code := Run([]string{"evaluate-profile", "--help"}, &out, &diagnostic); code != 0 || !strings.Contains(out.String(), "synthetic evidence") || diagnostic.Len() != 0 {
+	if code := Run([]string{"evaluate-profile", "--help"}, &out, &diagnostic); code != 0 || !strings.Contains(out.String(), "synthetic test evidence") || diagnostic.Len() != 0 {
 		t.Fatalf("help: exit %d output %s error %s", code, out.String(), diagnostic.String())
 	}
 }

@@ -1,0 +1,34 @@
+{
+  "apiVersion": "evaluator.antaeus.io/v0alpha1",
+  "kind": "EvaluatorProfile",
+  "metadata": {
+    "name": "openai-rule-match",
+    "description": "Experimental OpenAI Responses rule-match evaluator with a pinned model snapshot."
+  },
+  "spec": {
+    "totalTimeoutMs": 90000,
+    "credentialSlots": [{"name": "openai-api-key"}],
+    "evaluators": [
+      {
+        "id": "openai-primary",
+        "mode": "semantic",
+        "adapter": {"id": "io.antaeus.openai", "version": "0.1.0"},
+        "protocol": {"id": "io.antaeus.rule-match", "version": "v0alpha1"},
+        "requiredCapabilities": ["json-input", "structured-rule-results"],
+        "timeoutMs": 40000,
+        "retry": {"maxAttempts": 2, "retryOn": ["timeout", "unavailable", "throttled"], "initialBackoffMs": 500, "maxBackoffMs": 4000, "multiplier": 2},
+        "provider": "openai",
+        "model": "gpt-5.4-mini-2026-03-17",
+        "instructionTemplate": {"id": "io.antaeus.openai.rule-match", "digest": "sha256:2074738685823fbc700b33fbf0cdd132a5ecff0df5b6efa9db0da74c1618ddfc"},
+        "credentialSlot": "openai-api-key",
+        "parameters": {"maxOutputTokens": 2048, "reasoningEffort": "low"}
+      }
+    ],
+    "routing": {
+      "primary": "openai-primary",
+      "fallbacks": [],
+      "confidence": {"enabled": false},
+      "terminal": {"onIndeterminate": "failure", "onFailure": "failure"}
+    }
+  }
+}

@@ -7,8 +7,8 @@ input, correlation ID, already-preflighted credentials, and an installed adapter
 registry keyed by exact adapter ID/version. It returns a validated Decision with
 a bounded execution trace. The CLI's `evaluate-profile` command connects local
 configuration selection to this runner for the installed deterministic fixture
-adapter. Configuration commands remain inspection and credential checks; no CLI
-command invokes a remote provider yet.
+adapter and the experimental [OpenAI adapter](./openai-adapter.md). Configuration
+commands remain inspection and credential checks and never call a provider.
 
 ## CLI fixture profiles
 
@@ -31,15 +31,18 @@ manifests. There is no implicit profile default, parent-directory search, `.env`
 loading, or raw-secret flag. Malformed lower-priority configuration still fails
 closed. Existing `evaluate` and `test` commands do not consume these manifests.
 
-Only `io.antaeus.fixture@0.1.0`, using `io.antaeus.rule-match@v0alpha1`, is
-installed. All profile entries must use it and name the supplied fixture set's
-exact name and version. The fixture case must match the policy and canonical
-input identities. The adapter supports `json-input` and `structured-rule-results`,
-not `confidence-scores`; confidence routing is therefore rejected. Profile
-deadlines and routing go through the reusable runner, with no remote calls or
-credential reads. Selected semantic profiles are rejected, including trusted
-ones, before credential preflight, without prompting for unusable credentials
-or a trust grant. Unused bindings are never resolved.
+Two adapters are installed, both using `io.antaeus.rule-match@v0alpha1`: the
+synthetic `io.antaeus.fixture@0.1.0` and the semantic
+[`io.antaeus.openai@0.1.0`](./openai-adapter.md). Every profile entry must use
+the same one of them. Fixture profiles require `--fixture-set` and `--case`,
+must name the supplied fixture set's exact name and version, and the case must
+match the policy and canonical input identities. Semantic profiles reject those
+flags. Neither adapter supports `confidence-scores`, so confidence routing is
+rejected. Profile deadlines and routing go through the reusable runner. Fixture
+runs make no remote calls or credential reads. Profiles using any other adapter
+are rejected, including trusted ones, before credential preflight, without
+prompting for unusable credentials or a trust grant. Unused bindings are never
+resolved.
 Fixture execution neither consults nor modifies saved trust markers because no
 credential authority is needed; a corrupt marker cannot grant authority or block
 a fixture. Malformed manifests/artifacts and invalid reference combinations still
@@ -80,8 +83,8 @@ the zero value rejects it before any adapter call or Decision. The guard covers
 every configured route, including uninvoked escalation and fallback. Semantic
 profiles do not need this opt-in. This is an intentional-use guard, not an
 authorization mechanism: a trusted embedding boundary chooses execution mode.
-The fixture-only CLI sets the opt-in internally without a bypass flag; revisit
-that internal permission before adding semantic adapters to the command.
+The CLI sets the opt-in internally, without a bypass flag, only when every
+profile entry uses the installed fixture adapter; semantic profiles never receive it.
 Fixture evidence remains visibly synthetic in local use.
 
 Once the first attempt starts, returned adapter errors, malformed results, cancellation,

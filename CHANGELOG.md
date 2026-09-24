@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Experimental OpenAI Responses semantic adapter `io.antaeus.openai@0.1.0` with strict structured output, `store: false`, a digest-pinned instruction template, a fixed origin without redirects, bounded bodies and typed retryable failures. CLI `evaluate-profile` now runs OpenAI profiles using the `OPENAI_API_KEY` adapter default or explicit bindings, requiring saved project trust for project-supplied credential configuration. See the [adapter guide](./docs/openai-adapter.md).
 - Profile-driven execution with bounded retries, deadlines, confidence escalation, operational fallbacks, and portable attempt traces.
 - CLI configuration inspection, credential checks, and project-scoped digest trust/revocation with strict local manifests.
 - Local profile and credential-reference precedence with immutable snapshots, project-digest trust checks, and redacted source summaries.
@@ -25,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- CLI `evaluate-profile` no longer requires `--fixture-set` and `--case` for semantic profiles; fixture profiles still require both, and semantic profiles reject them. The diagnostic for uninstalled adapters changed from "only the deterministic fixture adapter is installed" to name both installed adapters.
 - Preserve UTF-8 character boundaries when truncating valid profile validation messages, retaining the 512-byte message cap, ASCII output, error codes and wrapped causes. This does not sanitize malformed adapter text or change policy/profile identity, Decisions or published schemas.
 - For planned v0.1.0, publish complete CLI trust markers atomically without overwriting existing entries, reject dangling intermediate configuration symlinks, and check user/trust directory containment by filesystem identity. Existing marker keys and published schemas remain unchanged; granting trust now requires same-directory hard-link support. See the [configuration migration](./docs/cli-configuration.md#development-migration-for-the-planned-v010-release).
 - For planned v0.1.0, align execution metadata and Decision adapter/fixture versions with the existing ECMA-262 nonblank patterns: reject U+FEFF-only text and accept U+0085 as nonblank. Add Go/JavaScript conformance without changing published schemas or other fields' explicit whitespace rules. This affects result/Decision validation, both Go execution paths, `regression.Run`, and CLI `evaluate`, `test` and `evaluate-profile` with unusual fixture versions. A U+FEFF-version fixture still loads but fails later result validation on single-attempt/regression paths; see the [field-specific migration](./docs/execution-text.md).

@@ -1,8 +1,9 @@
 # Evaluator and adapter boundary
 
 This guide describes the implemented Go APIs, not a released provider SDK or a
-remote evaluator wire protocol. The installed CLI evaluator is the credential-free
-deterministic fixture. There is no remote semantic adapter in the CLI yet.
+remote evaluator wire protocol. The CLI installs the credential-free
+deterministic fixture and the experimental [OpenAI adapter](./openai-adapter.md)
+(`adapters/openai`), which is a worked example of a remote adapter.
 The [portable schemas](../contracts/README.md) remain authoritative for their
 versioned artifacts; these Go types do not replace them. Public Go compatibility
 follows the [development compatibility policy](./compatibility.md).
@@ -152,5 +153,5 @@ Adapter changes should cover exact rule coverage, invalid metadata/confidence,
 parameter rejection, identity mismatch, cancellation/deadline behavior and safe
 errors. Run the relevant tests under `scripts/with-build-lock`, followed by
 `scripts/check` directly (it owns its lock). A remote adapter additionally needs
-its own verified provider contract and transport tests; the fixture example is
-not evidence that a remote provider integration exists or is ready for use.
+its own verified provider contract and transport tests, as in `adapters/openai`;
+the fixture example is not evidence that a remote provider is ready for use.
