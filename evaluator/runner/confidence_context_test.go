@@ -43,12 +43,19 @@ func TestConfidenceWithoutEscalation(t *testing.T) {
 			wantStatus, wantTerminal := decision.RuleNotMatched, "completed"
 			wantOutcome := decision.Outcome(in.Policy.Spec.DefaultOutcome)
 			wantReasons := []string{"test.evidence"}
+			wantDecisionReasons := []string{"policy.default_outcome"}
+			var wantFailure *decision.Failure
 			if tt.unresolved {
 				wantStatus, wantTerminal, wantOutcome = decision.RuleIndeterminate, "evaluation.unresolved_rule", decision.OutcomeFailure
 				wantReasons = []string{"evaluation.low_confidence"}
+				wantDecisionReasons = []string{"evaluation.unresolved_rule"}
+				wantFailure = &decision.Failure{Code: "evaluation.unresolved_rule", Stage: "evaluation", Retryable: false}
 			}
 			if d.RuleResults[0].Status != decision.RuleNotMatched || d.RuleResults[1].Status != wantStatus || d.Outcome != wantOutcome || trace.Terminal != wantTerminal || !reflect.DeepEqual(d.RuleResults[1].ReasonCodes, wantReasons) || !reflect.DeepEqual(d.RuleResults[1].Confidence, tt.confidence) {
 				t.Fatalf("decision=%+v trace=%+v", d, trace)
+			}
+			if !reflect.DeepEqual(d.ReasonCodes, wantDecisionReasons) || !reflect.DeepEqual(d.Failure, wantFailure) {
+				t.Fatalf("decision reasons=%v failure=%+v; want reasons=%v failure=%+v", d.ReasonCodes, d.Failure, wantDecisionReasons, wantFailure)
 			}
 		})
 	}
@@ -105,6 +112,12 @@ func TestLowConfidenceFallbackAfterEscalationFailure(t *testing.T) {
 
 func TestAdapterPanicCancelsAttemptAndTotalContexts(t *testing.T) {
 	in := inputFixture(t)
+	// This tests cleanup, not deadline expiry. Context deadlines use real time
+	// even though retry scheduling below uses the injected clock.
+	in.Profile.Spec.TotalTimeoutMS = 300000
+	for i := range in.Profile.Spec.Evaluators {
+		in.Profile.Spec.Evaluators[i].TimeoutMS = 100000
+	}
 	clock := &fakeTime{current: time.Now()}
 	timer := clock.timing()
 	var total context.Context
@@ -119,11 +132,10 @@ func TestAdapterPanicCancelsAttemptAndTotalContexts(t *testing.T) {
 	defer cancel()
 	var attempts []context.Context
 	const panicValue = "synthetic adapter panic"
+	var recovered any
 	func() {
 		defer func() {
-			if got := recover(); got != panicValue {
-				t.Fatalf("panic=%v want %q", got, panicValue)
-			}
+			recovered = recover()
 		}()
 		_, _ = run(caller, in, installed(func(ctx context.Context, _ evaluator.Request, _ Configuration) (evaluator.Result, error) {
 			attempts = append(attempts, ctx)
@@ -136,6 +148,9 @@ func TestAdapterPanicCancelsAttemptAndTotalContexts(t *testing.T) {
 			panic(panicValue)
 		}), timer)
 	}()
+	if recovered != panicValue {
+		t.Fatalf("panic=%v want %q", recovered, panicValue)
+	}
 	if total == nil || len(attempts) != 2 {
 		t.Fatalf("missing observed contexts: total=%v attempts=%d", total != nil, len(attempts))
 	}
