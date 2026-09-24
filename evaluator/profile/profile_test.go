@@ -64,15 +64,17 @@ func TestJSONAndYAMLProduceSameIdentity(t *testing.T) {
 
 func TestParseRejectsConformanceProfiles(t *testing.T) {
 	expected := map[string]string{
-		"invalid-confidence.json":         "confidence.threshold_invalid",
-		"invalid-fixture-adapter.json":    "fixture_adapter.invalid",
-		"invalid-fixture-credential.json": "fixture_configuration.invalid",
-		"invalid-mixed-modes.json":        "evaluator_mode.mixed",
-		"invalid-number-overflow.json":    "source.number",
-		"invalid-terminal-failure.json":   "terminal.invalid",
-		"invalid-terminal-outcome.json":   "terminal.invalid",
-		"invalid-unknown-property.json":   "source.schema",
-		"invalid-unsafe-integer.json":     "source.number",
+		"invalid-confidence.json":               "confidence.threshold_invalid",
+		"invalid-fixture-adapter.json":          "fixture_adapter.invalid",
+		"invalid-fixture-credential.json":       "fixture_configuration.invalid",
+		"invalid-mixed-modes.json":              "evaluator_mode.mixed",
+		"invalid-number-overflow.json":          "source.number",
+		"invalid-semantic-number-overflow.json": "source.number",
+		"invalid-semantic-unsafe-integer.json":  "source.number",
+		"invalid-terminal-failure.json":         "terminal.invalid",
+		"invalid-terminal-outcome.json":         "terminal.invalid",
+		"invalid-unknown-property.json":         "source.schema",
+		"invalid-unsafe-integer.json":           "source.number",
 	}
 	entries, err := os.ReadDir(contractsPath("conformance", "v0alpha1", "evaluator-profile"))
 	if err != nil {
@@ -376,7 +378,8 @@ func TestIntegerSpellingsHaveParity(t *testing.T) {
 	}
 }
 
-func TestParserAndSchemaAgreeOnPublishedFixtures(t *testing.T) {
+func profileSchema(t *testing.T) *jsonschema.Schema {
+	t.Helper()
 	compiler := jsonschema.NewCompiler()
 	compiler.UseRegexpEngine(schematest.CompilePattern)
 	compiler.AssertFormat()
@@ -398,6 +401,11 @@ func TestParserAndSchemaAgreeOnPublishedFixtures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	return schema
+}
+
+func TestParserAndSchemaAgreeOnPublishedFixtures(t *testing.T) {
+	schema := profileSchema(t)
 	for _, name := range []string{"quickstart-fixture.json", "semantic-routing.json"} {
 		source := readContract(t, "examples", "v0alpha1", "evaluator-profile", name)
 		if err := schema.Validate(decodeSchemaInstance(t, source)); err != nil {
@@ -407,8 +415,9 @@ func TestParserAndSchemaAgreeOnPublishedFixtures(t *testing.T) {
 			t.Fatalf("parser rejected valid %s: %v", name, err)
 		}
 	}
-	// Numeric portability fixtures are intentionally excluded: JSON Schema
-	// cannot express the RFC 8785 binary64 safe-range rule enforced by Parse.
+	// The two original numeric fixtures also violate closed fixture parameters.
+	// They remain byte-for-byte unchanged; TestNumericConformance isolates the
+	// numeric rule using open semantic parameters and schema-valid controls.
 	for _, name := range []string{
 		"invalid-confidence.json",
 		"invalid-fixture-adapter.json",

@@ -70,6 +70,31 @@ Parser-level fixtures also reject non-finite binary64 values and normalized
 numbers outside the interoperable IEEE-754 safe range before structural
 validation.
 
+### Isolated numeric profile cases
+
+`evaluator-profile/numeric-cases.json` is an additive case index; paths are
+relative to that index. Each `valid` source must load, canonicalize to the exact
+bytes of its `canonical` file (excluding that text file's final LF), and produce
+the `sha256:` value in `digest`. JSON `1e3`, JSON `1000.0` and YAML `1000.0`
+therefore have the same profile identity. The adapter is an example identifier,
+not an installed implementation or a claim of semantic execution.
+
+Each `invalid` case must fail the existing numeric-portability source rule.
+`number` identifies the single offending parameter literal; replacing only that
+literal with `1000` must produce the same valid identity. These semantic profiles
+have open parameter objects and pass structural JSON Schema validation with an
+arbitrary-precision JSON decoder, so an unrelated schema error cannot satisfy
+the test. `rejection: numeric-portability` describes the required reason category,
+not a new portable error payload; the Go parser reports `source.number`.
+Overflow `1e400` is not finite binary64, while `9007199254740993` exceeds the
+accepted safe range. A schema validator alone is not the source portability gate.
+
+The earlier `invalid-number-overflow.json` and `invalid-unsafe-integer.json`
+files remain unchanged. They also contain unknown deterministic-fixture
+parameters, so generic rejection of those legacy cases alone does **not** prove
+numeric conformance. The new isolated cases and positive controls supplement
+them without modifying any published schema or existing fixture bytes.
+
 ## Local secret bindings
 
 The valid example maps an adapter and logical credential slot to an environment

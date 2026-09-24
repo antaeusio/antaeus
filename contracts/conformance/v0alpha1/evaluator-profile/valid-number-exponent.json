@@ -1,0 +1,48 @@
+{
+  "apiVersion": "evaluator.antaeus.io/v0alpha1",
+  "kind": "EvaluatorProfile",
+  "metadata": {
+    "name": "numeric-identity"
+  },
+  "spec": {
+    "totalTimeoutMs": 2000,
+    "credentialSlots": [],
+    "evaluators": [
+      {
+        "id": "semantic-primary",
+        "mode": "semantic",
+        "adapter": {
+          "id": "io.example.numeric",
+          "version": "1.0.0"
+        },
+        "protocol": {
+          "id": "io.antaeus.rule-match",
+          "version": "v0alpha1"
+        },
+        "requiredCapabilities": [
+          "json-input",
+          "structured-rule-results"
+        ],
+        "timeoutMs": 1000,
+        "retry": {
+          "maxAttempts": 1,
+          "retryOn": []
+        },
+        "parameters": {
+          "value": 1e3
+        }
+      }
+    ],
+    "routing": {
+      "primary": "semantic-primary",
+      "fallbacks": [],
+      "confidence": {
+        "enabled": false
+      },
+      "terminal": {
+        "onIndeterminate": "failure",
+        "onFailure": "failure"
+      }
+    }
+  }
+}

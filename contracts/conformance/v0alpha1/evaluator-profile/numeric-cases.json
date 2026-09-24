@@ -1,0 +1,9 @@
+{
+  "valid": ["valid-number-exponent.json", "valid-number-decimal.json", "valid-number-decimal.yaml"],
+  "canonical": "numeric-identity.canonical.json",
+  "digest": "numeric-identity.sha256",
+  "invalid": [
+    {"file": "invalid-semantic-number-overflow.json", "number": "1e400", "rejection": "numeric-portability"},
+    {"file": "invalid-semantic-unsafe-integer.json", "number": "9007199254740993", "rejection": "numeric-portability"}
+  ]
+}
