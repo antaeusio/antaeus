@@ -232,6 +232,9 @@ func TestConfigTrustStorageIsIndependentAndRejectsCorruption(t *testing.T) {
 	writeConfigTestFile(t, marker, "corrupt")
 	configCommand(t, r, 1, "check")
 	configCommand(t, r, 1, "trust", "--digest", digest)
+	if data, err := os.ReadFile(marker); err != nil || string(data) != "corrupt" {
+		t.Fatalf("failed grant changed corrupt marker: %q, %v", data, err)
+	}
 	configCommand(t, r, 0, "revoke", "--digest", digest)
 	configCommand(t, r, 0, "trust", "--digest", digest)
 }
@@ -252,6 +255,12 @@ func TestConfigRejectsSymlinkedTrustAndDanglingManifest(t *testing.T) {
 	}
 	configCommand(t, r, 1, "inspect")
 	configCommand(t, r, 1, "trust", "--digest", digest)
+	if target, err := os.Readlink(marker); err != nil || target != other {
+		t.Fatalf("failed grant changed symlink: %q, %v", target, err)
+	}
+	if data, err := os.ReadFile(other); err != nil || string(data) != content {
+		t.Fatalf("failed grant changed symlink target: %q, %v", data, err)
+	}
 	configCommand(t, r, 0, "revoke", "--digest", digest)
 	if _, err := os.Stat(other); err != nil {
 		t.Fatal("revoke removed symlink target")

@@ -307,12 +307,12 @@ func readConfigFileWithin(path string, maxBytes int64, boundary string) ([]byte,
 			// component. Do not turn malformed higher-priority configuration
 			// into permission to use a lower-priority manifest.
 			for candidate := path; ; candidate = filepath.Dir(candidate) {
-				link, linkErr := lstat(candidate)
+				_, linkErr := lstat(candidate)
 				if linkErr == nil {
-					if link.Mode()&os.ModeSymlink != 0 {
-						if _, targetErr := stat(candidate); targetErr != nil {
-							return nil, errors.New("configuration contains an unresolved symlink")
-						}
+					// Not all platforms label directory redirections as
+					// symlinks. Require every existing ancestor to resolve.
+					if _, targetErr := stat(candidate); targetErr != nil {
+						return nil, errors.New("configuration contains an unresolved path")
 					}
 					break
 				}
@@ -489,8 +489,14 @@ func changeProjectTrust(runtime configRuntime, digest string, grant bool) error 
 		return errors.New("cannot save project trust; grant was not recorded")
 	}
 	if err := os.Link(f.Name(), path); errors.Is(err, os.ErrExist) {
-		_, err = projectTrusted(runtime, digest)
-		return err
+		trusted, err := projectTrusted(runtime, digest)
+		if err != nil {
+			return err
+		}
+		if !trusted {
+			return errors.New("project trust changed during grant; inspect and retry")
+		}
+		return nil
 	} else if err != nil {
 		return errors.New("cannot publish project trust; trust storage must support atomic hard links")
 	}

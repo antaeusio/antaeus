@@ -161,4 +161,29 @@ func TestConfigCaseAliasedContainment(t *testing.T) {
 	if err := independentUserConfig(r); err == nil || !strings.Contains(err.Error(), "outside the project") {
 		t.Fatalf("case alias containment accepted: %v", err)
 	}
+	r.userDir = t.TempDir()
+	if err := os.Symlink(alias, filepath.Join(r.userDir, "trust")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if _, _, err := trustMarker(r, "sha256:"+strings.Repeat("0", 64)); err == nil || !strings.Contains(err.Error(), "outside the project") {
+		t.Fatalf("case alias trust containment accepted: %v", err)
+	}
+}
+
+func TestConfigDanglingUnconfinedAncestor(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "directory", "config.json")
+	// No directory is genuinely an absent manifest.
+	if layer, err := loadConfigManifest(path, ""); err != nil || layer.Digest() != "" {
+		t.Fatalf("absent manifest: %v", err)
+	}
+	if err := os.Symlink("missing", filepath.Join(root, "directory")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if _, err := readConfigFile(path, 16<<10); err == nil || errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("dangling ancestor treated as absent: %v", err)
+	}
+	if _, err := loadConfigManifest(path, ""); err == nil || !strings.Contains(err.Error(), "cannot read configuration manifest") {
+		t.Fatalf("malformed user manifest fell through: %v", err)
+	}
 }
