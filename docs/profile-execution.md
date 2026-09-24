@@ -1,5 +1,7 @@
 # Profile-driven evaluation
 
+For the portable record and reducer semantics, see [reading a Decision](./decisions.md).
+
 `evaluator/runner.Run` accepts a policy, an immutable evaluator profile, canonical
 input, correlation ID, already-preflighted credentials, and an installed adapter
 registry keyed by exact adapter ID/version. It returns a validated Decision with
