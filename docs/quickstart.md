@@ -1,5 +1,8 @@
 # Local fixture quickstart
 
+For field definitions, valid/invalid policies and content identity, see
+[policy authoring](./policy-authoring.md).
+
 This quickstart validates and executes one policy entirely on your machine. It
 uses committed synthetic fixture evidence, performs no network access, reads no
 credentials, and does not represent semantic model inference.
