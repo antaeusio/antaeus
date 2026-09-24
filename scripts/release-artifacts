@@ -1,0 +1,69 @@
+#!/bin/sh
+
+# Build and package release archives for one tagged version:
+#   scripts/release-artifacts v0.1.0
+# Writes archives and SHA256SUMS to .tmp/release/<version>/.
+
+set -eu
+
+[ "$#" -eq 1 ] || { echo "usage: scripts/release-artifacts vMAJOR.MINOR.PATCH[-PRERELEASE]" >&2; exit 64; }
+version=$1
+if ! printf '%s\n' "$version" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$'; then
+  echo "release-artifacts: version must look like v0.1.0 or v0.1.0-rc.1" >&2
+  exit 64
+fi
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+repo_root=$(CDPATH='' cd -- "$script_dir/.." && pwd)
+
+# Hold the build lock for the whole build-and-package run; nested scripts/build
+# calls see the held lock and run directly.
+if [ "${ANTAEUS_BUILD_LOCK_HELD:-}" != 1 ]; then
+  exec "$repo_root/scripts/with-build-lock" "$0" "$@"
+fi
+out_dir="$repo_root/.tmp/release/$version"
+dist_dir="$repo_root/.tmp/dist"
+
+if [ -n "$(git -C "$repo_root" status --porcelain --untracked-files=normal)" ]; then
+  echo "release-artifacts: working tree is not clean" >&2
+  exit 65
+fi
+commit=$(git -C "$repo_root" rev-parse --short=12 HEAD)
+
+rm -rf "$out_dir" "$dist_dir"
+mkdir -p "$out_dir"
+ANTAEUS_VERSION=$version ANTAEUS_COMMIT=$commit "$repo_root/scripts/cross-build"
+
+plain=${version#v}
+for binary in "$dist_dir"/antaeus_*; do
+  name=$(basename -- "$binary")
+  target=${name#antaeus_}
+  target=${target%.exe}
+  stage="$out_dir/stage/antaeus_${plain}_${target}"
+  mkdir -p "$stage"
+  if [ "${name%.exe}" != "$name" ]; then
+    cp "$binary" "$stage/antaeus.exe"
+  else
+    cp "$binary" "$stage/antaeus"
+    chmod 0755 "$stage/antaeus"
+  fi
+  cp "$repo_root/LICENSE" "$repo_root/README.md" "$repo_root/CHANGELOG.md" "$stage/"
+  (
+    cd "$out_dir/stage"
+    case "$target" in
+      windows_*) zip -q -r -X "$out_dir/antaeus_${plain}_${target}.zip" "antaeus_${plain}_${target}" ;;
+      *) tar -czf "$out_dir/antaeus_${plain}_${target}.tar.gz" "antaeus_${plain}_${target}" ;;
+    esac
+  )
+done
+rm -rf "$out_dir/stage"
+
+(
+  cd "$out_dir"
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum antaeus_* >SHA256SUMS
+  else
+    shasum -a 256 antaeus_* >SHA256SUMS
+  fi
+)
+echo "release-artifacts: wrote $(find "$out_dir" -name 'antaeus_*' | wc -l | tr -d ' ') archives and SHA256SUMS to $out_dir"

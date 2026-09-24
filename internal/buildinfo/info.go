@@ -1,7 +1,10 @@
 // Package buildinfo exposes version metadata to the Antaeus command.
 package buildinfo
 
-import "fmt"
+import (
+	"fmt"
+	"runtime/debug"
+)
 
 var (
 	version = "dev"
@@ -14,12 +17,22 @@ type Info struct {
 	Commit  string
 }
 
-// Current returns the metadata embedded in the running command.
+// Current returns the metadata embedded in the running command. Builds
+// without injected metadata, such as go install of a tagged module version,
+// fall back to the module version recorded by the Go toolchain.
 func Current() Info {
-	return Info{
-		Version: version,
-		Commit:  commit,
+	moduleVersion := ""
+	if build, ok := debug.ReadBuildInfo(); ok {
+		moduleVersion = build.Main.Version
 	}
+	return current(version, commit, moduleVersion)
+}
+
+func current(version, commit, moduleVersion string) Info {
+	if version == "dev" && moduleVersion != "" && moduleVersion != "(devel)" {
+		version = moduleVersion
+	}
+	return Info{Version: version, Commit: commit}
 }
 
 // String returns a stable, human-readable version summary.

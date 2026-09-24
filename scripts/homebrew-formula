@@ -1,0 +1,68 @@
+#!/bin/sh
+
+# Render the Homebrew formula for a published release from its SHA256SUMS:
+#   scripts/homebrew-formula v0.1.0 .tmp/release/v0.1.0/SHA256SUMS > Formula/antaeus.rb
+
+set -eu
+
+[ "$#" -eq 2 ] || { echo "usage: scripts/homebrew-formula VERSION SHA256SUMS" >&2; exit 64; }
+version=$1
+sums=$2
+if ! printf '%s\n' "$version" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$'; then
+  echo "homebrew-formula: version must look like v0.1.0" >&2
+  exit 64
+fi
+plain=${version#v}
+base="https://github.com/antaeusio/antaeus/releases/download/$version"
+
+sum_for() {
+  value=$(awk -v f="antaeus_${plain}_$1.tar.gz" '$2 == f { print $1 }' "$sums")
+  if ! printf '%s\n' "$value" | grep -Eq '^[0-9a-f]{64}$'; then
+    echo "homebrew-formula: missing checksum for $1" >&2
+    exit 65
+  fi
+  printf '%s\n' "$value"
+}
+
+darwin_arm64=$(sum_for darwin_arm64)
+darwin_amd64=$(sum_for darwin_amd64)
+linux_arm64=$(sum_for linux_arm64)
+linux_amd64=$(sum_for linux_amd64)
+
+cat <<FORMULA
+class Antaeus < Formula
+  desc "Open-source semantic policy engine and CLI"
+  homepage "https://antaeus.io"
+  license "Apache-2.0"
+
+  on_macos do
+    on_arm do
+      url "$base/antaeus_${plain}_darwin_arm64.tar.gz"
+      sha256 "$darwin_arm64"
+    end
+    on_intel do
+      url "$base/antaeus_${plain}_darwin_amd64.tar.gz"
+      sha256 "$darwin_amd64"
+    end
+  end
+
+  on_linux do
+    on_arm do
+      url "$base/antaeus_${plain}_linux_arm64.tar.gz"
+      sha256 "$linux_arm64"
+    end
+    on_intel do
+      url "$base/antaeus_${plain}_linux_amd64.tar.gz"
+      sha256 "$linux_amd64"
+    end
+  end
+
+  def install
+    bin.install "antaeus"
+  end
+
+  test do
+    assert_match "$version", shell_output("#{bin}/antaeus version")
+  end
+end
+FORMULA
