@@ -419,7 +419,14 @@ func boundedMessage(message string) string {
 	if len(message) <= max {
 		return message
 	}
-	return message[:max-3] + "..."
+	// Keep the existing byte budget, but do not split a UTF-8 character in
+	// otherwise valid text. This bounds diagnostics; it is not a sanitizer
+	// for malformed text returned by an adapter.
+	end := max - 3
+	for end > 0 && !utf8.RuneStart(message[end]) {
+		end--
+	}
+	return message[:end] + "..."
 }
 
 func canonicalParameters(parameters map[string]any) (json.RawMessage, error) {
