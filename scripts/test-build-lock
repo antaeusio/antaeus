@@ -1,0 +1,178 @@
+#!/bin/sh
+# shellcheck disable=SC2016 # command strings are expanded by the child shell
+
+# Lifecycle tests for scripts/with-build-lock. Each case runs a copy of the
+# wrapper in a temporary root, so the repository's real lock is never touched.
+
+set -u
+# Signals ignored when a non-interactive shell starts cannot be trapped, and
+# harnesses often start tests with SIGINT ignored. These cases therefore use
+# TERM and HUP, which follow the same forwarding path as a terminal's INT.
+# TEST_SHELL selects the shell that runs the wrapper (for example dash).
+test_shell=${TEST_SHELL:-sh}
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd) || exit 70
+work=$(mktemp -d) || exit 70
+trap 'rm -rf "$work"' 0
+failures=0
+
+fail() {
+  echo "test-build-lock: FAIL: $1" >&2
+  failures=$((failures + 1))
+}
+
+new_root() {
+  root="$work/$1"
+  mkdir -p "$root/scripts" "$root/.tmp"
+  cp "$script_dir/with-build-lock" "$root/scripts/with-build-lock"
+  lock="$root/.tmp/antaeus-build.lock"
+}
+
+wait_for() {
+  tries=0
+  until [ -e "$1" ]; do
+    tries=$((tries + 1))
+    [ "$tries" -le 100 ] || return 1
+    sleep 0.1
+  done
+}
+
+dead_pid() {
+  sh -c 'exit 0' &
+  pid=$!
+  wait "$pid"
+  echo "$pid"
+}
+
+# 1. An interrupted command keeps the lock until it has finished stopping.
+new_root interrupt
+ready="$root/ready"
+stopped="$root/stopped"
+ANTAEUS_BUILD_LOCK_POLL_SECONDS=1 "$test_shell" "$root/scripts/with-build-lock" sh -c '
+  trap "sleep 2; touch \"$2\"; exit 0" TERM
+  touch "$1"
+  while :; do sleep 0.1; done
+' sh "$ready" "$stopped" &
+wrapper=$!
+wait_for "$ready" || fail "interrupt: command did not start"
+kill -s TERM "$wrapper"
+sleep 1
+[ -d "$lock" ] || fail "interrupt: lock released while the command was still stopping"
+wait "$wrapper"
+status=$?
+[ "$status" -eq 143 ] || fail "interrupt: wrapper exited $status, want 143"
+[ -e "$stopped" ] || fail "interrupt: command did not receive TERM and finish cleanup"
+[ ! -e "$lock" ] || fail "interrupt: lock remained after the command stopped"
+
+# 2. A command that ignores the signal is killed after the stop timeout, and
+#    the lock is held until then.
+new_root escalate
+ready="$root/ready"
+ANTAEUS_BUILD_LOCK_STOP_SECONDS=2 "$test_shell" "$root/scripts/with-build-lock" sh -c '
+  trap "" INT TERM HUP
+  touch "$1"
+  while :; do sleep 0.1; done
+' sh "$ready" 2>"$root/stderr" &
+wrapper=$!
+wait_for "$ready" || fail "escalate: command did not start"
+command_pid=$(sed -n '1p' "$lock/command_pid" 2>/dev/null || true)
+kill -s HUP "$wrapper"
+sleep 1
+[ -d "$lock" ] || fail "escalate: lock released before the command was killed"
+wait "$wrapper"
+status=$?
+[ "$status" -eq 129 ] || fail "escalate: wrapper exited $status, want 129"
+if [ "$command_pid" ] && ps -p "$command_pid" >/dev/null 2>&1; then
+  fail "escalate: command survived escalation"
+  kill -s KILL "$command_pid" 2>/dev/null
+fi
+[ ! -e "$lock" ] || fail "escalate: lock remained after escalation"
+
+# 3. A lock owned by a verified-dead process is removed.
+new_root stale
+mkdir "$lock"
+dead_pid >"$lock/pid"
+"$test_shell" "$root/scripts/with-build-lock" true 2>/dev/null || fail "stale: wrapper did not take over a dead owner's lock"
+[ ! -e "$lock" ] || fail "stale: lock remained"
+
+# 4. A lock without metadata is never broken; the wrapper times out.
+new_root metadata
+mkdir "$lock"
+ANTAEUS_BUILD_LOCK_WAIT_SECONDS=1 ANTAEUS_BUILD_LOCK_POLL_SECONDS=1 "$test_shell" "$root/scripts/with-build-lock" true 2>/dev/null
+status=$?
+[ "$status" -eq 75 ] || fail "metadata: exited $status, want 75"
+[ -d "$lock" ] || fail "metadata: lock without metadata was removed"
+
+# 5. A live owner's lock is never broken.
+new_root live
+mkdir "$lock"
+echo "$$" >"$lock/pid"
+ANTAEUS_BUILD_LOCK_WAIT_SECONDS=1 ANTAEUS_BUILD_LOCK_POLL_SECONDS=1 "$test_shell" "$root/scripts/with-build-lock" true 2>/dev/null
+status=$?
+[ "$status" -eq 75 ] || fail "live: exited $status, want 75"
+[ "$(cat "$lock/pid")" = "$$" ] || fail "live: live owner's lock was replaced"
+
+# 5b. A process this user cannot signal (EPERM) is still treated as live.
+if [ "$(id -u)" != 0 ]; then
+  new_root eperm
+  mkdir "$lock"
+  echo 1 >"$lock/pid"
+  ANTAEUS_BUILD_LOCK_WAIT_SECONDS=1 ANTAEUS_BUILD_LOCK_POLL_SECONDS=1 "$test_shell" "$root/scripts/with-build-lock" true 2>/dev/null
+  status=$?
+  [ "$status" -eq 75 ] || fail "eperm: exited $status, want 75"
+  [ "$(cat "$lock/pid")" = 1 ] || fail "eperm: PID 1's lock was replaced"
+fi
+
+# 5c. A lock whose owner has not written metadata yet is waited for, not broken.
+new_root window
+mkdir "$lock"
+released="$root/released"
+(
+  sleep 1
+  echo "$$" >"$lock/pid"
+  sleep 2
+  touch "$released"
+  rm -rf "$lock"
+) &
+ANTAEUS_BUILD_LOCK_WAIT_SECONDS=20 ANTAEUS_BUILD_LOCK_POLL_SECONDS=1 "$test_shell" "$root/scripts/with-build-lock" sh -c '[ -e "$1" ]' sh "$released" 2>/dev/null
+status=$?
+[ "$status" -eq 0 ] || fail "window: command ran before the owner released the lock (exit $status)"
+
+# 5d. The lock is held until background descendants of a finished command exit.
+new_root descendants
+done_marker="$root/descendant-done"
+"$test_shell" "$root/scripts/with-build-lock" sh -c '(sleep 2; touch "$1") & exit 0' sh "$done_marker" 2>/dev/null
+[ -e "$done_marker" ] || fail "descendants: lock released while a descendant was still running"
+[ ! -e "$lock" ] || fail "descendants: lock remained"
+
+# 6. Waiters racing to remove the same stale lock never run concurrently.
+new_root race
+mkdir "$lock"
+dead_pid >"$lock/pid"
+log="$root/log"
+pids=''
+for i in 1 2 3 4; do
+  ANTAEUS_BUILD_LOCK_POLL_SECONDS=1 "$test_shell" "$root/scripts/with-build-lock" sh -c '
+    echo "start $2" >>"$1"
+    sleep 0.3
+    echo "end $2" >>"$1"
+  ' sh "$log" "$i" 2>/dev/null &
+  pids="$pids $!"
+done
+for pid in $pids; do
+  wait "$pid" || fail "race: a waiter failed"
+done
+expected_state=end
+while read -r event id; do
+  case "$event" in
+    start) [ "$expected_state" = end ] || fail "race: commands overlapped at start $id"; expected_state=start ;;
+    end) [ "$expected_state" = start ] || fail "race: unexpected end $id"; expected_state=end ;;
+  esac
+done <"$log"
+[ "$(grep -c start "$log")" -eq 4 ] || fail "race: not every waiter ran"
+
+if [ "$failures" -ne 0 ]; then
+  echo "test-build-lock: $failures failure(s)" >&2
+  exit 1
+fi
+echo "test-build-lock: ok"

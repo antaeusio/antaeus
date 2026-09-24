@@ -1,6 +1,6 @@
 # Contributing to Antaeus
 
-Antaeus is in early implementation, with policy validation, deterministic fixture evaluation, regression suites and profile routing. It has no released API or live semantic adapter yet. Contributions should focus on concrete design feedback, documentation corrections, tests, and small changes agreed with the maintainers before implementation.
+Antaeus is in early implementation, with policy validation, deterministic fixture evaluation, regression suites and profile routing. v0.1.0 is its first release; the OpenAI semantic adapter is experimental and the public API is pre-v1. Contributions should focus on concrete design feedback, documentation corrections, tests, and small changes agreed with the maintainers before implementation.
 
 ## Before opening a change
 

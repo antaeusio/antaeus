@@ -100,3 +100,11 @@ jobs:
           GOPROXY: 'off'
           GOFLAGS: '-mod=readonly'
         run: scripts/cross-build
+      - name: Injected version reaches the built command
+        if: matrix.go == '1.27.1'
+        env:
+          GOPROXY: 'off'
+          GOFLAGS: '-mod=readonly'
+        run: |
+          ANTAEUS_VERSION=v0.0.0-ci ANTAEUS_COMMIT=ci123 scripts/build
+          test "$(.tmp/bin/antaeus version)" = 'antaeus v0.0.0-ci (ci123)'

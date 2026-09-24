@@ -2,7 +2,22 @@
 
 Antaeus is an open-source project for turning human-written semantic business policies into versioned, testable, auditable decisions that applications can safely consume.
 
-> **Project status:** early implementation. The repository contains the initial portable policy, decision, fixture, and regression contracts; constrained JSON/YAML policy loading; a provider-neutral evaluator boundary; a deterministic synthetic fixture evaluator; and local validation, evaluation, and regression commands, but there is no release or semantic evaluator yet.
+> **Project status:** early, pre-v1. [v0.1.0](https://github.com/antaeusio/antaeus/releases/tag/v0.1.0) is the first release. It contains portable policy, decision, fixture, and regression contracts; constrained JSON/YAML policy loading; a provider-neutral evaluator boundary; a deterministic synthetic fixture evaluator; local validation, evaluation, and regression commands; and an experimental bring-your-own-key OpenAI semantic evaluator that has not yet been measured for accuracy.
+
+## Install
+
+```sh
+brew install antaeusio/tap/antaeus                            # macOS or Linux
+go install github.com/antaeusio/antaeus/cmd/antaeus@latest    # Go 1.26.0 or newer
+antaeus version
+```
+
+Prebuilt archives for macOS, Linux, and Windows are attached to each
+[GitHub release](https://github.com/antaeusio/antaeus/releases) with a
+`SHA256SUMS` file and build-provenance attestations
+(`gh attestation verify <archive> --repo antaeusio/antaeus`). Then follow the
+[five-minute quickstart](./docs/quickstart.md), or try the
+[OpenAI evaluator](./docs/openai-adapter.md) with your own API key.
 
 ## What Antaeus is for
 
@@ -30,7 +45,7 @@ Provider credentials, customer data, hosted-service implementation, billing, and
 
 ## Development status
 
-The Go module is `github.com/antaeusio/antaeus`. Development requires Go 1.26.0 or newer; Go 1.27.1 is the preferred toolchain. The current command exposes help and version information plus policy validation, deterministic local fixture evaluation, portable offline regression suites, and an experimental bring-your-own-key OpenAI semantic evaluator; no release artifact exists yet.
+The Go module is `github.com/antaeusio/antaeus`. Development requires Go 1.26.0 or newer; Go 1.27.1 is the preferred toolchain. The current command exposes help and version information plus policy validation, deterministic local fixture evaluation, portable offline regression suites, and an experimental bring-your-own-key OpenAI semantic evaluator.
 
 Use [`evaluate-profile`](./docs/profile-execution.md#cli-fixture-profiles) to run
 an explicitly selected evaluator profile, with configuration precedence and a
@@ -63,9 +78,9 @@ The command can validate a policy, execute an exact synthetic fixture case, and
 run a portable named regression suite locally. This credential-free path is test
 plumbing, not semantic model inference; see the [five-minute quickstart](./docs/quickstart.md).
 
-Build every planned binary target with `scripts/cross-build`. Generated files stay under `.tmp/` and are not release artifacts.
+Build every supported binary target with `scripts/cross-build`. Generated files stay under `.tmp/`; published archives come only from the tag-triggered release workflow described in [releasing](./docs/releasing.md).
 
-Do not treat proposed behavior as released functionality. The changelog and future release notes will identify what is actually available.
+Do not treat proposed behavior as released functionality. The [changelog](./CHANGELOG.md) and release notes identify what is actually available.
 
 See [compatibility and platform support](./docs/compatibility.md) for the pre-v1 compatibility policy and planned release matrix.
 

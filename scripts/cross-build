@@ -15,7 +15,10 @@ for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64; d
   fi
 
   echo "cross-build: $goos/$goarch"
+  # Pin the documented release baselines instead of inheriting the caller's.
   CGO_ENABLED=0 \
+    GOAMD64=v1 \
+    GOARM64=v8.0 \
     GOOS="$goos" \
     GOARCH="$goarch" \
     ANTAEUS_OUTPUT="$dist_dir/antaeus_${goos}_${goarch}${suffix}" \

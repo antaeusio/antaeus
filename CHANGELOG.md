@@ -6,7 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-24
+
+First public release. Antaeus turns human-written policies into versioned,
+testable decisions (`allow`, `review`, `deny`, or `failure`) and runs locally
+without an account. It includes a credential-free deterministic quickstart and
+an **experimental** bring-your-own-key OpenAI semantic evaluator. The semantic
+evaluator has not been measured on a frozen corpus and is not suitable for
+enforcement. Public Go APIs and CLI behavior may still change in minor
+releases before v1.0.0; see [compatibility](./docs/compatibility.md).
+
+Install with `brew install antaeusio/tap/antaeus`, with
+`go install github.com/antaeusio/antaeus/cmd/antaeus@v0.1.0`, or by downloading
+an archive from this release and checking it against `SHA256SUMS`. Archives
+carry GitHub build-provenance attestations
+(`gh attestation verify <archive> --repo antaeusio/antaeus`).
+
 ### Added
+
+- Release archives for macOS (amd64, arm64), Linux (amd64, arm64), and Windows (amd64) with SHA-256 checksums and build-provenance attestations, plus a Homebrew tap. `antaeus version` reports the module version for `go install` builds.
 
 - Experimental OpenAI Responses semantic adapter `io.antaeus.openai@0.1.0` with strict structured output, `store: false`, a digest-pinned instruction template, a fixed origin without redirects, bounded bodies and typed retryable failures. CLI `evaluate-profile` now runs OpenAI profiles using the `OPENAI_API_KEY` adapter default or explicit bindings, requiring saved project trust for project-supplied credential configuration. See the [adapter guide](./docs/openai-adapter.md).
 - Profile-driven execution with bounded retries, deadlines, confidence escalation, operational fallbacks, and portable attempt traces.
@@ -28,10 +46,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - CLI `evaluate-profile` no longer requires `--fixture-set` and `--case` for semantic profiles; fixture profiles still require both, and semantic profiles reject them. The diagnostic for uninstalled adapters changed from "only the deterministic fixture adapter is installed" to name both installed adapters.
 - Preserve UTF-8 character boundaries when truncating valid profile validation messages, retaining the 512-byte message cap, ASCII output, error codes and wrapped causes. This does not sanitize malformed adapter text or change policy/profile identity, Decisions or published schemas.
-- For planned v0.1.0, publish complete CLI trust markers atomically without overwriting existing entries, reject dangling intermediate configuration symlinks, and check user/trust directory containment by filesystem identity. Existing marker keys and published schemas remain unchanged; granting trust now requires same-directory hard-link support. See the [configuration migration](./docs/cli-configuration.md#development-migration-for-the-planned-v010-release).
-- For planned v0.1.0, align execution metadata and Decision adapter/fixture versions with the existing ECMA-262 nonblank patterns: reject U+FEFF-only text and accept U+0085 as nonblank. Add Go/JavaScript conformance without changing published schemas or other fields' explicit whitespace rules. This affects result/Decision validation, both Go execution paths, `regression.Run`, and CLI `evaluate`, `test` and `evaluate-profile` with unusual fixture versions. A U+FEFF-version fixture still loads but fails later result validation on single-attempt/regression paths; see the [field-specific migration](./docs/execution-text.md).
-- For planned v0.1.0, Go profile-runner and CLI `evaluate-profile` failure Decisions expose the terminal operational code, append it after the generic unresolved reason, and classify transient retryability only when all unresolved rules failed solely for that cause. Deny precedence, the standalone reducer, legacy commands and published schemas are unchanged. See the [Go/CLI migration note](./docs/profile-execution.md#development-migration-for-the-planned-v010-release).
-- For planned v0.1.0, retries no longer sleep away the final budget when the next jittered delay leaves no time to retry. Eligible fallback evidence can now produce a policy judgment where the old runner failed at the deadline; without recovery, transient trace/rule codes can replace the deadline code. Published schemas and the reducer are unchanged. Cancellation and exhausted deadlines retain precedence. See the [Go/CLI migration note](./docs/profile-execution.md#development-migration-for-the-planned-v010-release).
-- For the planned first minor release v0.1.0, profile-runner Go callers must explicitly set `AllowSyntheticFixtures` for non-enforcement fixture execution. Enforcement still rejects fixtures. The fixture-only CLI opts in internally; its flags/output and published schemas are unchanged. See the [migration note](./docs/profile-execution.md#development-migration-for-the-planned-v010-release). No release has been published.
+- Publish complete CLI trust markers atomically without overwriting existing entries, reject dangling intermediate configuration symlinks, and check user/trust directory containment by filesystem identity. Existing marker keys and published schemas remain unchanged; granting trust now requires same-directory hard-link support. See the [configuration migration](./docs/cli-configuration.md#development-migration-for-the-planned-v010-release).
+- Align execution metadata and Decision adapter/fixture versions with the existing ECMA-262 nonblank patterns: reject U+FEFF-only text and accept U+0085 as nonblank. Add Go/JavaScript conformance without changing published schemas or other fields' explicit whitespace rules. This affects result/Decision validation, both Go execution paths, `regression.Run`, and CLI `evaluate`, `test` and `evaluate-profile` with unusual fixture versions. A U+FEFF-version fixture still loads but fails later result validation on single-attempt/regression paths; see the [field-specific migration](./docs/execution-text.md).
+- Go profile-runner and CLI `evaluate-profile` failure Decisions expose the terminal operational code, append it after the generic unresolved reason, and classify transient retryability only when all unresolved rules failed solely for that cause. Deny precedence, the standalone reducer, legacy commands and published schemas are unchanged. See the [Go/CLI migration note](./docs/profile-execution.md#development-migration-for-the-planned-v010-release).
+- Retries no longer sleep away the final budget when the next jittered delay leaves no time to retry. Eligible fallback evidence can now produce a policy judgment where the old runner failed at the deadline; without recovery, transient trace/rule codes can replace the deadline code. Published schemas and the reducer are unchanged. Cancellation and exhausted deadlines retain precedence. See the [Go/CLI migration note](./docs/profile-execution.md#development-migration-for-the-planned-v010-release).
+- Profile-runner Go callers must explicitly set `AllowSyntheticFixtures` for non-enforcement fixture execution. Enforcement still rejects fixtures. The fixture-only CLI opts in internally; its flags/output and published schemas are unchanged. See the [migration note](./docs/profile-execution.md#development-migration-for-the-planned-v010-release).
 - Documented existing adapter panic propagation, deferred cleanup and embedding-host isolation responsibilities; panics do not produce a Decision or completed trace.
 - Tightened the unreleased v0alpha1 evaluator metadata so mode and synthetic status are explicit and deterministic fixtures carry exact set and adapter versions.
+
+### Fixed
+
+- `scripts/with-build-lock` keeps the lock until an interrupted command's whole process group has stopped (escalating to KILL after a bounded wait), serializes stale-lock takeover, waits for owners that have not yet written metadata, and no longer treats another user's process as dead. `scripts/test-build-lock` covers these cases ([#42](https://github.com/antaeusio/antaeus/issues/42)).
+- `scripts/cross-build` pins `GOAMD64=v1` and `GOARM64=v8.0` instead of inheriting the caller's environment.
+
+[Unreleased]: https://github.com/antaeusio/antaeus/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/antaeusio/antaeus/releases/tag/v0.1.0

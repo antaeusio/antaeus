@@ -14,19 +14,18 @@ Packages below `internal/`, unexported identifiers, test helpers, and undocument
 
 Published policy, decision, evaluator-profile, JSON Schema, OpenAPI, and machine-output contract versions are immutable even before the Go module reaches v1. An incompatible data or semantic change receives a new contract version rather than silently changing an existing one.
 
-## Initial release targets
+## Release targets
 
-The planned first release matrix is:
+Each release publishes:
 
 | Artifact | Architectures | Minimum operating system |
 | --- | --- | --- |
 | macOS binary | amd64, arm64 | macOS 13 Ventura |
 | Linux binary | amd64, arm64 | Linux kernel 3.2 |
 | Windows binary | amd64 | Windows 10 or Windows Server 2016 |
-| Linux container | amd64, arm64 | OCI-compatible Linux runtime |
 
-Release binaries are pure Go and built with `CGO_ENABLED=0`, `GOAMD64=v1`, and `GOARM64=v8.0`. Containers will include CA certificates and run as a numeric non-root user.
+Release binaries are pure Go and built with `CGO_ENABLED=0`, `GOAMD64=v1`, and `GOARM64=v8.0`. The same macOS and Linux archives back the Homebrew tap. A multi-architecture Linux container image is planned for a later release; when published it will include CA certificates and run as a numeric non-root user.
 
 Other Go targets may compile, but they are unsupported until Antaeus publishes native validation and release artifacts for them. WSL uses the Linux binary and is not a separate target.
 
-No release artifacts exist yet. This matrix is a commitment for the first published release, not a claim that downloads are currently available.
+Release archives are cross-compiled on Linux and smoke-tested natively on Linux amd64. Other targets are compiled but not yet executed natively in the release workflow.
