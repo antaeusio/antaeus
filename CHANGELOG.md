@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Experimental System One semantic adapter `io.antaeus.systemone@0.1.0` for a self-hosted Contrastive Language Model (CLM) server. It asks one yes/no question per rule, returns confidence scores for confidence routing, requires `https` (or loopback `http`) endpoints, follows no redirects, and takes an optional `clm-api-key` credential (`CLM_API_KEY`). CLI `evaluate-profile` runs System One profiles and semantic profiles that combine it with the OpenAI adapter. Example profiles are in `examples/clm/`, and the [adapter guide](./docs/systemone-adapter.md) covers setup.
+- Remote adapters share one isolated transport and failure classification in `internal/remote`.
+- CLI `evaluate-profile` requires saved project trust for every semantic profile selected by project configuration, including credential-free System One profiles, because a profile decides where input is sent.
 - README with the brand lockup for light and dark themes, a worked marketplace-moderation example with real output, a "how it works" diagram, and a documentation index. The example inputs are in `examples/marketplace/`. `docs/assets/social-preview.png` is the repository's link-preview image.
 
 ## [0.1.0] - 2026-09-24

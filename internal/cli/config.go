@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/antaeusio/antaeus/adapters/openai"
+	"github.com/antaeusio/antaeus/adapters/systemone"
 	"github.com/antaeusio/antaeus/evaluator/localbinding"
 	"github.com/antaeusio/antaeus/evaluator/localconfig"
 	"github.com/antaeusio/antaeus/evaluator/profile"
@@ -45,8 +46,16 @@ type configRuntime struct {
 	projectDir  string
 	userDir     string
 	environment localbinding.Environment
-	// openAI replaces the installed OpenAI adapter in tests only.
-	openAI *runner.Adapter
+	// openAI and systemOne replace the installed adapters in tests only.
+	openAI    *runner.Adapter
+	systemOne *runner.Adapter
+}
+
+func (r configRuntime) systemOneAdapter() runner.Adapter {
+	if r.systemOne != nil {
+		return *r.systemOne
+	}
+	return systemone.Registration()
 }
 
 func (r configRuntime) openAIAdapter() runner.Adapter {

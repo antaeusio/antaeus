@@ -28,7 +28,8 @@ presence only: installed-adapter parameter validation, provider authentication,
 network requests, and semantic evaluation remain separate execution requirements.
 The installed OpenAI adapter provides a default reference for its
 `openai-api-key` slot (the `OPENAI_API_KEY` variable, see
-[the adapter guide](./openai-adapter.md)); other credentialed profiles need
+[the adapter guide](./openai-adapter.md)), and the System One adapter for its
+optional `clm-api-key` slot (`CLM_API_KEY`, see [its guide](./systemone-adapter.md)); other credentialed profiles need
 explicit reference bindings, which also override the default. Missing credentials include remediation guidance
 without exposing names or values. An unset winning reference does not fall back
 to a lower-priority source.
@@ -41,12 +42,13 @@ The existing fixture `evaluate` and `test` commands retain their explicit,
 credential-free behavior and do not consume these manifests.
 The separate [`evaluate-profile` command](./profile-execution.md#cli-fixture-profiles)
 uses this selection workflow and the profile runner. It installs the
-deterministic fixture adapter, which never reads credentials, and the OpenAI
-adapter. Profiles using any other adapter are rejected without credential-setup
-or trust-grant prompts, even if project trust was previously granted. An OpenAI
-profile whose credential authority comes from project configuration runs only
-after saved trust for that exact project snapshot; execution reads saved trust
-but never grants it. Use `config` commands separately when deliberately
+deterministic fixture adapter, which never reads credentials, and the OpenAI and
+System One adapters. Profiles using any other adapter are rejected without
+credential-setup or trust-grant prompts, even if project trust was previously
+granted. A semantic profile sends input over the network, so when its profile
+or credential references come from project configuration it runs only after
+saved trust for that exact project snapshot, whether or not it reads
+credentials. Execution reads saved trust but never grants it. Use `config` commands separately when deliberately
 inspecting or managing configuration; execution never grants project trust.
 
 ## Locations and manifest

@@ -3,7 +3,8 @@
 This guide describes the implemented Go APIs, not a released provider SDK or a
 remote evaluator wire protocol. The CLI installs the credential-free
 deterministic fixture and the experimental [OpenAI adapter](./openai-adapter.md)
-(`adapters/openai`), which is a worked example of a remote adapter.
+(`adapters/openai`) and the [System One adapter](./systemone-adapter.md)
+(`adapters/systemone`), which are worked examples of remote adapters.
 The [portable schemas](../contracts/README.md) remain authoritative for their
 versioned artifacts; these Go types do not replace them. Public Go compatibility
 follows the [development compatibility policy](./compatibility.md).

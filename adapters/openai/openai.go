@@ -11,24 +11,21 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"regexp"
 	"slices"
-	"time"
 
 	"github.com/antaeusio/antaeus/decision"
 	"github.com/antaeusio/antaeus/evaluator"
 	"github.com/antaeusio/antaeus/evaluator/localbinding"
 	"github.com/antaeusio/antaeus/evaluator/profile"
 	"github.com/antaeusio/antaeus/evaluator/runner"
+	"github.com/antaeusio/antaeus/internal/remote"
 )
 
 const (
@@ -107,28 +104,7 @@ func registration(url string, client *http.Client) runner.Adapter {
 	}
 }
 
-// newHTTPClient builds an isolated transport. It deliberately ignores proxy
-// environment variables and any process-wide DefaultTransport customization:
-// the adapter takes no endpoint or routing behavior from ambient state.
-func newHTTPClient() *http.Client {
-	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
-	transport := &http.Transport{
-		Proxy:                 nil,
-		DialContext:           dialer.DialContext,
-		ForceAttemptHTTP2:     true,
-		TLSClientConfig:       &tls.Config{MinVersion: tls.VersionTLS12},
-		TLSHandshakeTimeout:   10 * time.Second,
-		IdleConnTimeout:       90 * time.Second,
-		MaxIdleConns:          4,
-		ExpectContinueTimeout: time.Second,
-	}
-	return &http.Client{
-		Transport: transport,
-		// Never follow redirects: authorization must not be forwarded and the
-		// approved origin is fixed.
-		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-	}
-}
+func newHTTPClient() *http.Client { return remote.NewClient() }
 
 // Parameters is the closed adapter parameter object carried by the profile.
 type Parameters struct {
@@ -260,11 +236,11 @@ func (a *adapter) evaluate(ctx context.Context, request evaluator.Request, confi
 		}
 		return evaluator.Result{}, statusFailure(response)
 	}
-	payload, err := io.ReadAll(io.LimitReader(response.Body, MaxResponseBytes+1))
+	payload, tooLarge, err := remote.ReadBounded(response.Body, MaxResponseBytes)
 	if err != nil {
 		return evaluator.Result{}, transportFailure(ctx, err)
 	}
-	if len(payload) > MaxResponseBytes {
+	if tooLarge {
 		return evaluator.Result{}, failure("openai.response_too_large", false, "provider response exceeded the size limit")
 	}
 	results, model, err := parseResponse(payload, request.Rules)
@@ -491,23 +467,5 @@ func errorCode(response *http.Response) string {
 }
 
 func transportFailure(ctx context.Context, err error) error {
-	if ctxErr := ctx.Err(); ctxErr != nil {
-		if errors.Is(ctxErr, context.DeadlineExceeded) {
-			return failure("evaluator.timeout", true, "provider request exceeded its deadline")
-		}
-		return failure("evaluation.cancelled", false, "provider request was cancelled")
-	}
-	var certificate *tls.CertificateVerificationError
-	var unknownAuthority x509.UnknownAuthorityError
-	var hostname x509.HostnameError
-	var invalid x509.CertificateInvalidError
-	var record tls.RecordHeaderError
-	if errors.As(err, &certificate) || errors.As(err, &unknownAuthority) || errors.As(err, &hostname) || errors.As(err, &invalid) || errors.As(err, &record) {
-		return failure("openai.tls_failed", false, "provider TLS verification failed")
-	}
-	var network net.Error
-	if errors.As(err, &network) && network.Timeout() {
-		return failure("evaluator.timeout", true, "provider connection timed out")
-	}
-	return failure("evaluator.unavailable", true, "provider connection failed")
+	return remote.TransportFailure(ctx, err, "openai")
 }

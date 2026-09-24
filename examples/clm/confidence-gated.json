@@ -1,0 +1,32 @@
+{
+  "apiVersion": "evaluator.antaeus.io/v0alpha1",
+  "kind": "EvaluatorProfile",
+  "metadata": {
+    "name": "clm-confidence-gated",
+    "description": "Experimental self-hosted CLM evaluator. Rules answered with less than 0.8 confidence become indeterminate, so the Decision is failure unless a matched deny applies."
+  },
+  "spec": {
+    "totalTimeoutMs": 10000,
+    "credentialSlots": [],
+    "evaluators": [
+      {
+        "id": "clm-primary",
+        "mode": "semantic",
+        "adapter": {"id": "io.antaeus.systemone", "version": "0.1.0"},
+        "protocol": {"id": "io.antaeus.rule-match", "version": "v0alpha1"},
+        "requiredCapabilities": ["json-input", "structured-rule-results", "confidence-scores"],
+        "timeoutMs": 5000,
+        "retry": {"maxAttempts": 2, "retryOn": ["timeout", "unavailable"], "initialBackoffMs": 200, "maxBackoffMs": 1000, "multiplier": 2},
+        "provider": "contrastive-lm",
+        "model": "clm-latest",
+        "parameters": {"endpoint": "http://127.0.0.1:8700"}
+      }
+    ],
+    "routing": {
+      "primary": "clm-primary",
+      "fallbacks": [],
+      "confidence": {"enabled": true, "minimumAccepted": 0.8, "onLowConfidence": "indeterminate"},
+      "terminal": {"onIndeterminate": "failure", "onFailure": "failure"}
+    }
+  }
+}
