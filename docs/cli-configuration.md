@@ -92,7 +92,7 @@ exact digest envelope, ordering, and production boundary.
 
 ## Trust storage
 
-Approvals are scoped to the canonical project-directory path and exact snapshot
+Approvals are scoped to the symlink-resolved absolute project-directory path and exact snapshot
 digest under the user directory's `trust/` folder. Moving or copying a project
 requires new approval. Each grant uses a separate marker to avoid overwriting
 unrelated grants. New directories and files request owner-only permissions,
@@ -104,3 +104,38 @@ reference names, or secret values. Corrupt or symlinked markers fail closed;
 revoke and reapprove the digest to repair one. Trust storage is user-controlled
 and must never be populated from project files. It is not a defense against
 another process that already has write access to the user's configuration.
+
+Grant creation prepares, syncs and closes a private temporary file before
+atomically linking it to the approval name without replacing an existing entry.
+The trust filesystem must support same-directory hard links; otherwise granting
+trust fails closed. Interrupted preparation may leave an ignored
+`.pending-approval-*` file, never a partial approval. This is atomic visibility,
+not a guarantee of persistence across power loss. Concurrent revocation can
+invalidate an observed grant; trust storage is not an interprocess execution lease.
+
+Containment of user configuration and trust storage is checked using existing
+ancestor directory identities, including case aliases, not just path spelling.
+Symlinked project paths share approval with their resolved target. Other aliases
+(such as alternate casing or Windows short names) can still require a separate
+approval because the trust key retains the resolved absolute spelling. Native
+Windows junction/short-name behavior is not established by cross-compilation.
+
+All commands refuse a user-config directory nested inside the current project,
+including when invoked from a parent such as the home directory. There is no
+grant-listing or moved/deleted-project revocation command. A corrupt marker also
+blocks inspection with explicit overrides; inspection never repairs trust.
+
+## Development migration for the planned v0.1.0 release
+
+Existing complete approval markers and their keys remain valid. Published schemas,
+CLI flags and successful output shapes are unchanged. Granting trust now requires
+hard-link support; use an independent user-config location on a supporting
+filesystem if the command reports that requirement. Corrupt legacy markers still
+require explicit revocation and reapproval.
+
+A dangling intermediate directory symlink (for example `.antaeus` pointing at a
+missing directory) is now a configuration error rather than an absent project
+manifest that could select user configuration. Repair the link or remove the
+invalid configuration deliberately; the CLI does not silently choose a lower
+layer. User/trust storage reached through a case alias into the project is also
+rejected. No release is claimed by this migration note.

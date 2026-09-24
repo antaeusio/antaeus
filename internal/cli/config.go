@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"unicode/utf8"
 
 	"github.com/antaeusio/antaeus/evaluator/localbinding"
@@ -304,8 +303,25 @@ func readConfigFileWithin(path string, maxBytes int64, boundary string) ([]byte,
 	info, err := stat(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			if link, linkErr := lstat(path); linkErr == nil && link.Mode()&os.ModeSymlink != 0 {
-				return nil, errors.New("configuration contains a dangling symlink")
+			// ENOENT may come from an intermediate symlink, not the final
+			// component. Do not turn malformed higher-priority configuration
+			// into permission to use a lower-priority manifest.
+			for candidate := path; ; candidate = filepath.Dir(candidate) {
+				_, linkErr := lstat(candidate)
+				if linkErr == nil {
+					// Not all platforms label directory redirections as
+					// symlinks. Require every existing ancestor to resolve.
+					if _, targetErr := stat(candidate); targetErr != nil {
+						return nil, errors.New("configuration contains an unresolved path")
+					}
+					break
+				}
+				if !errors.Is(linkErr, os.ErrNotExist) {
+					return nil, linkErr
+				}
+				if filepath.Dir(candidate) == candidate {
+					break
+				}
 			}
 		}
 		return nil, err
@@ -345,8 +361,11 @@ func trustMarker(runtime configRuntime, digest string) (string, string, error) {
 	if err != nil {
 		return "", "", errors.New("cannot resolve independent user trust directory")
 	}
-	rel, err := filepath.Rel(project, storage)
-	if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel) {
+	inside, err := pathWithinDirectory(project, storage)
+	if err != nil {
+		return "", "", errors.New("cannot verify independent user trust directory")
+	}
+	if inside {
 		return "", "", errors.New("user trust directory must be outside the project")
 	}
 	key := sha256.Sum256([]byte(project + "\x00" + digest))
@@ -384,11 +403,39 @@ func independentUserConfig(runtime configRuntime) error {
 	if err != nil {
 		return errors.New("cannot resolve user configuration directory")
 	}
-	rel, err := filepath.Rel(project, user)
-	if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel) {
+	inside, err := pathWithinDirectory(project, user)
+	if err != nil {
+		return errors.New("cannot verify independent user configuration directory")
+	}
+	if inside {
 		return errors.New("user configuration directory must be outside the project")
 	}
 	return nil
+}
+
+// Paths have already had existing symlinks resolved. Compare filesystem
+// identities of existing ancestors, not spellings: casing and other aliases
+// can identify the same directory on supported filesystems. Missing suffixes
+// are permitted because trust/config directories may not have been created yet.
+func pathWithinDirectory(directory, path string) (bool, error) {
+	base, err := os.Stat(directory)
+	if err != nil {
+		return false, err
+	}
+	for {
+		info, err := os.Stat(path)
+		if err == nil && os.SameFile(base, info) {
+			return true, nil
+		}
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return false, err
+		}
+		parent := filepath.Dir(path)
+		if parent == path {
+			return false, nil
+		}
+		path = parent
+	}
 }
 
 func projectTrusted(runtime configRuntime, digest string) (bool, error) {
@@ -427,19 +474,31 @@ func changeProjectTrust(runtime configRuntime, digest string, grant bool) error 
 	if err = os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return errors.New("cannot create project trust directory")
 	}
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
-	if errors.Is(err, os.ErrExist) {
-		_, err = projectTrusted(runtime, digest)
-		return err
-	}
+	// Publish only a complete, closed marker. A same-directory hard link is
+	// atomic and does not replace an existing grant or symlink. Unsupported
+	// filesystems fail closed rather than reverting to partial publication.
+	f, err := os.CreateTemp(filepath.Dir(path), ".pending-approval-*")
 	if err != nil {
 		return errors.New("cannot create project trust marker")
 	}
+	defer os.Remove(f.Name())
 	_, writeErr := io.WriteString(f, marker)
+	syncErr := f.Sync()
 	closeErr := f.Close()
-	if writeErr != nil || closeErr != nil {
-		_ = os.Remove(path)
+	if writeErr != nil || syncErr != nil || closeErr != nil {
 		return errors.New("cannot save project trust; grant was not recorded")
+	}
+	if err := os.Link(f.Name(), path); errors.Is(err, os.ErrExist) {
+		trusted, err := projectTrusted(runtime, digest)
+		if err != nil {
+			return err
+		}
+		if !trusted {
+			return errors.New("project trust changed during grant; inspect and retry")
+		}
+		return nil
+	} else if err != nil {
+		return errors.New("cannot publish project trust; trust storage must support atomic hard links")
 	}
 	return nil
 }
