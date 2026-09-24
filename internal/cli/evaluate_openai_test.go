@@ -165,3 +165,40 @@ func TestConfigCheckUsesOpenAIAdapterDefault(t *testing.T) {
 		t.Fatalf("output %s lookups %v", output, lookups)
 	}
 }
+
+func TestEvaluateProfileOpenAIProjectProfileWithAdapterDefaultRequiresTrust(t *testing.T) {
+	var lookups []string
+	calls := 0
+	r := openAIRuntime(t, &lookups, &calls)
+	data, err := os.ReadFile(openAIProfilePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeConfigTestFile(t, filepath.Join(r.projectDir, "profile.json"), string(data))
+	writeConfigTestFile(t, filepath.Join(r.projectDir, ".antaeus", "config.json"), `{"apiVersion":"config.antaeus.io/v0alpha1","kind":"LocalConfiguration","profileFile":"../profile.json"}`)
+	digest := projectTestDigest(t, r)
+	if diagnostic := evaluateProfileCommand(t, r, 1, openAIArgs()); !strings.Contains(diagnostic, "config trust --digest "+digest) || calls != 0 || len(lookups) != 0 {
+		t.Fatalf("diagnostic %s lookups %v", diagnostic, lookups)
+	}
+	configCommand(t, r, 0, "trust", "--digest", digest)
+	evaluateProfileCommand(t, r, 0, openAIArgs())
+	if calls != 1 || len(lookups) != 1 {
+		t.Fatalf("calls %d lookups %v", calls, lookups)
+	}
+}
+
+func TestEvaluateProfileInvalidProjectOpenAIProfileIsNotReportedAsUninstalled(t *testing.T) {
+	var lookups []string
+	calls := 0
+	r := openAIRuntime(t, &lookups, &calls)
+	data, err := os.ReadFile(openAIProfilePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeConfigTestFile(t, filepath.Join(r.projectDir, "profile.json"), strings.Replace(string(data), openai.TemplateDigest, "sha256:"+strings.Repeat("0", 64), 1))
+	writeConfigTestFile(t, filepath.Join(r.projectDir, ".antaeus", "config.json"), `{"apiVersion":"config.antaeus.io/v0alpha1","kind":"LocalConfiguration","profileFile":"../profile.json"}`)
+	diagnostic := evaluateProfileCommand(t, r, 1, openAIArgs())
+	if !strings.Contains(diagnostic, "OpenAI profile is invalid") || strings.Contains(diagnostic, "config trust") || calls != 0 || len(lookups) != 0 {
+		t.Fatalf("diagnostic %s", diagnostic)
+	}
+}

@@ -57,7 +57,9 @@ evaluator using this adapter must declare:
 
 No other parameters are accepted. Mutable aliases such as `gpt-5.4-mini` are
 accepted for exploration, but the provider can change what they resolve to, so
-Decisions made with them are not exactly reproducible. The adapter does not
+Decisions made with them are not exactly reproducible. The adapter does not yet
+reject aliases: no publishing or enforcement path exists in this repository, and
+an embedder running enforcement must require dated snapshots itself. The adapter does not
 declare `confidence-scores`: it never asks the model to invent a numeric
 confidence, so confidence routing cannot use it.
 
@@ -101,8 +103,11 @@ Each attempt makes one `POST https://api.openai.com/v1/responses` request with:
   whose `status` is `matched`, `not_matched`, or `indeterminate`.
 
 The origin is fixed. Redirects are never followed, TLS certificates are
-verified (TLS 1.2 or newer), and standard HTTPS proxy environment variables are
-honored. Requests are limited to 4 MiB and responses to 1 MiB.
+verified (TLS 1.2 or newer), and the adapter uses its own transport: proxy
+environment variables such as `HTTPS_PROXY` and any process-wide
+`http.DefaultTransport` changes are ignored. Requests are limited to 4 MiB and
+responses to 1 MiB. The correlation ID is sent as `X-Client-Request-Id` only
+when it is a plain ASCII token of at most 128 characters.
 
 ## Result validation
 
@@ -119,6 +124,7 @@ identifiers. Raw provider bodies and messages are never recorded.
 | Condition | Adapter code | Retryable |
 | --- | --- | --- |
 | HTTP 401 or 403 | `openai.credential_rejected` | no |
+| Credential with whitespace or control characters (never trimmed) | `openai.credential_invalid` | no |
 | HTTP 400, 404, or 422 | `openai.request_rejected` | no |
 | HTTP 408, or the attempt deadline elapsed | `evaluator.timeout` | yes |
 | HTTP 429 | `evaluator.throttled` | yes |
@@ -128,8 +134,16 @@ identifiers. Raw provider bodies and messages are never recorded.
 | TLS verification failure | `openai.tls_failed` | no |
 | Refusal | `openai.refused` | no |
 | Incomplete response (for example, too few output tokens) | `openai.response_incomplete` | no |
-| Malformed response or schema violation | `openai.response_malformed` / `openai.output_invalid` | no |
+| Malformed response, a success status other than 200, or schema violation | `openai.response_malformed` / `openai.output_invalid` | no |
 | Response larger than 1 MiB | `openai.response_too_large` | no |
+
+These codes are the adapter's contract with the runner. The runner records
+only the three transient codes in Decisions and traces; every non-retryable
+adapter code above currently appears there as `evaluation.adapter_failed`, so a
+rejected key and malformed output look the same in a Decision. Use
+`antaeus config check` and the provider dashboard to diagnose credential
+problems. Carrying a safe adapter code in the trace is a possible future
+contract change.
 
 Retries happen only as the profile's retry policy allows (see
 [profile execution](./profile-execution.md#retry-and-routing-rules)); the
@@ -141,5 +155,7 @@ records every attempt, and the profile's attempt limit bounds the total.
 
 - A frozen-corpus accuracy, calibration, cost, or adversarial evaluation.
 - Recording provider rate-limit or retry-after metadata.
+- Adapter-specific failure codes in Decisions and traces (see above).
+- Rejecting mutable model aliases for enforcement.
 - Other providers. The adapter boundary is provider-neutral, so additional
   adapters plug into the same registry and profile contract.

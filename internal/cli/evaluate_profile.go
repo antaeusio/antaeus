@@ -226,6 +226,11 @@ func resolveExecutionProfile(runtime configRuntime, profilePath, bindingsPath st
 			return nil, profile.Artifact{}, unsupportedProfile, profileErr
 		}
 		if kind, classifyErr := classifyProfile(p); classifyErr != nil || kind != openAIProfile {
+			if classifyErr != nil && classifyErr != errAdapterNotInstalled {
+				// An installed adapter with invalid fields: report that without
+				// prompting for trust in a profile that cannot run.
+				return nil, profile.Artifact{}, unsupportedProfile, errors.New("project-selected OpenAI profile is invalid; validate it with --profile before trusting the project")
+			}
 			return nil, profile.Artifact{}, unsupportedProfile, errAdapterNotInstalled
 		}
 		trusted, trustErr := projectTrusted(runtime, trust.Digest)

@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"regexp"
 	"slices"
+	"time"
 
 	"github.com/antaeusio/antaeus/decision"
 	"github.com/antaeusio/antaeus/evaluator"
@@ -106,9 +107,21 @@ func registration(url string, client *http.Client) runner.Adapter {
 	}
 }
 
+// newHTTPClient builds an isolated transport. It deliberately ignores proxy
+// environment variables and any process-wide DefaultTransport customization:
+// the adapter takes no endpoint or routing behavior from ambient state.
 func newHTTPClient() *http.Client {
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
+	transport := &http.Transport{
+		Proxy:                 nil,
+		DialContext:           dialer.DialContext,
+		ForceAttemptHTTP2:     true,
+		TLSClientConfig:       &tls.Config{MinVersion: tls.VersionTLS12},
+		TLSHandshakeTimeout:   10 * time.Second,
+		IdleConnTimeout:       90 * time.Second,
+		MaxIdleConns:          4,
+		ExpectContinueTimeout: time.Second,
+	}
 	return &http.Client{
 		Transport: transport,
 		// Never follow redirects: authorization must not be forwarded and the
@@ -205,6 +218,13 @@ func (a *adapter) evaluate(ctx context.Context, request evaluator.Request, confi
 	if len(config.Credential) == 0 {
 		return evaluator.Result{}, failure("openai.credential_missing", false, "credential is not available")
 	}
+	// Values are passed unmodified (never trimmed); a credential that cannot
+	// form a valid header is a configuration error, not a provider outage.
+	for _, b := range config.Credential {
+		if b < 0x21 || b > 0x7e {
+			return evaluator.Result{}, failure("openai.credential_invalid", false, "credential contains characters that are not valid in a bearer token")
+		}
+	}
 	if err := request.Validate(); err != nil {
 		return evaluator.Result{}, failure("openai.request_invalid", false, err.Error())
 	}
@@ -221,7 +241,11 @@ func (a *adapter) evaluate(ctx context.Context, request evaluator.Request, confi
 	httpRequest.Header.Set("Content-Type", "application/json")
 	httpRequest.Header.Set("Accept", "application/json")
 	httpRequest.Header.Set("Authorization", "Bearer "+string(config.Credential))
-	httpRequest.Header.Set("X-Client-Request-Id", request.CorrelationID)
+	// Forward the correlation ID only when it is a plain token; never let an
+	// arbitrary caller string become an invalid or data-bearing header.
+	if requestIDPattern.MatchString(request.CorrelationID) {
+		httpRequest.Header.Set("X-Client-Request-Id", request.CorrelationID)
+	}
 
 	response, err := a.client.Do(httpRequest)
 	if err != nil {
@@ -231,6 +255,9 @@ func (a *adapter) evaluate(ctx context.Context, request evaluator.Request, confi
 	requestID := safeRequestID(response.Header.Get("X-Request-Id"))
 
 	if response.StatusCode != http.StatusOK {
+		if response.StatusCode >= 200 && response.StatusCode < 300 {
+			return evaluator.Result{}, failure("openai.response_malformed", false, "provider returned an unexpected success status")
+		}
 		return evaluator.Result{}, statusFailure(response)
 	}
 	payload, err := io.ReadAll(io.LimitReader(response.Body, MaxResponseBytes+1))
