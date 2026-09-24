@@ -20,11 +20,22 @@ if ! command -v shellcheck >/dev/null 2>&1; then
   exit 69
 fi
 
-shellcheck \
-  "$repo_root/scripts/with-build-lock" \
-  "$repo_root/scripts/build" \
-  "$repo_root/scripts/check" \
-  "$repo_root/scripts/cross-build"
+# Analyze every shell script in scripts/ (the .mjs helper is JavaScript).
+set --
+for script in "$repo_root"/scripts/*; do
+  case "$script" in
+    *.mjs) ;;
+    *) set -- "$@" "$script" ;;
+  esac
+done
+shellcheck "$@"
+
+# Uses temporary copies of the wrapper; never the repository lock. Also run
+# the wrapper under dash when available, as Ubuntu's /bin/sh.
+"$repo_root/scripts/test-build-lock"
+if command -v dash >/dev/null 2>&1; then
+  TEST_SHELL=dash dash "$repo_root/scripts/test-build-lock"
+fi
 
 # The single-quoted program intentionally expands $1 in the child shell.
 # shellcheck disable=SC2016
