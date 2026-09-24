@@ -30,12 +30,14 @@ Provider credentials, customer data, hosted-service implementation, billing, and
 
 ## Development status
 
-The Go module is `github.com/antaeusio/antaeus`. Development requires Go 1.26.0 or newer; Go 1.27.1 is the preferred toolchain. The current command exposes help and version information plus policy validation, deterministic local fixture evaluation, and portable offline regression suites; no semantic evaluator or release artifact exists yet.
+The Go module is `github.com/antaeusio/antaeus`. Development requires Go 1.26.0 or newer; Go 1.27.1 is the preferred toolchain. The current command exposes help and version information plus policy validation, deterministic local fixture evaluation, portable offline regression suites, and an experimental bring-your-own-key OpenAI semantic evaluator; no release artifact exists yet.
 
 Use [`evaluate-profile`](./docs/profile-execution.md#cli-fixture-profiles) to run
-the installed synthetic fixture through an explicitly selected evaluator profile,
-with configuration precedence and a bounded execution trace. Remote adapters are
-not installed, and this path reads no credentials.
+an explicitly selected evaluator profile, with configuration precedence and a
+bounded execution trace. Fixture profiles use the installed synthetic fixture and
+read no credentials. The experimental [OpenAI adapter](./docs/openai-adapter.md)
+performs real semantic evaluation with your own `OPENAI_API_KEY`; it sends policy
+conditions and input to OpenAI and is not yet validated for enforcement.
 
 For Go embedding and adapter authors, the [evaluator guide](./docs/evaluator-adapters.md)
 explains normalized evidence, registration and execution boundaries, with an

@@ -13,9 +13,11 @@ import (
 	"regexp"
 	"unicode/utf8"
 
+	"github.com/antaeusio/antaeus/adapters/openai"
 	"github.com/antaeusio/antaeus/evaluator/localbinding"
 	"github.com/antaeusio/antaeus/evaluator/localconfig"
 	"github.com/antaeusio/antaeus/evaluator/profile"
+	"github.com/antaeusio/antaeus/evaluator/runner"
 	"github.com/antaeusio/antaeus/internal/strictsource"
 )
 
@@ -43,6 +45,15 @@ type configRuntime struct {
 	projectDir  string
 	userDir     string
 	environment localbinding.Environment
+	// openAI replaces the installed OpenAI adapter in tests only.
+	openAI *runner.Adapter
+}
+
+func (r configRuntime) openAIAdapter() runner.Adapter {
+	if r.openAI != nil {
+		return *r.openAI
+	}
+	return openai.Registration()
 }
 
 func runConfig(args []string, stdout, stderr io.Writer) int {
@@ -58,7 +69,7 @@ func runConfig(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return commandError(stderr, "config", errors.New("cannot locate OS user-config directory"))
 	}
-	return runConfigWith(args, stdout, stderr, configRuntime{projectDir, filepath.Join(userDir, "antaeus"), localbinding.EnvironmentFunc(os.LookupEnv)})
+	return runConfigWith(args, stdout, stderr, configRuntime{projectDir: projectDir, userDir: filepath.Join(userDir, "antaeus"), environment: localbinding.EnvironmentFunc(os.LookupEnv)})
 }
 
 func runConfigWith(args []string, stdout, stderr io.Writer, runtime configRuntime) int {
@@ -127,7 +138,7 @@ func runConfigWith(args []string, stdout, stderr io.Writer, runtime configRuntim
 	if err != nil {
 		return commandError(stderr, "config trust store", err)
 	}
-	o := localconfig.Options{CLI: cli, Project: project, User: user}
+	o := localconfig.Options{CLI: cli, Project: project, User: user, Defaults: installedDefaults()}
 	if trusted {
 		o.TrustedProjectDigest = project.Digest()
 	}
