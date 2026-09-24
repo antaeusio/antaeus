@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- README with the brand lockup for light and dark themes, a worked marketplace-moderation example with real output, a "how it works" diagram, and a documentation index. The example inputs are in `examples/marketplace/`. `docs/assets/social-preview.png` is the repository's link-preview image.
+
 ## [0.1.0] - 2026-09-24
 
 First public release. Antaeus turns human-written policies into versioned,

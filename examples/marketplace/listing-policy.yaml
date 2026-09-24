@@ -1,0 +1,16 @@
+apiVersion: policy.antaeus.io/v0alpha1
+kind: Policy
+metadata:
+  name: marketplace-listing
+  description: Decide whether a marketplace listing can be published.
+spec:
+  defaultOutcome: review
+  rules:
+    - id: prohibited-item
+      description: Deny listings for items the marketplace does not allow.
+      when: The listing offers weapons, counterfeit goods, or prescription drugs.
+      outcome: deny
+    - id: complete-listing
+      description: Publish complete, ordinary listings automatically.
+      when: The listing clearly describes a legal item with its condition and price.
+      outcome: allow
