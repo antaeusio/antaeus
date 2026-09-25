@@ -23,9 +23,10 @@ Each release publishes:
 | macOS binary | amd64, arm64 | macOS 13 Ventura |
 | Linux binary | amd64, arm64 | Linux kernel 3.2 |
 | Windows binary | amd64 | Windows 10 or Windows Server 2016 |
+| Linux container | amd64, arm64 | OCI-compatible Linux runtime |
 
-Release binaries are pure Go and built with `CGO_ENABLED=0`, `GOAMD64=v1`, and `GOARM64=v8.0`. The same macOS and Linux archives back the Homebrew tap. A multi-architecture Linux container image is planned for a later release; when published it will include CA certificates and run as a numeric non-root user.
+Release binaries are pure Go and built with `CGO_ENABLED=0`, `GOAMD64=v1`, and `GOARM64=v8.0`. The same macOS and Linux archives back the Homebrew tap. The container image, `ghcr.io/antaeusio/antaeus`, packages the same Linux binaries on a digest-pinned distroless base that includes CA certificates, and runs as numeric user 65532 with `/work` as its working directory. It has no shell.
 
 Other Go targets may compile, but they are unsupported until Antaeus publishes native validation and release artifacts for them. WSL uses the Linux binary and is not a separate target.
 
-Release archives are cross-compiled on Linux and smoke-tested natively on Linux amd64. Other targets are compiled but not yet executed natively in the release workflow.
+Release archives are cross-compiled on Linux and smoke-tested natively on Linux amd64, as is the amd64 container image. Other targets are compiled but not yet executed natively in the release workflow.

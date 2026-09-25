@@ -97,9 +97,15 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write
+      packages: write
       id-token: write
       attestations: write
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: release
@@ -111,6 +117,61 @@ jobs:
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: release/${{ github.ref_name }}/antaeus_*
+      - name: Stage the attested Linux binaries for the container
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          mkdir -p .tmp/dist
+          for arch in amd64 arm64; do
+            dir=$(mktemp -d)
+            tar -xzf "release/$VERSION/antaeus_${VERSION#v}_linux_${arch}.tar.gz" -C "$dir"
+            cp "$dir/antaeus_${VERSION#v}_linux_${arch}/antaeus" ".tmp/dist/antaeus_linux_${arch}"
+          done
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Record the commit time for reproducible image metadata
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+      # Push by digest only. No tag is public until the image is smoke-tested
+      # and attested; floating tags move only after the release exists.
+      - name: Build and push the multi-architecture image by digest
+        id: image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          provenance: false
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            REVISION=${{ github.sha }}
+      - name: Smoke-test the published image
+        shell: bash
+        env:
+          VERSION: ${{ github.ref_name }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          platforms=$(docker buildx imagetools inspect "$IMAGE@$DIGEST" --format '{{range .Manifest.Manifests}}{{.Platform.OS}}/{{.Platform.Architecture}} {{end}}')
+          case "$platforms" in *linux/amd64*) ;; *) echo "missing linux/amd64: $platforms"; exit 1 ;; esac
+          case "$platforms" in *linux/arm64*) ;; *) echo "missing linux/arm64: $platforms"; exit 1 ;; esac
+          docker run --rm "$IMAGE@$DIGEST" version | grep -F "$VERSION"
+          docker run --rm -v "$PWD/contracts:/work/contracts:ro" "$IMAGE@$DIGEST" \
+            validate contracts/examples/v0alpha1/policy/vendor-onboarding.yaml
+          test "$(docker image inspect "$IMAGE@$DIGEST" --format '{{.Config.User}}')" = '65532:65532'
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.image.outputs.digest }}
+          push-to-registry: true
+      - name: Tag the verified image with its version
+        env:
+          VERSION: ${{ github.ref_name }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+        run: docker buildx imagetools create -t "$IMAGE:$VERSION" "$IMAGE@$DIGEST"
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -119,6 +180,33 @@ jobs:
         run: |
           prerelease=''
           case "$VERSION" in *-*) prerelease='--prerelease' ;; esac
+          # Re-runs after a later failure must not fail on an existing release.
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "release $VERSION already exists; leaving it unchanged"
+            exit 0
+          fi
           gh release create "$VERSION" "release/$VERSION"/* \
             --title "Antaeus $VERSION" --notes-file "release/$VERSION.notes.md" \
             --verify-tag $prerelease
+      - name: Move floating image tags
+        shell: bash
+        env:
+          VERSION: ${{ github.ref_name }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          case "$VERSION" in *-*) echo "pre-release: floating tags unchanged"; exit 0 ;; esac
+          newest=$(git ls-remote --tags --refs "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" 'v*' \
+            | sed 's#.*refs/tags/##' | grep -Ev -- '-' | sort -V | tail -n 1)
+          minor=$(printf '%s' "${VERSION#v}" | cut -d. -f1,2)
+          newest_in_minor=$(git ls-remote --tags --refs "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "v$minor.*" \
+            | sed 's#.*refs/tags/##' | grep -Ev -- '-' | sort -V | tail -n 1)
+          tags=''
+          [ "$newest_in_minor" = "$VERSION" ] && tags="$tags -t $IMAGE:$minor"
+          [ "$newest" = "$VERSION" ] && tags="$tags -t $IMAGE:latest"
+          if [ -z "$tags" ]; then
+            echo "$VERSION is not the newest release; floating tags unchanged"
+            exit 0
+          fi
+          # shellcheck disable=SC2086 # tags holds separate -t arguments
+          docker buildx imagetools create $tags "$IMAGE@$DIGEST"

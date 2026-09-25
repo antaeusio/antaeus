@@ -1,0 +1,4 @@
+# The image contains only the prebuilt Linux release binaries.
+*
+!.tmp/dist/antaeus_linux_amd64
+!.tmp/dist/antaeus_linux_arm64
