@@ -6,11 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-25
+
+Adds a second, self-hosted semantic evaluator and a container image. The
+experimental System One adapter runs policies against your own Contrastive
+Language Model (CLM) server and returns confidence scores, so low-confidence
+judgments can become an explicit `failure` for human review. The CLM model's
+quality on policy tasks has not been measured. Antaeus is also published as a
+small multi-architecture container image. Public Go APIs and CLI behavior may
+still change in minor releases before v1.0.0.
+
+Install with `brew install antaeusio/tap/antaeus` (or `brew upgrade antaeus`),
+`go install github.com/antaeusio/antaeus/cmd/antaeus@v0.2.0`,
+`docker pull ghcr.io/antaeusio/antaeus:0.2`, or an archive from this release.
+
 ### Added
 
-- Experimental System One semantic adapter `io.antaeus.systemone@0.1.0` for a self-hosted Contrastive Language Model (CLM) server. It asks one yes/no question per rule, returns confidence scores for confidence routing, requires `https` (or loopback `http`) endpoints, follows no redirects, and takes an optional `clm-api-key` credential (`CLM_API_KEY`). CLI `evaluate-profile` runs System One profiles and semantic profiles that combine it with the OpenAI adapter. Example profiles are in `examples/clm/`, and the [adapter guide](./docs/systemone-adapter.md) covers setup.
-- Remote adapters share one isolated transport and failure classification in `internal/remote`.
-- CLI `evaluate-profile` requires saved project trust for every semantic profile selected by project configuration, including credential-free System One profiles, because a profile decides where input is sent.
+- Container image `ghcr.io/antaeusio/antaeus` for linux/amd64 and linux/arm64, built on a digest-pinned distroless base with CA certificates, running as numeric user 65532 and with build-provenance attestations. Tags are `vX.Y.Z`, plus `X.Y` and `latest` for the newest stable release; pre-releases get only their own tag. `scripts/container-image` builds it locally.
+- Experimental System One semantic adapter `io.antaeus.systemone@0.1.0` for a self-hosted Contrastive Language Model (CLM) server. It asks one yes/no question per rule, returns confidence scores for confidence routing, requires `https` (or loopback `http`) endpoints, follows no redirects, and takes an optional `clm-api-key` credential (`CLM_API_KEY`). CLI `evaluate-profile` runs System One profiles and semantic profiles that combine it with the OpenAI adapter; any semantic profile selected by project configuration requires saved project trust, even without a credential, because the profile decides where input is sent. Example profiles are in `examples/clm/`, and the [adapter guide](./docs/systemone-adapter.md) covers setup.
 - README with the brand lockup for light and dark themes, a worked marketplace-moderation example with real output, a "how it works" diagram, and a documentation index. The example inputs are in `examples/marketplace/`. `docs/assets/social-preview.png` is the repository's link-preview image.
 
 ## [0.1.0] - 2026-09-24
@@ -66,5 +79,6 @@ carry GitHub build-provenance attestations
 - `scripts/with-build-lock` keeps the lock until an interrupted command's whole process group has stopped (escalating to KILL after a bounded wait), serializes stale-lock takeover, waits for owners that have not yet written metadata, and no longer treats another user's process as dead. `scripts/test-build-lock` covers these cases ([#42](https://github.com/antaeusio/antaeus/issues/42)).
 - `scripts/cross-build` pins `GOAMD64=v1` and `GOARM64=v8.0` instead of inheriting the caller's environment.
 
-[Unreleased]: https://github.com/antaeusio/antaeus/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/antaeusio/antaeus/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/antaeusio/antaeus/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/antaeusio/antaeus/releases/tag/v0.1.0

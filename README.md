@@ -42,9 +42,9 @@ outcomes deterministically and returns a typed Decision (`allow`, `review`,
 and every attempt.
 
 > [!NOTE]
-> Antaeus is early and pre-v1. [v0.1.0](https://github.com/antaeusio/antaeus/releases/tag/v0.1.0)
-> is the first release. The OpenAI evaluator is **experimental**: it has not
-> yet been measured for accuracy and is not suitable for enforcement on its own.
+> Antaeus is early and pre-v1; see the [releases](https://github.com/antaeusio/antaeus/releases).
+> The OpenAI and CLM evaluators are **experimental**: they have not yet been
+> measured for accuracy and are not suitable for enforcement on their own.
 
 ## Highlights
 
@@ -68,7 +68,16 @@ and every attempt.
 ```sh
 brew install antaeusio/tap/antaeus                            # macOS or Linux
 go install github.com/antaeusio/antaeus/cmd/antaeus@latest    # Go 1.26 or newer
+docker run --rm ghcr.io/antaeusio/antaeus version             # container
 ```
+
+The container runs as a non-root user with `/work` as its working directory;
+mount your files there, for example
+`docker run --rm -v "$PWD:/work" ghcr.io/antaeusio/antaeus validate policy.yaml`.
+Pass provider keys with `-e OPENAI_API_KEY` or `-e CLM_API_KEY`. User
+configuration and project trust live under the container user's home
+directory; to keep them between runs, mount a named volume there, for example
+`-v antaeus-home:/home/nonroot`.
 
 Prebuilt archives for macOS, Linux, and Windows are attached to every
 [release](https://github.com/antaeusio/antaeus/releases), with `SHA256SUMS`

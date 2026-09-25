@@ -108,3 +108,13 @@ jobs:
         run: |
           ANTAEUS_VERSION=v0.0.0-ci ANTAEUS_COMMIT=ci123 scripts/build
           test "$(.tmp/bin/antaeus version)" = 'antaeus v0.0.0-ci (ci123)'
+      - name: Container image builds and runs
+        if: matrix.go == '1.27.1'
+        env:
+          GOPROXY: 'off'
+          GOFLAGS: '-mod=readonly'
+        run: |
+          ANTAEUS_VERSION=v0.0.0-ci ANTAEUS_COMMIT=ci123 scripts/cross-build
+          docker build --build-arg VERSION=v0.0.0-ci --build-arg REVISION=ci123 -t antaeus:ci .
+          test "$(docker run --rm antaeus:ci version)" = 'antaeus v0.0.0-ci (ci123)'
+          test "$(docker image inspect antaeus:ci --format '{{.Config.User}}')" = '65532:65532'

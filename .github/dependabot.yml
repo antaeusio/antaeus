@@ -1,0 +1,7 @@
+version: 2
+updates:
+  # Keep the digest-pinned distroless base (and its CA certificates) current.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
