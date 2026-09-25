@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-25
+
+Adds a CPU-only semantic evaluator you can run yourself. The System One adapter
+gains provider `antaeus`, which works with the open-source
+[`antaeusio/nli-server`](https://github.com/antaeusio/nli-server) and reads its
+optional key from `ANTAEUS_API_KEY`. Its quality on policy tasks has not been
+measured, so use confidence gating and review before relying on it. Existing
+CLM profiles keep working unchanged. Go users who register the System One
+adapter themselves should read the migration note below. Public Go APIs and CLI
+behavior may still change in minor releases before v1.0.0.
+
+Install with `brew install antaeusio/tap/antaeus` (or `brew upgrade antaeus`),
+`go install github.com/antaeusio/antaeus/cmd/antaeus@v0.3.0`,
+`docker pull ghcr.io/antaeusio/antaeus:0.3`, or an archive from this release.
+
 ### Added
 
 - System One adapter `io.antaeus.systemone@0.2.0` with provider `antaeus` for Antaeus System One servers, such as the open-source CPU-only [`antaeusio/nli-server`](https://github.com/antaeusio/nli-server). It takes an optional `antaeus-api-key` credential (`ANTAEUS_API_KEY`), records the provider in Decisions, and also accepts `contrastive-lm`. `io.antaeus.systemone@0.1.0` stays installed and unchanged, so existing CLM profiles keep working. Example profile: `examples/antaeus/nli-server.json`.
@@ -87,6 +102,7 @@ carry GitHub build-provenance attestations
 - `scripts/with-build-lock` keeps the lock until an interrupted command's whole process group has stopped (escalating to KILL after a bounded wait), serializes stale-lock takeover, waits for owners that have not yet written metadata, and no longer treats another user's process as dead. `scripts/test-build-lock` covers these cases ([#42](https://github.com/antaeusio/antaeus/issues/42)).
 - `scripts/cross-build` pins `GOAMD64=v1` and `GOARM64=v8.0` instead of inheriting the caller's environment.
 
-[Unreleased]: https://github.com/antaeusio/antaeus/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/antaeusio/antaeus/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/antaeusio/antaeus/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/antaeusio/antaeus/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/antaeusio/antaeus/releases/tag/v0.1.0
