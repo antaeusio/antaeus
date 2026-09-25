@@ -6,9 +6,12 @@
 // probability into provider-neutral rule evidence with a confidence score.
 // Rule outcomes are never sent.
 //
-// Version 0.1.0 supports the self-hosted Contrastive Language Model (CLM)
-// reference server. Other System One providers are rejected until their wire
-// contracts are verified.
+// Version 0.2.0 supports two providers: Antaeus System One servers, such as a
+// self-hosted antaeusio/nli-server, and the self-hosted Contrastive Language
+// Model (CLM) reference server. Version 0.1.0, which supports CLM only, stays
+// installed so existing profiles keep working.
+// Other System One providers are rejected until their wire contracts are
+// verified.
 package systemone
 
 import (
@@ -36,10 +39,17 @@ import (
 
 const (
 	AdapterID      = "io.antaeus.systemone"
-	AdapterVersion = "0.1.0"
+	AdapterVersion = "0.2.0"
+	// LegacyAdapterVersion is the first version, which supports CLM only.
+	LegacyAdapterVersion = "0.1.0"
+	// ProviderAntaeus is an Antaeus System One server, such as a self-hosted
+	// antaeusio/nli-server.
+	ProviderAntaeus = "antaeus"
 	// ProviderCLM is the self-hosted Contrastive Language Model server.
 	ProviderCLM = "contrastive-lm"
-	// CredentialSlot is optional: a CLM server without an API key needs none.
+	// Credential slots are optional: a server without an API key needs none.
+	AntaeusCredentialSlot     = "antaeus-api-key"
+	AntaeusCredentialVariable = "ANTAEUS_API_KEY"
 	CredentialSlot            = "clm-api-key"
 	DefaultCredentialVariable = "CLM_API_KEY"
 
@@ -51,25 +61,47 @@ const (
 // Protocol is the provider-neutral protocol this adapter implements.
 var Protocol = profile.ComponentIdentity{ID: "io.antaeus.rule-match", Version: "v0alpha1"}
 
-// Identity is the exact installed adapter identity.
+// Identity is the current installed adapter identity.
 var Identity = profile.ComponentIdentity{ID: AdapterID, Version: AdapterVersion}
+
+// LegacyIdentity is the installed CLM-only 0.1.0 identity.
+var LegacyIdentity = profile.ComponentIdentity{ID: AdapterID, Version: LegacyAdapterVersion}
+
+// providerSlots maps each adapter version's providers to their credential slot.
+var providerSlots = map[string]map[string]string{
+	LegacyAdapterVersion: {ProviderCLM: CredentialSlot},
+	AdapterVersion:       {ProviderAntaeus: AntaeusCredentialSlot, ProviderCLM: CredentialSlot},
+}
 
 // Capabilities includes confidence-scores: every answer carries a probability.
 var Capabilities = []string{"json-input", "structured-rule-results", "confidence-scores"}
 
-// DefaultReferences returns the documented local credential default. It is
-// used only when a profile declares the optional credential slot.
+// DefaultReferences returns the documented local credential defaults of the
+// current version. A default is used only when a profile declares its slot.
 func DefaultReferences() map[string]localbinding.Reference {
+	return map[string]localbinding.Reference{
+		AntaeusCredentialSlot: {Source: "environment", Name: AntaeusCredentialVariable},
+		CredentialSlot:        {Source: "environment", Name: DefaultCredentialVariable},
+	}
+}
+
+// LegacyDefaultReferences returns the credential default of version 0.1.0.
+func LegacyDefaultReferences() map[string]localbinding.Reference {
 	return map[string]localbinding.Reference{CredentialSlot: {Source: "environment", Name: DefaultCredentialVariable}}
 }
 
-// Registration returns the installed adapter for runner.Registry.
+// Registration returns the current adapter for runner.Registry.
 func Registration() runner.Adapter {
-	return registration(remote.NewClient())
+	return registration(remote.NewClient(), AdapterVersion)
 }
 
-func registration(client *http.Client) runner.Adapter {
-	a := &adapter{client: client}
+// LegacyRegistration returns the CLM-only 0.1.0 adapter for runner.Registry.
+func LegacyRegistration() runner.Adapter {
+	return registration(remote.NewClient(), LegacyAdapterVersion)
+}
+
+func registration(client *http.Client, version string) runner.Adapter {
+	a := &adapter{client: client, version: version}
 	return runner.Adapter{
 		Mode:         profile.ModeSemantic,
 		Protocol:     Protocol,
@@ -81,8 +113,8 @@ func registration(client *http.Client) runner.Adapter {
 
 // Parameters is the closed adapter parameter object carried by the profile.
 type Parameters struct {
-	// Endpoint is the server's base URL, for example https://clm.internal.example
-	// or http://127.0.0.1:8700. The adapter appends /v1/systemone.
+	// Endpoint is the server's base URL, for example https://evaluator.internal.example
+	// or http://127.0.0.1:8080. The adapter appends /v1/systemone.
 	Endpoint string `json:"endpoint"`
 }
 
@@ -151,18 +183,26 @@ func loopback(host string) bool {
 
 var modelPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,255}$`)
 
-// ValidateEvaluator checks the profile fields this adapter requires. Run it
-// before accepting an evaluation so a misconfigured profile is rejected
-// rather than turned into a failure Decision.
+// ValidateEvaluator checks the profile fields this adapter requires, for
+// either installed version. Run it before accepting an evaluation so a
+// misconfigured profile is rejected rather than turned into a failure Decision.
 func ValidateEvaluator(e profile.Evaluator) error {
-	if e.Adapter != Identity || e.Mode != profile.ModeSemantic || e.Protocol != Protocol {
-		return errors.New("evaluator is not configured for " + AdapterID + "@" + AdapterVersion)
+	if (e.Adapter != Identity && e.Adapter != LegacyIdentity) || e.Mode != profile.ModeSemantic || e.Protocol != Protocol {
+		return errors.New("evaluator is not configured for " + AdapterID + "@" + AdapterVersion + " or @" + LegacyAdapterVersion)
 	}
-	if e.Provider == nil || *e.Provider != ProviderCLM {
-		return errors.New(`system one evaluators currently support only provider "` + ProviderCLM + `"`)
+	providers := providerSlots[e.Adapter.Version]
+	if e.Provider == nil {
+		return errors.New("system one evaluators require a provider")
+	}
+	slot, ok := providers[*e.Provider]
+	if !ok {
+		if e.Adapter.Version == LegacyAdapterVersion {
+			return errors.New(AdapterID + "@" + LegacyAdapterVersion + ` supports only provider "` + ProviderCLM + `"`)
+		}
+		return errors.New(`system one evaluators support only providers "` + ProviderAntaeus + `" and "` + ProviderCLM + `"`)
 	}
 	if e.Model == nil {
-		return errors.New("system one evaluators require an explicit model, for example clm-latest")
+		return errors.New("system one evaluators require an explicit model, the name the server serves")
 	}
 	if e.ModelRevision != nil {
 		return errors.New("system one evaluators do not support modelRevision")
@@ -170,8 +210,8 @@ func ValidateEvaluator(e profile.Evaluator) error {
 	if e.InstructionTemplate != nil {
 		return errors.New("system one evaluators send no instruction template; remove instructionTemplate")
 	}
-	if e.CredentialSlot != nil && *e.CredentialSlot != CredentialSlot {
-		return errors.New(`system one evaluators accept only credentialSlot "` + CredentialSlot + `"`)
+	if e.CredentialSlot != nil && *e.CredentialSlot != slot {
+		return errors.New(`provider "` + *e.Provider + `" accepts only credentialSlot "` + slot + `"`)
 	}
 	raw, err := json.Marshal(e.Parameters)
 	if err != nil {
@@ -182,7 +222,8 @@ func ValidateEvaluator(e profile.Evaluator) error {
 }
 
 type adapter struct {
-	client *http.Client
+	client  *http.Client
+	version string
 }
 
 func failure(code string, retryable bool, message string) error {
@@ -203,6 +244,9 @@ type requestBody struct {
 func (a *adapter) evaluate(ctx context.Context, request evaluator.Request, config runner.Configuration) (evaluator.Result, error) {
 	if err := ValidateEvaluator(config.Evaluator); err != nil {
 		return evaluator.Result{}, failure("systemone.configuration_invalid", false, err.Error())
+	}
+	if config.Evaluator.Adapter.Version != a.version {
+		return evaluator.Result{}, failure("systemone.configuration_invalid", false, "evaluator is not configured for "+AdapterID+"@"+a.version)
 	}
 	// Values are passed unmodified; a credential that cannot form a header is
 	// a configuration error, not a provider outage.
@@ -268,9 +312,9 @@ func (a *adapter) evaluate(ctx context.Context, request evaluator.Request, confi
 		RuleResults: results,
 		Metadata: evaluator.Metadata{
 			AdapterID:      AdapterID,
-			AdapterVersion: AdapterVersion,
+			AdapterVersion: a.version,
 			Mode:           evaluator.ModeSemantic,
-			Provider:       ProviderCLM,
+			Provider:       *config.Evaluator.Provider,
 			Model:          model,
 		},
 	}, nil

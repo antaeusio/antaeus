@@ -34,7 +34,7 @@ closed. Existing `evaluate` and `test` commands do not consume these manifests.
 Three adapters are installed, all using `io.antaeus.rule-match@v0alpha1`: the
 synthetic `io.antaeus.fixture@0.1.0` and the semantic
 [`io.antaeus.openai@0.1.0`](./openai-adapter.md) and
-[`io.antaeus.systemone@0.1.0`](./systemone-adapter.md). Fixture profiles use only
+[`io.antaeus.systemone@0.2.0`](./systemone-adapter.md) (with `0.1.0` still installed for existing CLM profiles). Fixture profiles use only
 the fixture adapter; semantic profiles may combine the two semantic adapters. Fixture profiles require `--fixture-set` and `--case`,
 must name the supplied fixture set's exact name and version, and the case must
 match the policy and canonical input identities. Semantic profiles reject those

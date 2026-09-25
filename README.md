@@ -55,10 +55,11 @@ and every attempt.
 - **Failure is a real outcome.** Timeouts, refusals, malformed model output,
   and unresolved rules become an explicit `failure`, never a silent `allow`.
 - **Provider-neutral.** Evaluators plug in behind one interface: a
-  credential-free deterministic fixture, OpenAI with your own key, and a
-  self-hosted open-weights [CLM](./docs/systemone-adapter.md) model that returns
-  confidence scores. Retries, deadlines, fallbacks, and traces live in a separate
-  evaluator profile.
+  credential-free deterministic fixture, OpenAI with your own key, and
+  [System One servers](./docs/systemone-adapter.md) you can run yourself (the
+  CPU-only Antaeus `nli-server` or a CLM model) that return confidence scores.
+  Retries, deadlines, fallbacks, and traces live in a separate evaluator
+  profile.
 - **Testable.** Named regression cases run offline and credential-free, so
   policy changes can be reviewed like code.
 - **Local-first.** A single Go binary with no account, service, or database.
@@ -74,7 +75,7 @@ docker run --rm ghcr.io/antaeusio/antaeus version             # container
 The container runs as a non-root user with `/work` as its working directory;
 mount your files there, for example
 `docker run --rm -v "$PWD:/work" ghcr.io/antaeusio/antaeus validate policy.yaml`.
-Pass provider keys with `-e OPENAI_API_KEY` or `-e CLM_API_KEY`. User
+Pass provider keys with `-e OPENAI_API_KEY`, `-e ANTAEUS_API_KEY`, or `-e CLM_API_KEY`. User
 configuration and project trust live under the container user's home
 directory; to keep them between runs, mount a named volume there, for example
 `-v antaeus-home:/home/nonroot`.
@@ -186,7 +187,7 @@ code.
 | [Writing policies](./docs/policy-authoring.md) | Policy fields, syntax, and digest identity |
 | [Reading a Decision](./docs/decisions.md) | Outcomes, failures, and fallback boundaries |
 | [OpenAI evaluator](./docs/openai-adapter.md) | Setup, request boundary, failures, and data handling |
-| [System One evaluator (CLM)](./docs/systemone-adapter.md) | Self-hosted CLM, confidence gating, and fallback profiles |
+| [System One evaluator](./docs/systemone-adapter.md) | Antaeus and CLM servers, confidence gating, and fallback profiles |
 | [Profile execution](./docs/profile-execution.md) | Retries, deadlines, routing, and traces |
 | [CLI configuration](./docs/cli-configuration.md) | Profile selection, credential bindings, and project trust |
 | [Evaluator adapters](./docs/evaluator-adapters.md) | Embedding in Go and writing an adapter |

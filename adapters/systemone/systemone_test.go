@@ -58,7 +58,21 @@ func serve(t *testing.T, handler http.HandlerFunc) (runner.Adapter, runner.Confi
 	t.Cleanup(server.Close)
 	entry := loadProfile(t, "confidence-gated.json").Spec.Evaluators[0]
 	entry.Parameters = map[string]any{"endpoint": server.URL}
-	return registration(remote.NewClient()), runner.Configuration{Evaluator: entry}
+	return registration(remote.NewClient(), entry.Adapter.Version), runner.Configuration{Evaluator: entry}
+}
+
+// serveAntaeus is serve for an adapter 0.2.0 evaluator with provider antaeus.
+func serveAntaeus(t *testing.T, handler http.HandlerFunc) (runner.Adapter, runner.Configuration) {
+	t.Helper()
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+	p, err := profile.LoadFile("../../examples/antaeus/nli-server.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := p.Spec.Evaluators[0]
+	entry.Parameters = map[string]any{"endpoint": server.URL}
+	return Registration(), runner.Configuration{Evaluator: entry}
 }
 
 func answers(pairs ...any) string {
@@ -84,11 +98,14 @@ func evaluationError(t *testing.T, err error) *evaluator.Error {
 }
 
 func TestExampleProfilesValidate(t *testing.T) {
-	for _, name := range []string{"confidence-gated.json", "openai-fallback.json"} {
-		p := loadProfile(t, name)
-		validators := profile.ParameterValidators{Identity: parameterValidator{}}
+	for _, name := range []string{"clm/confidence-gated.json", "clm/openai-fallback.json", "antaeus/nli-server.json"} {
+		p, err := profile.LoadFile("../../examples/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		validators := profile.ParameterValidators{Identity: parameterValidator{}, LegacyIdentity: parameterValidator{}}
 		for _, e := range p.Spec.Evaluators {
-			if e.Adapter == Identity {
+			if e.Adapter == Identity || e.Adapter == LegacyIdentity {
 				if err := ValidateEvaluator(e); err != nil {
 					t.Fatalf("%s: %v", name, err)
 				}
@@ -395,7 +412,7 @@ func pointProfile(t *testing.T, name, endpoint string) profile.Artifact {
 	t.Helper()
 	p := loadProfile(t, name)
 	for i := range p.Spec.Evaluators {
-		if p.Spec.Evaluators[i].Adapter == Identity {
+		if p.Spec.Evaluators[i].Adapter == LegacyIdentity {
 			p.Spec.Evaluators[i].Parameters = map[string]any{"endpoint": endpoint}
 		}
 	}
@@ -419,7 +436,7 @@ func TestRunnerConfidenceGating(t *testing.T) {
 				_, _ = io.WriteString(w, answers("prohibited-item", c.prohibited, "complete-listing", c.complete))
 			}))
 			defer server.Close()
-			d, err := runner.Run(context.Background(), runnerInput(t, pointProfile(t, "confidence-gated.json", server.URL)), runner.Registry{Identity: registration(remote.NewClient())})
+			d, err := runner.Run(context.Background(), runnerInput(t, pointProfile(t, "confidence-gated.json", server.URL)), runner.Registry{LegacyIdentity: registration(remote.NewClient(), LegacyAdapterVersion)})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -462,12 +479,131 @@ func TestRunnerFallsBackToSecondEvaluatorWhenServerIsDown(t *testing.T) {
 	}
 	defer credentials.Clear()
 	input.Credentials = credentials
-	d, err := runner.Run(context.Background(), input, runner.Registry{Identity: registration(remote.NewClient()), openaiIdentity: fallback})
+	d, err := runner.Run(context.Background(), input, runner.Registry{LegacyIdentity: registration(remote.NewClient(), LegacyAdapterVersion), openaiIdentity: fallback})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if d.Outcome != decision.OutcomeDeny || !d.Evaluator.Fallback || fallbackCalls.Load() != 1 || d.Evaluator.Provider != "openai" {
 		encoded, _ := json.Marshal(d)
 		t.Fatalf("unexpected decision %s", encoded)
+	}
+}
+
+func TestAntaeusProviderSendsKeyAndRecordsProvider(t *testing.T) {
+	var got string
+	var body map[string]any
+	adapter, config := serveAntaeus(t, func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Get("Authorization")
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		_, _ = io.WriteString(w, `{"model":"antaeus-local","answers":{"prohibited-item":{"type":"noul","noul":0.9},"complete-listing":{"type":"noul","noul":0.2}}}`)
+	})
+	config.Credential = []byte(testKey)
+	result, err := adapter.Evaluate(context.Background(), request(t), config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "Bearer "+testKey || body["model"] != "antaeus-local" {
+		t.Fatalf("authorization %q, model %v", got, body["model"])
+	}
+	want := evaluator.Metadata{AdapterID: AdapterID, AdapterVersion: "0.2.0", Mode: evaluator.ModeSemantic, Provider: ProviderAntaeus, Model: "antaeus-local"}
+	if result.Metadata != want {
+		t.Fatalf("metadata = %+v", result.Metadata)
+	}
+}
+
+func TestProvidersAndSlotsPerVersion(t *testing.T) {
+	str := func(v string) *string { return &v }
+	base := loadProfile(t, "confidence-gated.json").Spec.Evaluators[0]
+	cases := []struct {
+		name     string
+		version  string
+		provider *string
+		slot     *string
+		ok       bool
+	}{
+		{"legacy clm", LegacyAdapterVersion, str(ProviderCLM), str(CredentialSlot), true},
+		{"legacy antaeus", LegacyAdapterVersion, str(ProviderAntaeus), nil, false},
+		{"current clm", AdapterVersion, str(ProviderCLM), str(CredentialSlot), true},
+		{"current antaeus", AdapterVersion, str(ProviderAntaeus), str(AntaeusCredentialSlot), true},
+		{"antaeus without key", AdapterVersion, str(ProviderAntaeus), nil, true},
+		{"antaeus with clm slot", AdapterVersion, str(ProviderAntaeus), str(CredentialSlot), false},
+		{"clm with antaeus slot", AdapterVersion, str(ProviderCLM), str(AntaeusCredentialSlot), false},
+		{"unknown provider", AdapterVersion, str("typesafe"), nil, false},
+		{"unknown version", "9.9.9", str(ProviderAntaeus), nil, false},
+		{"missing provider", AdapterVersion, nil, nil, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			e := base
+			e.Adapter.Version = c.version
+			e.Provider = c.provider
+			e.CredentialSlot = c.slot
+			if err := ValidateEvaluator(e); (err == nil) != c.ok {
+				t.Fatalf("err = %v, want ok %v", err, c.ok)
+			}
+		})
+	}
+}
+
+func TestRegistrationRejectsTheOtherVersion(t *testing.T) {
+	var calls atomic.Int32
+	count := func(http.ResponseWriter, *http.Request) { calls.Add(1) }
+	_, current := serveAntaeus(t, count)
+	_, legacy := serve(t, count)
+	for name, run := range map[string]func() error{
+		"legacy adapter, 0.2.0 profile": func() error {
+			_, err := LegacyRegistration().Evaluate(context.Background(), request(t), current)
+			return err
+		},
+		"current adapter, 0.1.0 profile": func() error {
+			_, err := Registration().Evaluate(context.Background(), request(t), legacy)
+			return err
+		},
+	} {
+		if failure := evaluationError(t, run()); failure.Code != "systemone.configuration_invalid" {
+			t.Fatalf("%s: failure = %+v", name, failure)
+		}
+	}
+	if calls.Load() != 0 {
+		t.Fatalf("server called %d times", calls.Load())
+	}
+}
+
+func TestRunnerRecordsProviderAndVersion(t *testing.T) {
+	for _, c := range []struct {
+		provider, model string
+	}{{ProviderAntaeus, "antaeus-local"}, {ProviderCLM, "clm-latest"}} {
+		t.Run(c.provider, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Header.Get("Authorization") != "" {
+					t.Error("credential sent without a slot")
+				}
+				_, _ = fmt.Fprintf(w, `{"model":%q,"answers":{"prohibited-item":{"type":"noul","noul":0.95},"complete-listing":{"type":"noul","noul":0.05}}}`, c.model)
+			}))
+			t.Cleanup(server.Close)
+			p := pointProfile(t, "confidence-gated.json", server.URL)
+			e := &p.Spec.Evaluators[0]
+			e.Adapter = Identity
+			provider, model := c.provider, c.model
+			e.Provider, e.Model = &provider, &model
+			d, err := runner.Run(context.Background(), runnerInput(t, p), runner.Registry{Identity: Registration()})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if d.Evaluator == nil || d.Evaluator.AdapterVersion != AdapterVersion || d.Evaluator.Provider != c.provider || d.Evaluator.Model != c.model {
+				t.Fatalf("evaluator = %+v", d.Evaluator)
+			}
+		})
+	}
+}
+
+func TestDefaultReferences(t *testing.T) {
+	current := DefaultReferences()
+	if current[AntaeusCredentialSlot].Name != "ANTAEUS_API_KEY" || current[CredentialSlot].Name != "CLM_API_KEY" || len(current) != 2 {
+		t.Fatalf("current = %+v", current)
+	}
+	legacy := LegacyDefaultReferences()
+	if legacy[CredentialSlot].Name != "CLM_API_KEY" || len(legacy) != 1 {
+		t.Fatalf("legacy = %+v", legacy)
 	}
 }
