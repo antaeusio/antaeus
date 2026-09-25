@@ -73,7 +73,10 @@ jobs:
         run: |
           # Stop at the next version heading or the link definitions, and make
           # repository-relative links absolute for the release page.
-          awk -v v="${VERSION#v}" '
+          # Pre-releases (vX.Y.Z-rc.N) use the notes of the version they precede.
+          base="${VERSION#v}"
+          base="${base%%-*}"
+          awk -v v="$base" '
             $0 ~ "^## \\[" v "\\]" { found = 1; next }
             found && (/^## \[/ || /^\[[^]]+\]: /) { exit }
             found { print }
