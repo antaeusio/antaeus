@@ -208,13 +208,13 @@ func TestEvaluateProfileRunsSystemOneWithOpenAIFallback(t *testing.T) {
 	var lookups []string
 	calls := 0
 	r := openAIRuntime(t, &lookups, &calls)
-	clm := systemone.Registration()
+	clm := systemone.LegacyRegistration()
 	clmCalls := 0
 	clm.Evaluate = func(context.Context, evaluator.Request, runner.Configuration) (evaluator.Result, error) {
 		clmCalls++
 		return evaluator.Result{}, &evaluator.Error{Code: "evaluator.unavailable", Retryable: true}
 	}
-	r.systemOne = &clm
+	r.legacySystemOne = &clm
 	output := evaluateProfileCommand(t, r, 0, append(openAIArgs(), "--profile", filepath.Join("..", "..", "examples", "clm", "openai-fallback.json")))
 	var d decision.Decision
 	if err := json.Unmarshal([]byte(output), &d); err != nil {
@@ -229,7 +229,7 @@ func TestEvaluateProfileSystemOneNeedsNoCredential(t *testing.T) {
 	var lookups []string
 	calls := 0
 	r := openAIRuntime(t, &lookups, &calls)
-	clm := systemone.Registration()
+	clm := systemone.LegacyRegistration()
 	clm.Evaluate = func(_ context.Context, request evaluator.Request, config runner.Configuration) (evaluator.Result, error) {
 		if len(config.Credential) != 0 {
 			t.Error("credential passed to a profile without a credential slot")
@@ -239,9 +239,9 @@ func TestEvaluateProfileSystemOneNeedsNoCredential(t *testing.T) {
 			confidence := 0.95
 			results[i] = evaluator.RuleResult{RuleID: rule.ID, Status: decision.RuleNotMatched, Confidence: &confidence, ReasonCodes: []string{"systemone.not_matched"}}
 		}
-		return evaluator.Result{RuleResults: results, Metadata: evaluator.Metadata{AdapterID: systemone.AdapterID, AdapterVersion: systemone.AdapterVersion, Mode: evaluator.ModeSemantic, Provider: systemone.ProviderCLM, Model: "clm-latest"}}, nil
+		return evaluator.Result{RuleResults: results, Metadata: evaluator.Metadata{AdapterID: systemone.AdapterID, AdapterVersion: systemone.LegacyAdapterVersion, Mode: evaluator.ModeSemantic, Provider: systemone.ProviderCLM, Model: "clm-latest"}}, nil
 	}
-	r.systemOne = &clm
+	r.legacySystemOne = &clm
 	output := evaluateProfileCommand(t, r, 0, append(openAIArgs(), "--profile", filepath.Join("..", "..", "examples", "clm", "confidence-gated.json")))
 	if len(lookups) != 0 || !strings.Contains(output, `"provider":"contrastive-lm"`) {
 		t.Fatalf("lookups %v output %s", lookups, output)
@@ -252,7 +252,7 @@ func TestEvaluateProfileProjectSystemOneWithoutCredentialsRequiresTrust(t *testi
 	var lookups []string
 	calls := 0
 	r := openAIRuntime(t, &lookups, &calls)
-	clm := systemone.Registration()
+	clm := systemone.LegacyRegistration()
 	clmCalls := 0
 	clm.Evaluate = func(_ context.Context, request evaluator.Request, _ runner.Configuration) (evaluator.Result, error) {
 		clmCalls++
@@ -261,9 +261,9 @@ func TestEvaluateProfileProjectSystemOneWithoutCredentialsRequiresTrust(t *testi
 			confidence := 0.95
 			results[i] = evaluator.RuleResult{RuleID: rule.ID, Status: decision.RuleNotMatched, Confidence: &confidence, ReasonCodes: []string{"systemone.not_matched"}}
 		}
-		return evaluator.Result{RuleResults: results, Metadata: evaluator.Metadata{AdapterID: systemone.AdapterID, AdapterVersion: systemone.AdapterVersion, Mode: evaluator.ModeSemantic, Provider: systemone.ProviderCLM, Model: "clm-latest"}}, nil
+		return evaluator.Result{RuleResults: results, Metadata: evaluator.Metadata{AdapterID: systemone.AdapterID, AdapterVersion: systemone.LegacyAdapterVersion, Mode: evaluator.ModeSemantic, Provider: systemone.ProviderCLM, Model: "clm-latest"}}, nil
 	}
-	r.systemOne = &clm
+	r.legacySystemOne = &clm
 	data, err := os.ReadFile(filepath.Join("..", "..", "examples", "clm", "confidence-gated.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -286,5 +286,35 @@ func TestEvaluateProfileProjectSystemOneWithoutCredentialsRequiresTrust(t *testi
 	evaluateProfileCommand(t, r, 1, openAIArgs())
 	if clmCalls != 1 {
 		t.Fatal("revoked trust still evaluated")
+	}
+}
+
+func TestEvaluateProfileAntaeusProviderReadsAntaeusAPIKey(t *testing.T) {
+	var lookups []string
+	calls := 0
+	r := openAIRuntime(t, &lookups, &calls)
+	r.environment = localbinding.EnvironmentFunc(func(name string) (string, bool) {
+		lookups = append(lookups, name)
+		if name == systemone.AntaeusCredentialVariable {
+			return "antaeus-test-key", true
+		}
+		return "", false
+	})
+	current := systemone.Registration()
+	current.Evaluate = func(_ context.Context, request evaluator.Request, config runner.Configuration) (evaluator.Result, error) {
+		if string(config.Credential) != "antaeus-test-key" {
+			t.Errorf("credential %q", config.Credential)
+		}
+		results := make([]evaluator.RuleResult, len(request.Rules))
+		for i, rule := range request.Rules {
+			confidence := 0.95
+			results[i] = evaluator.RuleResult{RuleID: rule.ID, Status: decision.RuleNotMatched, Confidence: &confidence, ReasonCodes: []string{"systemone.not_matched"}}
+		}
+		return evaluator.Result{RuleResults: results, Metadata: evaluator.Metadata{AdapterID: systemone.AdapterID, AdapterVersion: systemone.AdapterVersion, Mode: evaluator.ModeSemantic, Provider: systemone.ProviderAntaeus, Model: "antaeus-local"}}, nil
+	}
+	r.systemOne = &current
+	output := evaluateProfileCommand(t, r, 0, append(openAIArgs(), "--profile", filepath.Join("..", "..", "examples", "antaeus", "nli-server.json")))
+	if len(lookups) != 1 || lookups[0] != systemone.AntaeusCredentialVariable || !strings.Contains(output, `"provider":"antaeus"`) || !strings.Contains(output, `"adapterVersion":"0.2.0"`) {
+		t.Fatalf("lookups %v output %s", lookups, output)
 	}
 }

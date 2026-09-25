@@ -29,7 +29,7 @@ network requests, and semantic evaluation remain separate execution requirements
 The installed OpenAI adapter provides a default reference for its
 `openai-api-key` slot (the `OPENAI_API_KEY` variable, see
 [the adapter guide](./openai-adapter.md)), and the System One adapter for its
-optional `clm-api-key` slot (`CLM_API_KEY`, see [its guide](./systemone-adapter.md)); other credentialed profiles need
+optional `antaeus-api-key` (`ANTAEUS_API_KEY`) and `clm-api-key` (`CLM_API_KEY`) slots (see [its guide](./systemone-adapter.md)); other credentialed profiles need
 explicit reference bindings, which also override the default. Missing credentials include remediation guidance
 without exposing names or values. An unset winning reference does not fall back
 to a lower-priority source.

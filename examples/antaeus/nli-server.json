@@ -1,0 +1,33 @@
+{
+  "apiVersion": "evaluator.antaeus.io/v0alpha1",
+  "kind": "EvaluatorProfile",
+  "metadata": {
+    "name": "antaeus-nli-server-confidence-gated",
+    "description": "Experimental Antaeus System One evaluator on a local antaeusio/nli-server started with NLI_MODEL_NAME=antaeus-local and NLI_API_KEY set to the same value as ANTAEUS_API_KEY. Rules answered with less than 0.8 confidence become indeterminate, so the Decision is failure unless a matched deny applies."
+  },
+  "spec": {
+    "totalTimeoutMs": 30000,
+    "credentialSlots": [{"name": "antaeus-api-key"}],
+    "evaluators": [
+      {
+        "id": "antaeus-primary",
+        "mode": "semantic",
+        "adapter": {"id": "io.antaeus.systemone", "version": "0.2.0"},
+        "protocol": {"id": "io.antaeus.rule-match", "version": "v0alpha1"},
+        "requiredCapabilities": ["json-input", "structured-rule-results", "confidence-scores"],
+        "timeoutMs": 20000,
+        "retry": {"maxAttempts": 2, "retryOn": ["timeout", "unavailable"], "initialBackoffMs": 500, "maxBackoffMs": 2000, "multiplier": 2},
+        "provider": "antaeus",
+        "model": "antaeus-local",
+        "credentialSlot": "antaeus-api-key",
+        "parameters": {"endpoint": "http://127.0.0.1:8080"}
+      }
+    ],
+    "routing": {
+      "primary": "antaeus-primary",
+      "fallbacks": [],
+      "confidence": {"enabled": true, "minimumAccepted": 0.8, "onLowConfidence": "indeterminate"},
+      "terminal": {"onIndeterminate": "failure", "onFailure": "failure"}
+    }
+  }
+}

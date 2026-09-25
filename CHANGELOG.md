@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- System One adapter `io.antaeus.systemone@0.2.0` with provider `antaeus` for Antaeus System One servers, such as the open-source CPU-only [`antaeusio/nli-server`](https://github.com/antaeusio/nli-server). It takes an optional `antaeus-api-key` credential (`ANTAEUS_API_KEY`), records the provider in Decisions, and also accepts `contrastive-lm`. `io.antaeus.systemone@0.1.0` stays installed and unchanged, so existing CLM profiles keep working. Example profile: `examples/antaeus/nli-server.json`.
+
+### Changed
+
+- Go API: `systemone.AdapterVersion`, `Identity`, `Registration`, and `DefaultReferences` now refer to version 0.2.0. To keep running 0.1.0 profiles in your own registry, also register `systemone.LegacyIdentity: systemone.LegacyRegistration()` and use `systemone.LegacyDefaultReferences()` for that identity. The CLI installs both versions.
+
 ## [0.2.0] - 2026-09-25
 
 Adds a second, self-hosted semantic evaluator and a container image. The
