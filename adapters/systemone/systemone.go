@@ -338,14 +338,13 @@ func (a *adapter) evaluate(ctx context.Context, request evaluator.Request, confi
 		return evaluator.Result{}, remote.TransportFailure(ctx, err, "systemone")
 	}
 	defer func() { _ = response.Body.Close() }()
-	// Versions before 0.3.0 keep their original status handling and metadata.
-	current := a.version == AdapterVersion
+	signals := reportsProviderSignals(a.version)
 	if response.StatusCode != http.StatusOK {
 		if response.StatusCode >= 200 && response.StatusCode < 300 {
 			return evaluator.Result{}, failure("systemone.response_malformed", false, "provider returned an unexpected success status")
 		}
-		err := statusFailure(response.StatusCode, current)
-		if failure, ok := err.(*evaluator.Error); ok && current && failure.Retryable {
+		err := statusFailure(response.StatusCode, signals)
+		if failure, ok := err.(*evaluator.Error); ok && signals && failure.Retryable {
 			failure.RetryAfter = retryAfter(response.Header, a.now())
 		}
 		return evaluator.Result{}, err
@@ -362,7 +361,7 @@ func (a *adapter) evaluate(ctx context.Context, request evaluator.Request, confi
 		return evaluator.Result{}, err
 	}
 	var requestID string
-	if current {
+	if signals {
 		requestID = safeRequestID(response.Header.Get("X-Request-Id"))
 	}
 	return evaluator.Result{
@@ -504,9 +503,17 @@ func retryAfter(header http.Header, now time.Time) time.Duration {
 	return 0
 }
 
-// statusFailure classifies a non-success HTTP status. current enables the
+// reportsProviderSignals reports whether a version maps HTTP 529, carries
+// provider Retry-After waits, and records request IDs. Versions 0.1.0 and
+// 0.2.0 predate these behaviors and keep their original handling; 0.3.0 and
+// every later version keep them.
+func reportsProviderSignals(version string) bool {
+	return version != LegacyAdapterVersion && version != PreviousAdapterVersion
+}
+
+// statusFailure classifies a non-success HTTP status. signals enables the
 // 0.3.0 mapping of HTTP 529 (overloaded) to a retryable unavailable failure.
-func statusFailure(status int, current bool) error {
+func statusFailure(status int, signals bool) error {
 	switch {
 	case status == http.StatusUnauthorized || status == http.StatusForbidden:
 		return failure("systemone.credential_rejected", false, fmt.Sprintf("provider rejected the credential (HTTP %d)", status))
@@ -516,7 +523,7 @@ func statusFailure(status int, current bool) error {
 		return failure("evaluator.throttled", true, "provider rate limit reached (HTTP 429)")
 	case status == http.StatusBadRequest || status == http.StatusNotFound || status == http.StatusUnprocessableEntity:
 		return failure("systemone.request_rejected", false, fmt.Sprintf("provider rejected the request (HTTP %d)", status))
-	case status == http.StatusInternalServerError || status == http.StatusBadGateway || status == http.StatusServiceUnavailable || status == http.StatusGatewayTimeout || (current && status == statusOverloaded):
+	case status == http.StatusInternalServerError || status == http.StatusBadGateway || status == http.StatusServiceUnavailable || status == http.StatusGatewayTimeout || (signals && status == statusOverloaded):
 		return failure("evaluator.unavailable", true, fmt.Sprintf("provider is unavailable (HTTP %d)", status))
 	}
 	return failure("systemone.unexpected_status", false, fmt.Sprintf("provider returned unexpected HTTP %d", status))

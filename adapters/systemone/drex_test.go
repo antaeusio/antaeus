@@ -58,7 +58,9 @@ func serveDrex(t *testing.T, handler http.HandlerFunc) (runner.Adapter, runner.C
 		r.URL.Host = local.Host
 		return transport.RoundTrip(r)
 	})
-	return registration(client, AdapterVersion), runner.Configuration{Evaluator: drexProfile(t).Spec.Evaluators[0], Credential: []byte(drexTestKey)}
+	// Pinned to 0.3.0 so these tests keep covering that installed version
+	// after AdapterVersion moves on.
+	return registration(client, "0.3.0"), runner.Configuration{Evaluator: drexProfile(t).Spec.Evaluators[0], Credential: []byte(drexTestKey)}
 }
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -96,7 +98,7 @@ func TestDrexCapturedSuccess(t *testing.T) {
 	if r.Status != decision.RuleMatched || *r.Confidence != 0.9037 {
 		t.Fatalf("result = %+v", r)
 	}
-	want := evaluator.Metadata{AdapterID: AdapterID, AdapterVersion: AdapterVersion, Mode: evaluator.ModeSemantic, Provider: ProviderDrex, Model: "drex-latest", RequestID: "req_00000000000000000000000000000001"}
+	want := evaluator.Metadata{AdapterID: AdapterID, AdapterVersion: "0.3.0", Mode: evaluator.ModeSemantic, Provider: ProviderDrex, Model: "drex-latest", RequestID: "req_00000000000000000000000000000001"}
 	if result.Metadata != want {
 		t.Fatalf("metadata = %+v", result.Metadata)
 	}
@@ -263,5 +265,13 @@ func TestPreviousVersionKeepsStatusHandling(t *testing.T) {
 	result, err := adapter.Evaluate(context.Background(), request(t), config)
 	if err != nil || result.Metadata.RequestID != "" {
 		t.Fatalf("err = %v, metadata = %+v", err, result.Metadata)
+	}
+}
+
+func TestProviderSignalsPerVersion(t *testing.T) {
+	for version, want := range map[string]bool{"0.1.0": false, "0.2.0": false, "0.3.0": true, "0.4.0": true} {
+		if got := reportsProviderSignals(version); got != want {
+			t.Fatalf("reportsProviderSignals(%q) = %v, want %v", version, got, want)
+		}
 	}
 }
