@@ -1,0 +1,131 @@
+{
+  "policy": "apiVersion: policy.antaeus.io/v0alpha1\nkind: Policy\nmetadata:\n  name: parity-listing\n  description: Shared native and WebAssembly parity policy.\nspec:\n  defaultOutcome: allow\n  rules:\n    - id: prohibited-item\n      description: Deny prohibited items.\n      when: The listing offers weapons, counterfeit goods, or prescription drugs.\n      outcome: deny\n    - id: needs-review\n      description: Review listings that mention bulk quantities.\n      when: The listing offers items in bulk quantities.\n      outcome: review\n    - id: complete-listing\n      description: Allow complete listings.\n      when: The item is described in detail, including its condition.\n      outcome: allow\n",
+  "profile": {
+    "apiVersion": "evaluator.antaeus.io/v0alpha1",
+    "kind": "EvaluatorProfile",
+    "metadata": {
+      "name": "parity-profile",
+      "description": "Shared native and WebAssembly parity profile."
+    },
+    "spec": {
+      "totalTimeoutMs": 5000,
+      "credentialSlots": [],
+      "evaluators": [
+        {
+          "id": "primary",
+          "mode": "semantic",
+          "adapter": {
+            "id": "io.antaeus.systemone",
+            "version": "0.3.0"
+          },
+          "protocol": {
+            "id": "io.antaeus.rule-match",
+            "version": "v0alpha1"
+          },
+          "requiredCapabilities": [
+            "json-input",
+            "structured-rule-results",
+            "confidence-scores"
+          ],
+          "timeoutMs": 4000,
+          "retry": {
+            "maxAttempts": 1,
+            "retryOn": []
+          },
+          "provider": "antaeus",
+          "model": "parity-model",
+          "parameters": {
+            "endpoint": "ENDPOINT"
+          }
+        }
+      ],
+      "routing": {
+        "primary": "primary",
+        "fallbacks": [],
+        "confidence": {
+          "enabled": true,
+          "minimumAccepted": 0.7,
+          "onLowConfidence": "indeterminate"
+        },
+        "terminal": {
+          "onIndeterminate": "failure",
+          "onFailure": "failure"
+        }
+      }
+    }
+  },
+  "input": {
+    "title": "Parity listing"
+  },
+  "correlationId": "parity",
+  "cases": [
+    {
+      "name": "conflicting deny and allow",
+      "status": 200,
+      "answers": {
+        "prohibited-item": 0.95,
+        "needs-review": 0.1,
+        "complete-listing": 0.9
+      }
+    },
+    {
+      "name": "matched review only",
+      "status": 200,
+      "answers": {
+        "prohibited-item": 0.05,
+        "needs-review": 0.9,
+        "complete-listing": 0.2
+      }
+    },
+    {
+      "name": "matched review and allow",
+      "status": 200,
+      "answers": {
+        "prohibited-item": 0.05,
+        "needs-review": 0.9,
+        "complete-listing": 0.9
+      }
+    },
+    {
+      "name": "confidence at threshold",
+      "status": 200,
+      "answers": {
+        "prohibited-item": 0.3,
+        "needs-review": 0.3,
+        "complete-listing": 0.7
+      }
+    },
+    {
+      "name": "confidence below threshold",
+      "status": 200,
+      "answers": {
+        "prohibited-item": 0.31,
+        "needs-review": 0.1,
+        "complete-listing": 0.9
+      }
+    },
+    {
+      "name": "undecided probability",
+      "status": 200,
+      "answers": {
+        "prohibited-item": 0.5,
+        "needs-review": 0.1,
+        "complete-listing": 0.9
+      }
+    },
+    {
+      "name": "nothing matched uses default",
+      "status": 200,
+      "answers": {
+        "prohibited-item": 0.05,
+        "needs-review": 0.05,
+        "complete-listing": 0.05
+      }
+    },
+    {
+      "name": "provider unavailable",
+      "status": 503,
+      "answers": null
+    }
+  ]
+}

@@ -24,3 +24,6 @@ for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64; d
     ANTAEUS_OUTPUT="$dist_dir/antaeus_${goos}_${goarch}${suffix}" \
     "$repo_root/scripts/build"
 done
+
+echo "cross-build: js/wasm"
+"$repo_root/scripts/build-wasm"

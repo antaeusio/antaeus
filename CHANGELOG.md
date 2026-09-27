@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Experimental WebAssembly build of the engine for JavaScript hosts such as Cloudflare Workers, browsers, and Node.js: `antaeus_<version>_js_wasm.tar.gz` in each release, built with `scripts/build-wasm`. `start()` from its `antaeus.mjs` returns JSON `validate` and `evaluate` calls (interface version 1) that take credentials and an optional absolute deadline per call and return the same Decisions as the CLI. Each call runs in a fresh engine instance entered only from its own request's context, which keeps Cloudflare Workers from cancelling one request's timers and I/O on behalf of another; concurrent instances are capped, waiting calls are bounded (`host.busy` beyond 16 calls or 16 MiB) and settle at their own deadline. Remote evaluators use the host's `fetch` without following redirects and stream response bodies; unexpected host values become provider failures rather than stopping the engine. See `docs/webassembly.md`.
+
 ## [0.4.0] - 2026-09-27
 
 Adds the hosted [Drex](https://drex.nace.ai) API by Nace.AI as a System One

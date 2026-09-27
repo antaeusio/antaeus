@@ -189,6 +189,7 @@ code.
 | [Reading a Decision](./docs/decisions.md) | Outcomes, failures, and fallback boundaries |
 | [OpenAI evaluator](./docs/openai-adapter.md) | Setup, request boundary, failures, and data handling |
 | [System One evaluator](./docs/systemone-adapter.md) | Antaeus, CLM, and Drex providers, confidence gating, and fallback profiles |
+| [WebAssembly engine](./docs/webassembly.md) | Running the engine in Cloudflare Workers, browsers, and Node.js |
 | [Profile execution](./docs/profile-execution.md) | Retries, deadlines, routing, and traces |
 | [CLI configuration](./docs/cli-configuration.md) | Profile selection, credential bindings, and project trust |
 | [Evaluator adapters](./docs/evaluator-adapters.md) | Embedding in Go and writing an adapter |

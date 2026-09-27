@@ -171,6 +171,52 @@ while read -r event id; do
 done <"$log"
 [ "$(grep -c start "$log")" -eq 4 ] || fail "race: not every waiter ran"
 
+# 7. scripts/build-wasm leaves existing output alone until it holds the lock,
+# and stages its files under that lock. A stub compiler and a fake go stand in
+# for the toolchain.
+new_root wasm
+cp "$script_dir/build-wasm" "$root/scripts/build-wasm"
+mkdir -p "$root/cmd/antaeus-wasm"
+printf 'export {};' >"$root/cmd/antaeus-wasm/antaeus.mjs"
+cat >"$root/scripts/build" <<'STUB'
+#!/bin/sh
+set -eu
+printf 'wasm' >"$ANTAEUS_OUTPUT"
+STUB
+chmod +x "$root/scripts/build" "$root/scripts/build-wasm"
+fake="$root/fakebin"
+mkdir -p "$fake" "$root/goroot/lib/wasm"
+printf 'loader' >"$root/goroot/lib/wasm/wasm_exec.js"
+printf 'license' >"$root/goroot/LICENSE"
+cat >"$fake/go" <<STUB
+#!/bin/sh
+[ "\$*" = "env GOROOT" ] && echo "$root/goroot"
+STUB
+chmod +x "$fake/go"
+out="$root/.tmp/dist/antaeus_js_wasm"
+mkdir -p "$out"
+touch "$out/previous"
+ready="$root/holder-ready"
+"$root/scripts/with-build-lock" sh -c 'touch "$1"; sleep 2' sh "$ready" &
+holder=$!
+wait_for "$ready" || fail "wasm: lock holder did not start"
+PATH="$fake:$PATH" ANTAEUS_BUILD_LOCK_POLL_SECONDS=1 "$test_shell" "$root/scripts/build-wasm" >/dev/null 2>&1 &
+builder=$!
+sleep 1
+[ -e "$out/previous" ] || fail "wasm: output was deleted before the lock was acquired"
+[ ! -e "$out/antaeus.wasm" ] || fail "wasm: output was written before the lock was acquired"
+wait "$holder"
+wait "$builder" || fail "wasm: build-wasm failed after acquiring the lock"
+[ ! -e "$out/previous" ] || fail "wasm: stale output was kept"
+for file in antaeus.wasm wasm_exec.js antaeus.mjs LICENSE-go; do
+  [ -s "$out/$file" ] || fail "wasm: $file was not staged"
+done
+[ ! -d "$lock" ] || fail "wasm: lock was not released"
+if ANTAEUS_WASM_DIR="$root" PATH="$fake:$PATH" "$test_shell" "$root/scripts/build-wasm" >/dev/null 2>&1; then
+  fail "wasm: an output directory outside .tmp was accepted"
+fi
+[ -e "$root/scripts/build-wasm" ] || fail "wasm: a rejected output directory was deleted"
+
 if [ "$failures" -ne 0 ]; then
   echo "test-build-lock: $failures failure(s)" >&2
   exit 1

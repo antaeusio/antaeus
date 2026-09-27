@@ -7,6 +7,7 @@ repo_root=$(CDPATH='' cd -- "$script_dir/.." && pwd)
 output=${ANTAEUS_OUTPUT:-$repo_root/.tmp/bin/antaeus}
 version=${ANTAEUS_VERSION:-dev}
 commit=${ANTAEUS_COMMIT:-}
+package=${ANTAEUS_PACKAGE:-./cmd/antaeus}
 
 case "$output" in
   /*) ;;
@@ -28,6 +29,14 @@ if [ -z "$commit" ]; then
 fi
 commit=${commit:-unknown}
 
+case "$package" in
+  ./cmd/antaeus|./cmd/antaeus-wasm) ;;
+  *)
+    echo "build: ANTAEUS_PACKAGE must be ./cmd/antaeus or ./cmd/antaeus-wasm" >&2
+    exit 64
+    ;;
+esac
+
 case "$commit" in
   *[!A-Za-z0-9._+-]*)
     echo "build: ANTAEUS_COMMIT contains unsupported characters" >&2
@@ -41,4 +50,4 @@ ldflags="-X github.com/antaeusio/antaeus/internal/buildinfo.version=$version -X 
 
 cd "$repo_root"
 CGO_ENABLED=0 exec "$repo_root/scripts/with-build-lock" \
-  go build -trimpath -buildvcs=false -ldflags "$ldflags" -o "$output" ./cmd/antaeus
+  go build -trimpath -buildvcs=false -ldflags "$ldflags" -o "$output" "$package"
