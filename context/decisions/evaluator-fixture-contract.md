@@ -35,7 +35,11 @@ This single-attempt runner returns configuration, adapter, cancellation, and
 deadline errors to its caller. The separate `evaluator/runner` profile router owns retries
 and conversion of exhausted accepted evaluations into failed rule evidence and
 a typed failure Decision; transports must not invent a policy judgment from an
-error. Evaluator implementations must honor context cancellation and return
+error. Adapters report a provider-required wait, such as `Retry-After`, as
+`evaluator.Error.RetryAfter` rather than sleeping or retrying themselves. The
+router treats it as a floor on the jittered, capped backoff and skips any retry
+that cannot start before the total deadline, preserving the transient failure
+for an eligible fallback. Evaluator implementations must honor context cancellation and return
 promptly when the context is done; the runner remains synchronous and does not
 detach adapter goroutines.
 

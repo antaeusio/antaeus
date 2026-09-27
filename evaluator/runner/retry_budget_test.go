@@ -124,3 +124,84 @@ func TestFutileEscalationRetryPreservesSubsetAndPrimaryDeny(t *testing.T) {
 		t.Fatalf("ids=%v delays=%v decision=%+v trace=%+v", ids, clock.delays, d, trace)
 	}
 }
+
+func TestProviderRetryDelayIsAFloor(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		totalMS    int
+		retryAfter time.Duration
+		fallback   bool
+		cancel     bool
+		wantIDs    []string
+		terminal   string
+		delays     []time.Duration
+	}{
+		// Jitter halves the 100ms backoff; the provider delay still wins.
+		{"longer than jittered backoff", 2000, 500 * time.Millisecond, true, false, []string{"semantic-primary", "semantic-primary"}, "completed", []time.Duration{500 * time.Millisecond}},
+		// The profile caps backoff at 1s; the provider delay is not capped.
+		{"longer than backoff cap", 10000, 5 * time.Second, true, false, []string{"semantic-primary", "semantic-primary"}, "completed", []time.Duration{5 * time.Second}},
+		{"shorter than backoff", 2000, time.Millisecond, true, false, []string{"semantic-primary", "semantic-primary"}, "completed", []time.Duration{50 * time.Millisecond}},
+		// Five seconds required with two remaining: no wait, no retry.
+		{"exceeds remaining budget uses fallback", 2000, 5 * time.Second, true, false, []string{"semantic-primary", "semantic-fallback"}, "completed", nil},
+		{"exceeds remaining budget without fallback", 2000, 5 * time.Second, false, false, []string{"semantic-primary"}, "evaluator.throttled", nil},
+		{"cancel during provider wait", 10000, 5 * time.Second, true, true, []string{"semantic-primary"}, "evaluation.cancelled", nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			in := inputFixture(t)
+			in.Profile.Spec.TotalTimeoutMS = tt.totalMS
+			in.Profile.Spec.Routing.Escalation = nil
+			in.Profile.Spec.Routing.Confidence = profile.Confidence{Enabled: false}
+			if !tt.fallback {
+				in.Profile.Spec.Routing.Fallbacks = []string{}
+				in.Profile.Spec.Routing.FallbackOn = nil
+			} else {
+				in.Profile.Spec.Routing.FallbackOn = []profile.TransientFailure{profile.FailureThrottled}
+			}
+			clock := &fakeTime{current: time.Now().Add(time.Hour)}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			timing := clock.timing()
+			timing.jitter = func(d time.Duration) time.Duration { return d / 2 }
+			if tt.cancel {
+				sleep := timing.sleep
+				timing.sleep = func(ctx context.Context, d time.Duration) error {
+					cancel()
+					return sleep(ctx, d)
+				}
+			}
+			var ids []string
+			d, err := run(ctx, in, installed(func(_ context.Context, r evaluator.Request, c Configuration) (evaluator.Result, error) {
+				ids = append(ids, c.Evaluator.ID)
+				if len(ids) == 1 {
+					return evaluator.Result{}, &evaluator.Error{Code: "evaluator.throttled", Retryable: true, RetryAfter: tt.retryAfter}
+				}
+				return evidence(r, c, 1), nil
+			}), timing)
+			if err != nil {
+				t.Fatal(err)
+			}
+			trace := traceOf(t, d)
+			if !reflect.DeepEqual(ids, tt.wantIDs) || trace.Terminal != tt.terminal || !reflect.DeepEqual(clock.delays, tt.delays) {
+				t.Fatalf("ids=%v terminal=%s delays=%v", ids, trace.Terminal, clock.delays)
+			}
+		})
+	}
+}
+
+func TestProviderRetryDelayIgnoredWhenNotRetryable(t *testing.T) {
+	in := inputFixture(t)
+	in.Profile.Spec.Routing.Escalation = nil
+	in.Profile.Spec.Routing.Confidence = profile.Confidence{Enabled: false}
+	clock := &fakeTime{current: time.Now().Add(time.Hour)}
+	calls := 0
+	d, err := run(context.Background(), in, installed(func(_ context.Context, r evaluator.Request, c Configuration) (evaluator.Result, error) {
+		calls++
+		return evaluator.Result{}, &evaluator.Error{Code: "evaluator.throttled", Retryable: false, RetryAfter: time.Second}
+	}), clock.timing())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 || len(clock.delays) != 0 || d.Outcome != decision.OutcomeFailure {
+		t.Fatalf("calls=%d delays=%v outcome=%s", calls, clock.delays, d.Outcome)
+	}
+}

@@ -89,6 +89,10 @@ type Error struct {
 	Code      string
 	Retryable bool
 	Message   string
+	// RetryAfter is the minimum wait the provider requires before another
+	// attempt, or zero when it states none. The runner never retries sooner
+	// and skips a retry that cannot start within the remaining deadline.
+	RetryAfter time.Duration
 }
 
 func (e *Error) Error() string {

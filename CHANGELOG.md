@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Go API: `evaluator.Error.RetryAfter` lets an adapter report a provider-required wait, such as an HTTP `Retry-After` header. The profile runner never retries sooner than that wait, even when jitter or `maxBackoffMs` would shorten it, and skips a retry that cannot start before the total deadline so an eligible fallback can use the remaining time.
+
 ## [0.3.0] - 2026-09-25
 
 Adds a CPU-only semantic evaluator you can run yourself. The System One adapter

@@ -195,7 +195,10 @@ For retry number `n` (1 is the first retry), the base delay in milliseconds is
 `min(maxBackoffMs, initialBackoffMs * multiplier^(n-1))`, truncated to an integer.
 The production clock uses equal jitter uniformly over the inclusive interval
 from half that base delay to the full base delay, at nanosecond resolution, and
-consumes one jitter draw per contemplated retry. If that delay is greater than
+consumes one jitter draw per contemplated retry. When the retryable adapter
+error carries a positive `RetryAfter`, such as a provider's `Retry-After`
+header, the delay is the larger of the jittered delay and that wait; neither
+jitter nor `maxBackoffMs` shortens a provider-required wait. If that delay is greater than
 or equal to the remaining total budget, retries stop without sleeping: preserve
 the last transient failure so an eligible configured fallback can use the time
 left. Without an eligible fallback, return that failure promptly. An already
