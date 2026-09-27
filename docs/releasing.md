@@ -17,7 +17,8 @@ Maintainers push release tags; the workflow refuses tags that are not on
 3. The [release workflow](../.github/workflows/release.yml) then:
    - refuses tags that are not on `main` history;
    - runs `scripts/check`;
-   - builds archives with `scripts/release-artifacts`, which injects the
+   - builds archives with `scripts/release-artifacts`, including the
+     WebAssembly engine as `antaeus_X.Y.Z_js_wasm.tar.gz`, which injects the
      version and commit and pins the documented target baselines;
    - smoke-tests the Linux amd64 archive and verifies `SHA256SUMS`;
    - records build-provenance attestations for every archive;

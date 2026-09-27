@@ -36,6 +36,8 @@ ANTAEUS_VERSION=$version ANTAEUS_COMMIT=$commit "$repo_root/scripts/cross-build"
 
 plain=${version#v}
 for binary in "$dist_dir"/antaeus_*; do
+  # The WebAssembly engine is a directory, packaged below.
+  [ -f "$binary" ] || continue
   name=$(basename -- "$binary")
   target=${name#antaeus_}
   target=${target%.exe}
@@ -56,6 +58,11 @@ for binary in "$dist_dir"/antaeus_*; do
     esac
   )
 done
+wasm_stage="$out_dir/stage/antaeus_${plain}_js_wasm"
+mkdir -p "$wasm_stage"
+cp "$dist_dir/antaeus_js_wasm/antaeus.wasm" "$dist_dir/antaeus_js_wasm/wasm_exec.js" "$dist_dir/antaeus_js_wasm/LICENSE-go" "$wasm_stage/"
+cp "$repo_root/LICENSE" "$repo_root/README.md" "$repo_root/CHANGELOG.md" "$repo_root/docs/webassembly.md" "$wasm_stage/"
+(cd "$out_dir/stage" && tar -czf "$out_dir/antaeus_${plain}_js_wasm.tar.gz" "antaeus_${plain}_js_wasm")
 rm -rf "$out_dir/stage"
 
 (

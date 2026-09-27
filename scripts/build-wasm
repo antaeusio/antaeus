@@ -1,0 +1,31 @@
+#!/bin/sh
+
+# Build the WebAssembly engine for JavaScript hosts into
+# .tmp/dist/antaeus_js_wasm/: antaeus.wasm, the matching Go wasm_exec.js
+# loader, and the Go license that covers wasm_exec.js.
+
+set -eu
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+repo_root=$(CDPATH='' cd -- "$script_dir/.." && pwd)
+out_dir=${ANTAEUS_WASM_DIR:-$repo_root/.tmp/dist/antaeus_js_wasm}
+
+case "$out_dir" in
+  /*) ;;
+  *) out_dir="$repo_root/$out_dir" ;;
+esac
+
+goroot=$(go env GOROOT)
+loader="$goroot/lib/wasm/wasm_exec.js"
+if [ ! -f "$loader" ]; then
+  echo "build-wasm: $loader not found; Go 1.24 or newer is required" >&2
+  exit 69
+fi
+
+rm -rf "$out_dir"
+mkdir -p "$out_dir"
+GOOS=js GOARCH=wasm ANTAEUS_PACKAGE=./cmd/antaeus-wasm ANTAEUS_OUTPUT="$out_dir/antaeus.wasm" \
+  "$repo_root/scripts/build"
+cp "$loader" "$out_dir/wasm_exec.js"
+cp "$goroot/LICENSE" "$out_dir/LICENSE-go"
+chmod 0644 "$out_dir/wasm_exec.js" "$out_dir/LICENSE-go"

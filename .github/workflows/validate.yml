@@ -100,6 +100,11 @@ jobs:
           GOPROXY: 'off'
           GOFLAGS: '-mod=readonly'
         run: scripts/cross-build
+      - name: WebAssembly engine interface
+        if: matrix.go == '1.27.1'
+        run: |
+          test "$(node --version)" = 'v24.21.0'
+          node scripts/check-wasm.mjs
       - name: Injected version reaches the built command
         if: matrix.go == '1.27.1'
         env:
