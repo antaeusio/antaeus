@@ -54,39 +54,50 @@ export async function start(module, { maxInstances = 2, maxWaitMs = 10_000 } = {
   let waitingCalls = 0;
   let waitingBytes = 0;
 
+  // An instance's run promise settles only if the instance stops. Both
+  // outcomes are handled at once, including for an instance that failed to
+  // start, so a stopped instance never leaves an unhandled rejection.
+  const stopped = () => failure('host.internal_error', 'the engine stopped during this call');
+
   async function instantiate() {
     const go = new globalThis.Go();
     const instance = await WebAssembly.instantiate(compiled, go.importObject);
-    const exit = go.run(instance);
+    const exit = Promise.resolve(go.run(instance)).then(stopped, stopped);
     const core = globalThis.__antaeusCore;
     delete globalThis.__antaeusCore;
     if (!core) throw new Error('the Antaeus engine did not start');
     return { core, exit };
   }
 
-  // The first instance supplies the interface constants and serves the first
-  // call; like every instance, it is used once.
-  let spare = await instantiate();
+  // A probe instance supplies the interface constants and is then discarded
+  // without serving a call: it was started in the context that called
+  // start(), and an instance is entered only from its own caller's context.
+  const probe = (await instantiate()).core;
   const limits = {
-    interfaceVersion: spare.core.interfaceVersion,
-    version: spare.core.version,
-    maxRequestBytes: spare.core.maxRequestBytes,
-    maxPendingCalls: spare.core.maxPendingCalls,
-    maxPendingBytes: spare.core.maxPendingBytes,
+    interfaceVersion: probe.interfaceVersion,
+    version: probe.version,
+    maxRequestBytes: probe.maxRequestBytes,
+    maxPendingCalls: probe.maxPendingCalls,
+    maxPendingBytes: probe.maxPendingBytes,
   };
 
   async function claim() {
     running += 1;
-    if (spare) {
-      const instance = spare;
-      spare = undefined;
-      return instance;
-    }
     try {
       return await instantiate();
     } catch {
       running -= 1;
       return undefined;
+    }
+  }
+
+  // run resolves to the call's response; a synchronous throw or a rejection
+  // becomes an internal error.
+  async function run(instance, kind, text) {
+    try {
+      return await instance.core.run(kind, text);
+    } catch {
+      return failure('host.internal_error', 'the engine failed while handling this call');
     }
   }
 
@@ -121,10 +132,7 @@ export async function start(module, { maxInstances = 2, maxWaitMs = 10_000 } = {
     }
     if (instance === undefined) return failure('host.internal_error', 'the engine could not start an instance');
     try {
-      return await Promise.race([
-        instance.core.run(kind, text),
-        instance.exit.then(() => failure('host.internal_error', 'the engine exited')),
-      ]);
+      return await Promise.race([run(instance, kind, text), instance.exit]);
     } finally {
       running -= 1;
     }

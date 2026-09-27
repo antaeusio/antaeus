@@ -70,7 +70,8 @@ keeps one pending timer and re-registers it, along with any work it resumes,
 in whichever context enters it. In Cloudflare Workers, timers and I/O
 registered in a request's context are cancelled when that request ends, so a
 runtime shared between requests, or reused after one, can lose its deadline
-timer and its provider requests and hang.
+timer and its provider requests and hang. `start` also starts one instance to
+read the interface constants and discards it without letting any call use it.
 
 When `maxInstances` calls are running, a new call waits by polling with its own
 timers. At most 16 calls, totalling at most 16 MiB of request text, may wait;
@@ -78,8 +79,9 @@ further calls return `host.busy` at once. Waiting requests stay JavaScript
 strings. An `evaluate` call with `deadlineUnixMs` that is still waiting at its
 deadline returns `host.deadline_exceeded` then; a call that has started ends
 within its deadline as usual. A call that stops waiting leaves nothing behind.
-If an instance exits during a call, for example on a fatal error such as
-running out of memory, that call returns `host.internal_error`.
+If an instance fails to start, stops during a call (for example on a fatal
+error such as running out of memory), or fails in any other way, that call
+returns `host.internal_error` and its slot is released.
 
 ## Calls
 

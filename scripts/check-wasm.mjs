@@ -4,6 +4,7 @@
 // The directory defaults to scripts/build-wasm's output and must contain
 // antaeus.wasm, wasm_exec.js, and antaeus.mjs.
 import assert from 'node:assert/strict';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
@@ -15,6 +16,33 @@ const dist = process.argv[2]
   : new URL('.tmp/dist/antaeus_js_wasm/', root);
 const read = (path) => readFileSync(new URL(path, root), 'utf8');
 createRequire(import.meta.url)(new URL('wasm_exec.js', dist).pathname);
+
+// Wraps Go's loader so the checks can inject instance failures and record the
+// asynchronous context that starts, and the one that enters, each instance.
+const context = new AsyncLocalStorage();
+let fault;
+let rejectExit;
+const entries = [];
+const RealGo = globalThis.Go;
+globalThis.Go = class extends RealGo {
+  run(instance) {
+    const born = context.getStore();
+    if (fault === 'no-core') return Promise.reject(new Error('injected startup failure'));
+    const exit = super.run(instance);
+    const core = globalThis.__antaeusCore;
+    if (core) {
+      const run = core.run;
+      core.run = (...args) => {
+        entries.push({ born, entered: context.getStore() });
+        if (fault === 'run-throws') throw new Error('injected call failure');
+        if (fault === 'run-rejects') return Promise.reject(new Error('injected call failure'));
+        return run(...args);
+      };
+    }
+    if (fault !== 'exit-rejects') return exit;
+    return new Promise((resolve, reject) => { rejectExit = reject; exit.then(resolve, reject); });
+  }
+};
 
 const policy = read('examples/marketplace/listing-policy.yaml');
 const profile = read('examples/drex/profile.json');
@@ -279,6 +307,79 @@ assert.equal(calls.length, 0);
   const results = await Promise.all(['a', 'b', 'c', 'd'].map((title) => pool.evaluate(request({ input: { title } }))));
   assert(results.every((raw) => JSON.parse(raw).decision.outcome === 'allow'));
   assert.equal(peak, 2, `peak concurrency ${peak} with two instances`);
+}
+
+// A failing instance is a typed internal error, never a rejected call or an
+// unhandled rejection, and its slot is released for the next call.
+{
+  const unhandled = [];
+  const onUnhandled = (reason) => unhandled.push(reason);
+  process.on('unhandledRejection', onUnhandled);
+  const solo = await start(wasmBytes, { maxInstances: 1 });
+  const ok = async () => {
+    calls = [];
+    script = [reply(answers(0.05, 0.9))];
+    assert.equal(JSON.parse(await solo.evaluate(request())).decision.outcome, 'allow');
+  };
+  for (const kind of ['no-core', 'run-throws', 'run-rejects']) {
+    fault = kind;
+    calls = [];
+    script = [];
+    const raw = JSON.parse(await solo.evaluate(request()));
+    fault = undefined;
+    assert.equal(raw.error?.code, 'host.internal_error', kind);
+    await ok();
+  }
+  let release;
+  const held = new Promise((done) => { release = done; });
+  fault = 'exit-rejects';
+  calls = [];
+  script = [async () => {
+    fault = undefined;
+    rejectExit(new Error('injected exit'));
+    await held;
+    return new Response(answers(0.05, 0.9), { status: 200 });
+  }];
+  const raw = JSON.parse(await solo.evaluate(request()));
+  assert.equal(raw.error?.code, 'host.internal_error', 'exit-rejects');
+  await ok();
+  release();
+  await new Promise((done) => setTimeout(done, 50));
+  process.off('unhandledRejection', onUnhandled);
+  assert.deepEqual(unhandled, [], 'an instance failure left an unhandled rejection');
+}
+
+// Every call enters only an instance started in its own context, even when
+// start() ran in an earlier request that made no successful call, and a
+// provider call there still ends at its deadline.
+{
+  const later = await context.run('request-a', async () => {
+    const started = await start(wasmBytes, { maxInstances: 1 });
+    assert.equal(JSON.parse(await started.evaluate('x'.repeat((4 << 20) + 1))).error.code, 'host.request_invalid');
+    return started;
+  });
+  entries.length = 0;
+  let aborted = false;
+  const hang = (init) => new Promise((_, reject) => init.signal.addEventListener('abort', () => { aborted = true; reject(new DOMException('aborted', 'AbortError')); }));
+  const began = performance.now();
+  const raw = JSON.parse(await context.run('request-b', () => {
+    calls = [];
+    script = [hang, hang];
+    return later.evaluate(request({ deadlineUnixMs: Date.now() + 300 }));
+  }));
+  assert.equal(raw.decision.outcome, 'failure');
+  assert(aborted, 'the provider request was not aborted at its deadline');
+  assert(performance.now() - began < 2000, 'the call outlived its deadline');
+  const next = JSON.parse(await context.run('request-c', () => {
+    calls = [];
+    script = [reply(answers(0.05, 0.9))];
+    return later.evaluate(request());
+  }));
+  assert.equal(next.decision.outcome, 'allow');
+  assert.deepEqual(entries, [
+    { born: 'request-b', entered: 'request-b' },
+    { born: 'request-c', entered: 'request-c' },
+  ]);
 }
 
 // Parity: the shared cases produce the same Decisions as the native engine
