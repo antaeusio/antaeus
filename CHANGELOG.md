@@ -8,7 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- System One adapter `io.antaeus.systemone@0.3.0` with provider `drex` for the hosted [Drex](https://drex.nace.ai) API by Nace.AI. It requires the `drex-api-key` credential (`DREX_API_KEY`) and endpoint `https://drex.nace.ai`, and sends policy conditions and unredacted input to Nace.AI. Version 0.3.0 also retries HTTP 529 as `evaluator.unavailable`, reports `Retry-After-Ms` and `Retry-After` waits to the runner, and records the provider's `X-Request-Id` in adapter metadata. Versions 0.2.0 and 0.1.0 stay installed and unchanged. Example profile: `examples/drex/profile.json`.
 - Go API: `evaluator.Error.RetryAfter` lets an adapter report a provider-required wait, such as an HTTP `Retry-After` header. The profile runner never retries sooner than that wait, even when jitter or `maxBackoffMs` would shorten it, and skips a retry that cannot start before the total deadline so an eligible fallback can use the remaining time.
+
+### Changed
+
+- Go API: `systemone.AdapterVersion`, `Identity`, `Registration`, and `DefaultReferences` now refer to version 0.3.0. To keep running 0.2.0 profiles in your own registry, also register `systemone.PreviousIdentity: systemone.PreviousRegistration()` and use `systemone.PreviousDefaultReferences()` for that identity. The CLI installs all three versions.
 
 ## [0.3.0] - 2026-09-25
 

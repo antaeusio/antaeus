@@ -300,8 +300,8 @@ func TestEvaluateProfileAntaeusProviderReadsAntaeusAPIKey(t *testing.T) {
 		}
 		return "", false
 	})
-	current := systemone.Registration()
-	current.Evaluate = func(_ context.Context, request evaluator.Request, config runner.Configuration) (evaluator.Result, error) {
+	previous := systemone.PreviousRegistration()
+	previous.Evaluate = func(_ context.Context, request evaluator.Request, config runner.Configuration) (evaluator.Result, error) {
 		if string(config.Credential) != "antaeus-test-key" {
 			t.Errorf("credential %q", config.Credential)
 		}
@@ -310,11 +310,41 @@ func TestEvaluateProfileAntaeusProviderReadsAntaeusAPIKey(t *testing.T) {
 			confidence := 0.95
 			results[i] = evaluator.RuleResult{RuleID: rule.ID, Status: decision.RuleNotMatched, Confidence: &confidence, ReasonCodes: []string{"systemone.not_matched"}}
 		}
-		return evaluator.Result{RuleResults: results, Metadata: evaluator.Metadata{AdapterID: systemone.AdapterID, AdapterVersion: systemone.AdapterVersion, Mode: evaluator.ModeSemantic, Provider: systemone.ProviderAntaeus, Model: "antaeus-local"}}, nil
+		return evaluator.Result{RuleResults: results, Metadata: evaluator.Metadata{AdapterID: systemone.AdapterID, AdapterVersion: systemone.PreviousAdapterVersion, Mode: evaluator.ModeSemantic, Provider: systemone.ProviderAntaeus, Model: "antaeus-local"}}, nil
 	}
-	r.systemOne = &current
+	r.previousSystemOne = &previous
 	output := evaluateProfileCommand(t, r, 0, append(openAIArgs(), "--profile", filepath.Join("..", "..", "examples", "antaeus", "nli-server.json")))
 	if len(lookups) != 1 || lookups[0] != systemone.AntaeusCredentialVariable || !strings.Contains(output, `"provider":"antaeus"`) || !strings.Contains(output, `"adapterVersion":"0.2.0"`) {
+		t.Fatalf("lookups %v output %s", lookups, output)
+	}
+}
+
+func TestEvaluateProfileDrexProviderReadsDrexAPIKey(t *testing.T) {
+	var lookups []string
+	calls := 0
+	r := openAIRuntime(t, &lookups, &calls)
+	r.environment = localbinding.EnvironmentFunc(func(name string) (string, bool) {
+		lookups = append(lookups, name)
+		if name == systemone.DrexCredentialVariable {
+			return "drex-test-key", true
+		}
+		return "", false
+	})
+	current := systemone.Registration()
+	current.Evaluate = func(_ context.Context, request evaluator.Request, config runner.Configuration) (evaluator.Result, error) {
+		if string(config.Credential) != "drex-test-key" {
+			t.Errorf("credential %q", config.Credential)
+		}
+		results := make([]evaluator.RuleResult, len(request.Rules))
+		for i, rule := range request.Rules {
+			confidence := 0.95
+			results[i] = evaluator.RuleResult{RuleID: rule.ID, Status: decision.RuleNotMatched, Confidence: &confidence, ReasonCodes: []string{"systemone.not_matched"}}
+		}
+		return evaluator.Result{RuleResults: results, Metadata: evaluator.Metadata{AdapterID: systemone.AdapterID, AdapterVersion: systemone.AdapterVersion, Mode: evaluator.ModeSemantic, Provider: systemone.ProviderDrex, Model: "drex-latest"}}, nil
+	}
+	r.systemOne = &current
+	output := evaluateProfileCommand(t, r, 0, append(openAIArgs(), "--profile", filepath.Join("..", "..", "examples", "drex", "profile.json")))
+	if len(lookups) != 1 || lookups[0] != systemone.DrexCredentialVariable || !strings.Contains(output, `"provider":"drex"`) || !strings.Contains(output, `"adapterVersion":"0.3.0"`) {
 		t.Fatalf("lookups %v output %s", lookups, output)
 	}
 }

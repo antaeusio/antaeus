@@ -61,7 +61,8 @@ func serve(t *testing.T, handler http.HandlerFunc) (runner.Adapter, runner.Confi
 	return registration(remote.NewClient(), entry.Adapter.Version), runner.Configuration{Evaluator: entry}
 }
 
-// serveAntaeus is serve for an adapter 0.2.0 evaluator with provider antaeus.
+// serveAntaeus is serve for the adapter 0.2.0 example evaluator with provider
+// antaeus, registered as version 0.2.0.
 func serveAntaeus(t *testing.T, handler http.HandlerFunc) (runner.Adapter, runner.Configuration) {
 	t.Helper()
 	server := httptest.NewServer(handler)
@@ -72,7 +73,7 @@ func serveAntaeus(t *testing.T, handler http.HandlerFunc) (runner.Adapter, runne
 	}
 	entry := p.Spec.Evaluators[0]
 	entry.Parameters = map[string]any{"endpoint": server.URL}
-	return Registration(), runner.Configuration{Evaluator: entry}
+	return PreviousRegistration(), runner.Configuration{Evaluator: entry}
 }
 
 func answers(pairs ...any) string {
@@ -98,14 +99,14 @@ func evaluationError(t *testing.T, err error) *evaluator.Error {
 }
 
 func TestExampleProfilesValidate(t *testing.T) {
-	for _, name := range []string{"clm/confidence-gated.json", "clm/openai-fallback.json", "antaeus/nli-server.json"} {
+	for _, name := range []string{"clm/confidence-gated.json", "clm/openai-fallback.json", "antaeus/nli-server.json", "drex/profile.json"} {
 		p, err := profile.LoadFile("../../examples/" + name)
 		if err != nil {
 			t.Fatal(err)
 		}
-		validators := profile.ParameterValidators{Identity: parameterValidator{}, LegacyIdentity: parameterValidator{}}
+		validators := profile.ParameterValidators{Identity: parameterValidator{}, PreviousIdentity: parameterValidator{}, LegacyIdentity: parameterValidator{}}
 		for _, e := range p.Spec.Evaluators {
-			if e.Adapter == Identity || e.Adapter == LegacyIdentity {
+			if e.Adapter == Identity || e.Adapter == PreviousIdentity || e.Adapter == LegacyIdentity {
 				if err := ValidateEvaluator(e); err != nil {
 					t.Fatalf("%s: %v", name, err)
 				}
@@ -523,6 +524,14 @@ func TestProvidersAndSlotsPerVersion(t *testing.T) {
 	}{
 		{"legacy clm", LegacyAdapterVersion, str(ProviderCLM), str(CredentialSlot), true},
 		{"legacy antaeus", LegacyAdapterVersion, str(ProviderAntaeus), nil, false},
+		{"legacy drex", LegacyAdapterVersion, str(ProviderDrex), str(DrexCredentialSlot), false},
+		{"previous clm", PreviousAdapterVersion, str(ProviderCLM), str(CredentialSlot), true},
+		{"previous antaeus", PreviousAdapterVersion, str(ProviderAntaeus), str(AntaeusCredentialSlot), true},
+		{"previous drex", PreviousAdapterVersion, str(ProviderDrex), str(DrexCredentialSlot), false},
+		{"current drex", AdapterVersion, str(ProviderDrex), str(DrexCredentialSlot), true},
+		{"drex without key", AdapterVersion, str(ProviderDrex), nil, false},
+		{"drex with antaeus slot", AdapterVersion, str(ProviderDrex), str(AntaeusCredentialSlot), false},
+		{"antaeus with drex slot", AdapterVersion, str(ProviderAntaeus), str(DrexCredentialSlot), false},
 		{"current clm", AdapterVersion, str(ProviderCLM), str(CredentialSlot), true},
 		{"current antaeus", AdapterVersion, str(ProviderAntaeus), str(AntaeusCredentialSlot), true},
 		{"antaeus without key", AdapterVersion, str(ProviderAntaeus), nil, true},
@@ -538,6 +547,9 @@ func TestProvidersAndSlotsPerVersion(t *testing.T) {
 			e.Adapter.Version = c.version
 			e.Provider = c.provider
 			e.CredentialSlot = c.slot
+			if c.provider != nil && *c.provider == ProviderDrex {
+				e.Parameters = map[string]any{"endpoint": DrexEndpoint}
+			}
 			if err := ValidateEvaluator(e); (err == nil) != c.ok {
 				t.Fatalf("err = %v, want ok %v", err, c.ok)
 			}
@@ -553,6 +565,14 @@ func TestRegistrationRejectsTheOtherVersion(t *testing.T) {
 	for name, run := range map[string]func() error{
 		"legacy adapter, 0.2.0 profile": func() error {
 			_, err := LegacyRegistration().Evaluate(context.Background(), request(t), current)
+			return err
+		},
+		"current adapter, 0.2.0 profile": func() error {
+			_, err := Registration().Evaluate(context.Background(), request(t), current)
+			return err
+		},
+		"previous adapter, 0.1.0 profile": func() error {
+			_, err := PreviousRegistration().Evaluate(context.Background(), request(t), legacy)
 			return err
 		},
 		"current adapter, 0.1.0 profile": func() error {
@@ -599,8 +619,12 @@ func TestRunnerRecordsProviderAndVersion(t *testing.T) {
 
 func TestDefaultReferences(t *testing.T) {
 	current := DefaultReferences()
-	if current[AntaeusCredentialSlot].Name != "ANTAEUS_API_KEY" || current[CredentialSlot].Name != "CLM_API_KEY" || len(current) != 2 {
+	if current[AntaeusCredentialSlot].Name != "ANTAEUS_API_KEY" || current[CredentialSlot].Name != "CLM_API_KEY" || current[DrexCredentialSlot].Name != "DREX_API_KEY" || len(current) != 3 {
 		t.Fatalf("current = %+v", current)
+	}
+	previous := PreviousDefaultReferences()
+	if previous[AntaeusCredentialSlot].Name != "ANTAEUS_API_KEY" || previous[CredentialSlot].Name != "CLM_API_KEY" || len(previous) != 2 {
+		t.Fatalf("previous = %+v", previous)
 	}
 	legacy := LegacyDefaultReferences()
 	if legacy[CredentialSlot].Name != "CLM_API_KEY" || len(legacy) != 1 {
