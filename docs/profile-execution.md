@@ -34,7 +34,7 @@ closed. Existing `evaluate` and `test` commands do not consume these manifests.
 Three adapters are installed, all using `io.antaeus.rule-match@v0alpha1`: the
 synthetic `io.antaeus.fixture@0.1.0` and the semantic
 [`io.antaeus.openai@0.1.0`](./openai-adapter.md) and
-[`io.antaeus.systemone@0.2.0`](./systemone-adapter.md) (with `0.1.0` still installed for existing CLM profiles). Fixture profiles use only
+[`io.antaeus.systemone@0.3.0`](./systemone-adapter.md) (with `0.2.0` and `0.1.0` still installed for existing profiles). Fixture profiles use only
 the fixture adapter; semantic profiles may combine the two semantic adapters. Fixture profiles require `--fixture-set` and `--case`,
 must name the supplied fixture set's exact name and version, and the case must
 match the policy and canonical input identities. Semantic profiles reject those
@@ -195,7 +195,10 @@ For retry number `n` (1 is the first retry), the base delay in milliseconds is
 `min(maxBackoffMs, initialBackoffMs * multiplier^(n-1))`, truncated to an integer.
 The production clock uses equal jitter uniformly over the inclusive interval
 from half that base delay to the full base delay, at nanosecond resolution, and
-consumes one jitter draw per contemplated retry. If that delay is greater than
+consumes one jitter draw per contemplated retry. When the retryable adapter
+error carries a positive `RetryAfter`, such as a provider's `Retry-After`
+header, the delay is the larger of the jittered delay and that wait; neither
+jitter nor `maxBackoffMs` shortens a provider-required wait. If that delay is greater than
 or equal to the remaining total budget, retries stop without sleeping: preserve
 the last transient failure so an eligible configured fallback can use the time
 left. Without an eligible fallback, return that failure promptly. An already

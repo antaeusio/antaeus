@@ -6,10 +6,12 @@
 // probability into provider-neutral rule evidence with a confidence score.
 // Rule outcomes are never sent.
 //
-// Version 0.2.0 supports two providers: Antaeus System One servers, such as a
-// self-hosted antaeusio/nli-server, and the self-hosted Contrastive Language
-// Model (CLM) reference server. Version 0.1.0, which supports CLM only, stays
-// installed so existing profiles keep working.
+// Version 0.3.0 supports three providers: Antaeus System One servers, such as
+// a self-hosted antaeusio/nli-server, the self-hosted Contrastive Language
+// Model (CLM) reference server, and the hosted Drex API. It also retries HTTP
+// 529 and reports provider Retry-After waits to the runner. Versions 0.2.0
+// (Antaeus and CLM) and 0.1.0 (CLM only) stay installed with their original
+// behavior so existing profiles keep working.
 // Other System One providers are rejected until their wire contracts are
 // verified.
 package systemone
@@ -27,7 +29,9 @@ import (
 	"net/url"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/antaeusio/antaeus/decision"
 	"github.com/antaeusio/antaeus/evaluator"
@@ -39,7 +43,9 @@ import (
 
 const (
 	AdapterID      = "io.antaeus.systemone"
-	AdapterVersion = "0.2.0"
+	AdapterVersion = "0.3.0"
+	// PreviousAdapterVersion supports the antaeus and CLM providers.
+	PreviousAdapterVersion = "0.2.0"
 	// LegacyAdapterVersion is the first version, which supports CLM only.
 	LegacyAdapterVersion = "0.1.0"
 	// ProviderAntaeus is an Antaeus System One server, such as a self-hosted
@@ -47,11 +53,18 @@ const (
 	ProviderAntaeus = "antaeus"
 	// ProviderCLM is the self-hosted Contrastive Language Model server.
 	ProviderCLM = "contrastive-lm"
-	// Credential slots are optional: a server without an API key needs none.
+	// ProviderDrex is the hosted Drex API by Nace.AI, available only at
+	// DrexEndpoint. It always requires a credential.
+	ProviderDrex = "drex"
+	DrexEndpoint = "https://drex.nace.ai"
+	// Credential slots are optional for self-hosted servers: a server without
+	// an API key needs none.
 	AntaeusCredentialSlot     = "antaeus-api-key"
 	AntaeusCredentialVariable = "ANTAEUS_API_KEY"
 	CredentialSlot            = "clm-api-key"
 	DefaultCredentialVariable = "CLM_API_KEY"
+	DrexCredentialSlot        = "drex-api-key"
+	DrexCredentialVariable    = "DREX_API_KEY"
 
 	MaxRequestBytes  = 4 << 20
 	MaxResponseBytes = 1 << 20
@@ -64,13 +77,17 @@ var Protocol = profile.ComponentIdentity{ID: "io.antaeus.rule-match", Version: "
 // Identity is the current installed adapter identity.
 var Identity = profile.ComponentIdentity{ID: AdapterID, Version: AdapterVersion}
 
+// PreviousIdentity is the installed 0.2.0 identity.
+var PreviousIdentity = profile.ComponentIdentity{ID: AdapterID, Version: PreviousAdapterVersion}
+
 // LegacyIdentity is the installed CLM-only 0.1.0 identity.
 var LegacyIdentity = profile.ComponentIdentity{ID: AdapterID, Version: LegacyAdapterVersion}
 
 // providerSlots maps each adapter version's providers to their credential slot.
 var providerSlots = map[string]map[string]string{
-	LegacyAdapterVersion: {ProviderCLM: CredentialSlot},
-	AdapterVersion:       {ProviderAntaeus: AntaeusCredentialSlot, ProviderCLM: CredentialSlot},
+	LegacyAdapterVersion:   {ProviderCLM: CredentialSlot},
+	PreviousAdapterVersion: {ProviderAntaeus: AntaeusCredentialSlot, ProviderCLM: CredentialSlot},
+	AdapterVersion:         {ProviderAntaeus: AntaeusCredentialSlot, ProviderCLM: CredentialSlot, ProviderDrex: DrexCredentialSlot},
 }
 
 // Capabilities includes confidence-scores: every answer carries a probability.
@@ -79,6 +96,15 @@ var Capabilities = []string{"json-input", "structured-rule-results", "confidence
 // DefaultReferences returns the documented local credential defaults of the
 // current version. A default is used only when a profile declares its slot.
 func DefaultReferences() map[string]localbinding.Reference {
+	return map[string]localbinding.Reference{
+		AntaeusCredentialSlot: {Source: "environment", Name: AntaeusCredentialVariable},
+		CredentialSlot:        {Source: "environment", Name: DefaultCredentialVariable},
+		DrexCredentialSlot:    {Source: "environment", Name: DrexCredentialVariable},
+	}
+}
+
+// PreviousDefaultReferences returns the credential defaults of version 0.2.0.
+func PreviousDefaultReferences() map[string]localbinding.Reference {
 	return map[string]localbinding.Reference{
 		AntaeusCredentialSlot: {Source: "environment", Name: AntaeusCredentialVariable},
 		CredentialSlot:        {Source: "environment", Name: DefaultCredentialVariable},
@@ -95,13 +121,18 @@ func Registration() runner.Adapter {
 	return registration(remote.NewClient(), AdapterVersion)
 }
 
+// PreviousRegistration returns the 0.2.0 adapter for runner.Registry.
+func PreviousRegistration() runner.Adapter {
+	return registration(remote.NewClient(), PreviousAdapterVersion)
+}
+
 // LegacyRegistration returns the CLM-only 0.1.0 adapter for runner.Registry.
 func LegacyRegistration() runner.Adapter {
 	return registration(remote.NewClient(), LegacyAdapterVersion)
 }
 
 func registration(client *http.Client, version string) runner.Adapter {
-	a := &adapter{client: client, version: version}
+	a := &adapter{client: client, version: version, now: time.Now}
 	return runner.Adapter{
 		Mode:         profile.ModeSemantic,
 		Protocol:     Protocol,
@@ -184,11 +215,11 @@ func loopback(host string) bool {
 var modelPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,255}$`)
 
 // ValidateEvaluator checks the profile fields this adapter requires, for
-// either installed version. Run it before accepting an evaluation so a
+// any installed version. Run it before accepting an evaluation so a
 // misconfigured profile is rejected rather than turned into a failure Decision.
 func ValidateEvaluator(e profile.Evaluator) error {
-	if (e.Adapter != Identity && e.Adapter != LegacyIdentity) || e.Mode != profile.ModeSemantic || e.Protocol != Protocol {
-		return errors.New("evaluator is not configured for " + AdapterID + "@" + AdapterVersion + " or @" + LegacyAdapterVersion)
+	if (e.Adapter != Identity && e.Adapter != PreviousIdentity && e.Adapter != LegacyIdentity) || e.Mode != profile.ModeSemantic || e.Protocol != Protocol {
+		return errors.New("evaluator is not configured for " + AdapterID + "@" + AdapterVersion + ", @" + PreviousAdapterVersion + ", or @" + LegacyAdapterVersion)
 	}
 	providers := providerSlots[e.Adapter.Version]
 	if e.Provider == nil {
@@ -196,10 +227,13 @@ func ValidateEvaluator(e profile.Evaluator) error {
 	}
 	slot, ok := providers[*e.Provider]
 	if !ok {
-		if e.Adapter.Version == LegacyAdapterVersion {
+		switch e.Adapter.Version {
+		case LegacyAdapterVersion:
 			return errors.New(AdapterID + "@" + LegacyAdapterVersion + ` supports only provider "` + ProviderCLM + `"`)
+		case PreviousAdapterVersion:
+			return errors.New(AdapterID + "@" + PreviousAdapterVersion + ` supports only providers "` + ProviderAntaeus + `" and "` + ProviderCLM + `"`)
 		}
-		return errors.New(`system one evaluators support only providers "` + ProviderAntaeus + `" and "` + ProviderCLM + `"`)
+		return errors.New(`system one evaluators support only providers "` + ProviderAntaeus + `", "` + ProviderCLM + `", and "` + ProviderDrex + `"`)
 	}
 	if e.Model == nil {
 		return errors.New("system one evaluators require an explicit model, the name the server serves")
@@ -213,17 +247,30 @@ func ValidateEvaluator(e profile.Evaluator) error {
 	if e.CredentialSlot != nil && *e.CredentialSlot != slot {
 		return errors.New(`provider "` + *e.Provider + `" accepts only credentialSlot "` + slot + `"`)
 	}
+	if *e.Provider == ProviderDrex && e.CredentialSlot == nil {
+		return errors.New(`provider "` + ProviderDrex + `" requires credentialSlot "` + DrexCredentialSlot + `"`)
+	}
 	raw, err := json.Marshal(e.Parameters)
 	if err != nil {
 		return errors.New("parameters are invalid")
 	}
-	_, err = parseParameters(raw)
-	return err
+	p, err := parseParameters(raw)
+	if err != nil {
+		return err
+	}
+	// The Drex key is a hosted-service credential; never send it elsewhere.
+	if *e.Provider == ProviderDrex {
+		if target, _ := endpointURL(p.Endpoint); target != DrexEndpoint+"/v1/systemone" {
+			return errors.New(`provider "` + ProviderDrex + `" requires endpoint "` + DrexEndpoint + `"`)
+		}
+	}
+	return nil
 }
 
 type adapter struct {
 	client  *http.Client
 	version string
+	now     func() time.Time
 }
 
 func failure(code string, retryable bool, message string) error {
@@ -291,11 +338,16 @@ func (a *adapter) evaluate(ctx context.Context, request evaluator.Request, confi
 		return evaluator.Result{}, remote.TransportFailure(ctx, err, "systemone")
 	}
 	defer func() { _ = response.Body.Close() }()
+	signals := reportsProviderSignals(a.version)
 	if response.StatusCode != http.StatusOK {
 		if response.StatusCode >= 200 && response.StatusCode < 300 {
 			return evaluator.Result{}, failure("systemone.response_malformed", false, "provider returned an unexpected success status")
 		}
-		return evaluator.Result{}, statusFailure(response.StatusCode)
+		err := statusFailure(response.StatusCode, signals)
+		if failure, ok := err.(*evaluator.Error); ok && signals && failure.Retryable {
+			failure.RetryAfter = retryAfter(response.Header, a.now())
+		}
+		return evaluator.Result{}, err
 	}
 	payload, tooLarge, err := remote.ReadBounded(response.Body, MaxResponseBytes)
 	if err != nil {
@@ -308,6 +360,10 @@ func (a *adapter) evaluate(ctx context.Context, request evaluator.Request, confi
 	if err != nil {
 		return evaluator.Result{}, err
 	}
+	var requestID string
+	if signals {
+		requestID = safeRequestID(response.Header.Get("X-Request-Id"))
+	}
 	return evaluator.Result{
 		RuleResults: results,
 		Metadata: evaluator.Metadata{
@@ -316,6 +372,7 @@ func (a *adapter) evaluate(ctx context.Context, request evaluator.Request, confi
 			Mode:           evaluator.ModeSemantic,
 			Provider:       *config.Evaluator.Provider,
 			Model:          model,
+			RequestID:      requestID,
 		},
 	}, nil
 }
@@ -402,7 +459,61 @@ func parseResponse(payload []byte, rules []evaluator.Rule) ([]evaluator.RuleResu
 	return results, model, nil
 }
 
-func statusFailure(status int) error {
+var requestIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$`)
+
+func safeRequestID(value string) string {
+	if requestIDPattern.MatchString(value) {
+		return value
+	}
+	return ""
+}
+
+// statusOverloaded is the nonstandard HTTP 529 some providers, including Drex,
+// return when at capacity.
+const statusOverloaded = 529
+
+// maxRetryAfter bounds a provider-stated wait. Any longer wait already exceeds
+// every evaluation deadline, so the runner skips the retry either way.
+const maxRetryAfter = 24 * time.Hour
+
+// retryAfter reads the provider-required wait before another attempt:
+// retry-after-ms (milliseconds) first, then the standard Retry-After, which is
+// either delay-seconds or an HTTP-date (RFC 9110 section 10.2.3). Malformed or
+// negative values count as absent; a past date means no wait.
+func retryAfter(header http.Header, now time.Time) time.Duration {
+	if value := strings.TrimSpace(header.Get("Retry-After-Ms")); value != "" {
+		if ms, err := strconv.ParseFloat(value, 64); err == nil && !math.IsNaN(ms) && !math.IsInf(ms, 0) && ms >= 0 {
+			return time.Duration(math.Min(ms, float64(maxRetryAfter.Milliseconds())) * float64(time.Millisecond))
+		}
+	}
+	value := strings.TrimSpace(header.Get("Retry-After"))
+	if value == "" {
+		return 0
+	}
+	if strings.Trim(value, "0123456789") == "" {
+		seconds, err := strconv.ParseUint(value, 10, 64)
+		if err != nil || seconds > uint64(maxRetryAfter/time.Second) {
+			return maxRetryAfter
+		}
+		return time.Duration(seconds) * time.Second
+	}
+	if date, err := http.ParseTime(value); err == nil {
+		return min(max(date.Sub(now), 0), maxRetryAfter)
+	}
+	return 0
+}
+
+// reportsProviderSignals reports whether a version maps HTTP 529, carries
+// provider Retry-After waits, and records request IDs. Versions 0.1.0 and
+// 0.2.0 predate these behaviors and keep their original handling; 0.3.0 and
+// every later version keep them.
+func reportsProviderSignals(version string) bool {
+	return version != LegacyAdapterVersion && version != PreviousAdapterVersion
+}
+
+// statusFailure classifies a non-success HTTP status. signals enables the
+// 0.3.0 mapping of HTTP 529 (overloaded) to a retryable unavailable failure.
+func statusFailure(status int, signals bool) error {
 	switch {
 	case status == http.StatusUnauthorized || status == http.StatusForbidden:
 		return failure("systemone.credential_rejected", false, fmt.Sprintf("provider rejected the credential (HTTP %d)", status))
@@ -412,7 +523,7 @@ func statusFailure(status int) error {
 		return failure("evaluator.throttled", true, "provider rate limit reached (HTTP 429)")
 	case status == http.StatusBadRequest || status == http.StatusNotFound || status == http.StatusUnprocessableEntity:
 		return failure("systemone.request_rejected", false, fmt.Sprintf("provider rejected the request (HTTP %d)", status))
-	case status == http.StatusInternalServerError || status == http.StatusBadGateway || status == http.StatusServiceUnavailable || status == http.StatusGatewayTimeout:
+	case status == http.StatusInternalServerError || status == http.StatusBadGateway || status == http.StatusServiceUnavailable || status == http.StatusGatewayTimeout || (signals && status == statusOverloaded):
 		return failure("evaluator.unavailable", true, fmt.Sprintf("provider is unavailable (HTTP %d)", status))
 	}
 	return failure("systemone.unexpected_status", false, fmt.Sprintf("provider returned unexpected HTTP %d", status))

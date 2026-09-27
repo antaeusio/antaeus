@@ -1,0 +1,33 @@
+{
+  "apiVersion": "evaluator.antaeus.io/v0alpha1",
+  "kind": "EvaluatorProfile",
+  "metadata": {
+    "name": "drex-confidence-gated",
+    "description": "Experimental System One evaluator using the hosted Drex API by Nace.AI. Sends the policy conditions and input to https://drex.nace.ai and reads the key from DREX_API_KEY. Rules answered with less than 0.7 confidence become indeterminate, so the Decision is failure unless a matched deny applies."
+  },
+  "spec": {
+    "totalTimeoutMs": 10000,
+    "credentialSlots": [{"name": "drex-api-key"}],
+    "evaluators": [
+      {
+        "id": "drex-primary",
+        "mode": "semantic",
+        "adapter": {"id": "io.antaeus.systemone", "version": "0.3.0"},
+        "protocol": {"id": "io.antaeus.rule-match", "version": "v0alpha1"},
+        "requiredCapabilities": ["json-input", "structured-rule-results", "confidence-scores"],
+        "timeoutMs": 5000,
+        "retry": {"maxAttempts": 2, "retryOn": ["timeout", "unavailable", "throttled"], "initialBackoffMs": 250, "maxBackoffMs": 2000, "multiplier": 2},
+        "provider": "drex",
+        "model": "drex-latest",
+        "credentialSlot": "drex-api-key",
+        "parameters": {"endpoint": "https://drex.nace.ai"}
+      }
+    ],
+    "routing": {
+      "primary": "drex-primary",
+      "fallbacks": [],
+      "confidence": {"enabled": true, "minimumAccepted": 0.7, "onLowConfidence": "indeterminate"},
+      "terminal": {"onIndeterminate": "failure", "onFailure": "failure"}
+    }
+  }
+}

@@ -359,6 +359,11 @@ func (x *execution) invoke(ctx context.Context, id, route string, indexes []int)
 		}
 		base := math.Min(float64(*e.Retry.MaxBackoffMS), float64(*e.Retry.InitialBackoffMS)*math.Pow(*e.Retry.Multiplier, float64(attempt-1)))
 		delay := x.time.jitter(time.Duration(base) * time.Millisecond)
+		// A provider-required wait is a floor that neither jitter nor the
+		// backoff cap may shorten.
+		if wait := retryAfter(err); wait > delay {
+			delay = wait
+		}
 		if code := x.stopped(ctx); code != "" {
 			return failedRules(rules, code), code
 		}
@@ -399,6 +404,16 @@ func classify(err error) string {
 		return failure.Code
 	}
 	return "evaluation.adapter_failed"
+}
+
+// retryAfter returns the provider-required wait carried by a retryable
+// adapter error, or zero.
+func retryAfter(err error) time.Duration {
+	var failure *evaluator.Error
+	if errors.As(err, &failure) && failure != nil && failure.Retryable && failure.RetryAfter > 0 {
+		return failure.RetryAfter
+	}
+	return 0
 }
 
 func transient(code string) profile.TransientFailure {

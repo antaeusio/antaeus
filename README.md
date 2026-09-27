@@ -56,8 +56,9 @@ and every attempt.
   and unresolved rules become an explicit `failure`, never a silent `allow`.
 - **Provider-neutral.** Evaluators plug in behind one interface: a
   credential-free deterministic fixture, OpenAI with your own key, and
-  [System One servers](./docs/systemone-adapter.md) you can run yourself (the
-  CPU-only Antaeus `nli-server` or a CLM model) that return confidence scores.
+  [System One servers](./docs/systemone-adapter.md) that return confidence
+  scores: ones you run yourself (the CPU-only Antaeus `nli-server` or a CLM
+  model) or the hosted Drex API.
   Retries, deadlines, fallbacks, and traces live in a separate evaluator
   profile.
 - **Testable.** Named regression cases run offline and credential-free, so
@@ -187,7 +188,7 @@ code.
 | [Writing policies](./docs/policy-authoring.md) | Policy fields, syntax, and digest identity |
 | [Reading a Decision](./docs/decisions.md) | Outcomes, failures, and fallback boundaries |
 | [OpenAI evaluator](./docs/openai-adapter.md) | Setup, request boundary, failures, and data handling |
-| [System One evaluator](./docs/systemone-adapter.md) | Antaeus and CLM servers, confidence gating, and fallback profiles |
+| [System One evaluator](./docs/systemone-adapter.md) | Antaeus, CLM, and Drex providers, confidence gating, and fallback profiles |
 | [Profile execution](./docs/profile-execution.md) | Retries, deadlines, routing, and traces |
 | [CLI configuration](./docs/cli-configuration.md) | Profile selection, credential bindings, and project trust |
 | [Evaluator adapters](./docs/evaluator-adapters.md) | Embedding in Go and writing an adapter |

@@ -47,9 +47,10 @@ type configRuntime struct {
 	userDir     string
 	environment localbinding.Environment
 	// openAI and systemOne replace the installed adapters in tests only.
-	openAI          *runner.Adapter
-	systemOne       *runner.Adapter
-	legacySystemOne *runner.Adapter
+	openAI            *runner.Adapter
+	systemOne         *runner.Adapter
+	previousSystemOne *runner.Adapter
+	legacySystemOne   *runner.Adapter
 }
 
 func (r configRuntime) systemOneAdapter() runner.Adapter {
@@ -57,6 +58,13 @@ func (r configRuntime) systemOneAdapter() runner.Adapter {
 		return *r.systemOne
 	}
 	return systemone.Registration()
+}
+
+func (r configRuntime) previousSystemOneAdapter() runner.Adapter {
+	if r.previousSystemOne != nil {
+		return *r.previousSystemOne
+	}
+	return systemone.PreviousRegistration()
 }
 
 func (r configRuntime) legacySystemOneAdapter() runner.Adapter {

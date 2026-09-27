@@ -39,12 +39,17 @@ Installed adapters:
                             environment (see docs/openai-adapter.md). Project-supplied
                             configuration that reads credentials requires
                             antaeus config trust first.
-  io.antaeus.systemone@0.2.0 experimental System One evaluator for the server named
+  io.antaeus.systemone@0.3.0 experimental System One evaluator for the server named
                             by the profile's endpoint parameter. Returns confidence
                             scores. Provider antaeus (an Antaeus server such as
                             antaeusio/nli-server) reads an optional API key from the
                             slot antaeus-api-key; provider contrastive-lm (a CLM
-                            server) from clm-api-key (see docs/systemone-adapter.md).
+                            server) from clm-api-key. Provider drex sends the policy
+                            conditions and input to the hosted Drex API at
+                            https://drex.nace.ai and requires the slot drex-api-key
+                            (see docs/systemone-adapter.md).
+  io.antaeus.systemone@0.2.0 the earlier antaeus and CLM version, kept for existing
+                            profiles.
   io.antaeus.systemone@0.1.0 the earlier CLM-only version, kept for existing profiles.
 
 Fixture profiles use only the fixture adapter. Semantic profiles may combine the
@@ -149,9 +154,10 @@ func runEvaluateProfileWith(args []string, stdout, stderr io.Writer, runtime con
 		correlationID = "cli-fixture-" + caseName
 	} else {
 		registry = runner.Registry{
-			openai.Identity:          runtime.openAIAdapter(),
-			systemone.Identity:       runtime.systemOneAdapter(),
-			systemone.LegacyIdentity: runtime.legacySystemOneAdapter(),
+			openai.Identity:            runtime.openAIAdapter(),
+			systemone.Identity:         runtime.systemOneAdapter(),
+			systemone.PreviousIdentity: runtime.previousSystemOneAdapter(),
+			systemone.LegacyIdentity:   runtime.legacySystemOneAdapter(),
 		}
 		correlationID, err = randomCorrelationID()
 		if err != nil {
@@ -188,7 +194,7 @@ const (
 
 var errAdapterNotInstalled = errors.New("the selected profile uses an evaluator adapter that is not installed; installed adapters are " +
 	fixture.AdapterID + "@" + fixture.AdapterVersion + ", " + openai.AdapterID + "@" + openai.AdapterVersion + ", and " +
-	systemone.AdapterID + "@" + systemone.AdapterVersion + " (and " + systemone.LegacyAdapterVersion + ")")
+	systemone.AdapterID + "@" + systemone.AdapterVersion + " (and " + systemone.PreviousAdapterVersion + " and " + systemone.LegacyAdapterVersion + ")")
 
 // classifyProfile accepts a fixture-only profile or a semantic profile whose
 // evaluators all use installed semantic adapters with valid required fields.
@@ -205,7 +211,7 @@ func classifyProfile(p profile.Artifact) (profileKind, error) {
 				return unsupportedProfile, fmt.Errorf("evaluator %q: %w", entry.ID, err)
 			}
 			next = semanticProfile
-		case entry.Mode == profile.ModeSemantic && (entry.Adapter == systemone.Identity || entry.Adapter == systemone.LegacyIdentity):
+		case entry.Mode == profile.ModeSemantic && (entry.Adapter == systemone.Identity || entry.Adapter == systemone.PreviousIdentity || entry.Adapter == systemone.LegacyIdentity):
 			if err := systemone.ValidateEvaluator(entry); err != nil {
 				return unsupportedProfile, fmt.Errorf("evaluator %q: %w", entry.ID, err)
 			}
@@ -318,9 +324,10 @@ func randomCorrelationID() (string, error) {
 // adapters, keyed by exact adapter identity. Explicit bindings still win.
 func installedDefaults() map[profile.ComponentIdentity]map[string]localbinding.Reference {
 	return map[profile.ComponentIdentity]map[string]localbinding.Reference{
-		openai.Identity:          openai.DefaultReferences(),
-		systemone.Identity:       systemone.DefaultReferences(),
-		systemone.LegacyIdentity: systemone.LegacyDefaultReferences(),
+		openai.Identity:            openai.DefaultReferences(),
+		systemone.Identity:         systemone.DefaultReferences(),
+		systemone.PreviousIdentity: systemone.PreviousDefaultReferences(),
+		systemone.LegacyIdentity:   systemone.LegacyDefaultReferences(),
 	}
 }
 
