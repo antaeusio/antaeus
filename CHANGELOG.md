@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-27
+
+Adds the hosted [Drex](https://drex.nace.ai) API by Nace.AI as a System One
+provider, so you can evaluate semantic policies without running a model
+yourself. Provider `drex` is available in System One adapter version 0.3.0
+(adapter versions are numbered separately from releases). It reads its key from
+`DREX_API_KEY` and sends policy conditions and unredacted input to Nace.AI.
+Review Nace.AI's terms before sending personal or confidential data. Its quality on
+policy tasks has not been measured on a published evaluation set, so use
+confidence gating and review before relying on it. The profile runner now
+honors provider `Retry-After` waits. Existing profiles keep working unchanged.
+Go users who register the System One adapter themselves should read the
+migration note below. Public Go APIs and CLI behavior may still change in minor
+releases before v1.0.0.
+
+Install with `brew install antaeusio/tap/antaeus` (or `brew upgrade antaeus`),
+`go install github.com/antaeusio/antaeus/cmd/antaeus@v0.4.0`,
+`docker pull ghcr.io/antaeusio/antaeus:0.4`, or an archive from this release.
+
 ### Added
 
 - System One adapter `io.antaeus.systemone@0.3.0` with provider `drex` for the hosted [Drex](https://drex.nace.ai) API by Nace.AI. It requires the `drex-api-key` credential (`DREX_API_KEY`) and endpoint `https://drex.nace.ai`, and sends policy conditions and unredacted input to Nace.AI. Version 0.3.0 also retries HTTP 529 as `evaluator.unavailable`, reports `Retry-After-Ms` and `Retry-After` waits to the runner, and records the provider's `X-Request-Id` in adapter metadata. Versions 0.2.0 and 0.1.0 stay installed and unchanged. Example profile: `examples/drex/profile.json`.
@@ -111,7 +130,8 @@ carry GitHub build-provenance attestations
 - `scripts/with-build-lock` keeps the lock until an interrupted command's whole process group has stopped (escalating to KILL after a bounded wait), serializes stale-lock takeover, waits for owners that have not yet written metadata, and no longer treats another user's process as dead. `scripts/test-build-lock` covers these cases ([#42](https://github.com/antaeusio/antaeus/issues/42)).
 - `scripts/cross-build` pins `GOAMD64=v1` and `GOARM64=v8.0` instead of inheriting the caller's environment.
 
-[Unreleased]: https://github.com/antaeusio/antaeus/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/antaeusio/antaeus/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/antaeusio/antaeus/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/antaeusio/antaeus/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/antaeusio/antaeus/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/antaeusio/antaeus/releases/tag/v0.1.0
