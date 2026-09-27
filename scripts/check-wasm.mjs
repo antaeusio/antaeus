@@ -2,7 +2,7 @@
 // a stubbed fetch. No network access. Usage:
 //   node scripts/check-wasm.mjs [engine directory]
 // The directory defaults to scripts/build-wasm's output and must contain
-// antaeus.wasm and wasm_exec.js.
+// antaeus.wasm, wasm_exec.js, and antaeus.mjs.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -40,15 +40,26 @@ const reply = (body, status = 200, headers = {}) => () => Promise.resolve(new Re
 async function evaluate(steps, extra) {
   calls = [];
   script = steps;
-  const response = JSON.parse(await globalThis.antaeus.evaluate(request(extra)));
+  const response = JSON.parse(await engine.evaluate(request(extra)));
   assert(!JSON.stringify(response).includes(key), 'response must not contain the credential');
   return response;
 }
 
-const go = new Go();
-const { instance } = await WebAssembly.instantiate(readFileSync(new URL('antaeus.wasm', dist)), go.importObject);
-go.run(instance);
-const engine = globalThis.antaeus;
+// Record every engine instance so the checks can read each one's memory. Each
+// call runs in a fresh instance.
+const created = [];
+const instantiate = WebAssembly.instantiate;
+WebAssembly.instantiate = async (...args) => {
+  const result = await instantiate(...args);
+  created.push(result instanceof WebAssembly.Instance ? result : result.instance);
+  return result;
+};
+const memoryOf = (instance) => instance.exports.mem.buffer.byteLength;
+const { start } = await import(new URL('antaeus.mjs', dist));
+const wasmBytes = readFileSync(new URL('antaeus.wasm', dist));
+// One instance at a time, so these checks see strictly one call at a time.
+const engine = await start(wasmBytes, { maxInstances: 1 });
+assert.equal(globalThis.__antaeusCore, undefined, 'the engine core leaked into the global scope');
 assert.equal(engine.interfaceVersion, 1);
 assert.match(engine.version, /\S/);
 
@@ -96,14 +107,15 @@ assert(pulled < 64, `pulled ${pulled} chunks`);
 // adapter asks for, so its response limit bounds Go allocations.
 const huge = new Uint8Array(32 << 20).fill(0x20);
 let hugeCancelled = false;
-const memoryBefore = instance.exports.mem.buffer.byteLength;
+r = await evaluate([reply(answers(0.96, 0.2))]);
+const baseline = memoryOf(created.at(-1));
 r = await evaluate([() => Promise.resolve(new Response(new ReadableStream({
   start(controller) { controller.enqueue(huge); },
   cancel() { hugeCancelled = true; },
 }), { status: 200 }))]);
 assert.equal(r.decision.outcome, 'failure');
 assert(hugeCancelled, 'oversized single-chunk stream was not cancelled');
-const growth = instance.exports.mem.buffer.byteLength - memoryBefore;
+const growth = memoryOf(created.at(-1)) - baseline;
 assert(growth < (8 << 20), `engine memory grew by ${growth} bytes for a 32 MiB chunk`);
 
 // A fetch that never answers is aborted at the host deadline.
@@ -135,7 +147,7 @@ for (const bad of [
 r = await evaluate([reply(answers(0.96, 0.2))]);
 assert.equal(r.decision.outcome, 'deny');
 
-// Calls run one at a time in arrival order, never interleaved.
+// An instance runs one call at a time; waiting calls never interleave.
 let inFlight = 0;
 let maxInFlight = 0;
 const order = [];
@@ -153,7 +165,69 @@ const titles = ['a', 'b', 'c', 'd', 'e'];
 const results = await Promise.all(titles.map((title) => engine.evaluate(request({ input: { title } }))));
 assert(results.every((raw) => JSON.parse(raw).decision.outcome === 'allow'));
 assert.equal(maxInFlight, 1, 'evaluations overlapped');
-assert.deepEqual(order, titles);
+assert.deepEqual([...order].sort(), titles);
+
+// Admission is bounded: while one call runs, waiting calls are limited in
+// number and size, excess calls are refused as busy at once, waiting requests
+// are not copied into the engine, and every admitted call completes afterwards.
+{
+  let release;
+  const held = new Promise((done) => { release = done; });
+  calls = [];
+  script = [async () => { await held; return new Response(answers(0.05, 0.9), { status: 200 }); }];
+  const pad = 'p'.repeat(900 << 10);
+  const first = engine.evaluate(request({ input: { title: 'held' } }));
+  await new Promise((done) => setTimeout(done, 20));
+  const waiting = Array.from({ length: 24 }, (_, i) => engine.evaluate(request({ input: { title: `queued-${i}`, pad } })));
+  const busy = (await Promise.race([Promise.all(waiting.slice(16)), new Promise((done) => setTimeout(() => done(null), 1000))]));
+  assert(busy, 'refused calls did not settle while another call was running');
+  for (const raw of busy) assert.equal(JSON.parse(raw).error.code, 'host.busy');
+  const instancesWhileWaiting = created.length;
+  await new Promise((done) => setTimeout(done, 50));
+  assert.equal(created.length, instancesWhileWaiting, 'waiting calls started engine instances');
+  const runningMemory = memoryOf(created.at(-1));
+  assert(runningMemory < baseline + (4 << 20), `the running instance holds ${runningMemory} bytes while calls wait`);
+  script = Array.from({ length: 16 }, () => reply(answers(0.05, 0.9)));
+  release();
+  assert.equal(JSON.parse(await first).decision.outcome, 'allow');
+  for (const raw of await Promise.all(waiting.slice(0, 16))) assert.equal(JSON.parse(raw).decision.outcome, 'allow');
+  r = await evaluate([reply(answers(0.05, 0.9))]);
+  assert.equal(r.decision.outcome, 'allow');
+}
+
+// A queued call settles at its own deadline without starting, and later calls
+// still run in order.
+{
+  let release;
+  const held = new Promise((done) => { release = done; });
+  calls = [];
+  script = [async () => { await held; return new Response(answers(0.05, 0.9), { status: 200 }); }, reply(answers(0.05, 0.9))];
+  const slow = engine.evaluate(request({ input: { title: 'slow' } }));
+  await new Promise((done) => setTimeout(done, 20));
+  const started = performance.now();
+  const short = JSON.parse(await engine.evaluate(request({ input: { title: 'short' }, deadlineUnixMs: Date.now() + 50 })));
+  const waited = performance.now() - started;
+  assert.equal(short.error.code, 'host.deadline_exceeded');
+  assert(waited < 300, `queued call settled after ${waited} ms`);
+  const later = engine.evaluate(request({ input: { title: 'later' } }));
+  release();
+  assert.equal(JSON.parse(await slow).decision.outcome, 'allow');
+  assert.equal(JSON.parse(await later).decision.outcome, 'allow');
+  assert.deepEqual(calls.map((c) => JSON.parse(new TextDecoder().decode(c.init.body)).state.title), ['slow', 'later']);
+}
+
+// The size limit counts UTF-8 bytes, not UTF-16 code units: multibyte text
+// over the byte limit is refused before it is copied, and multibyte text
+// under it is accepted.
+{
+  const instancesBefore = created.length;
+  const overBytes = JSON.stringify({ policy: '€'.repeat(3 << 20), policyFormat: 'yaml' });
+  assert(overBytes.length < (4 << 20));
+  assert.equal(JSON.parse(await engine.validate(overBytes)).error.code, 'host.request_invalid');
+  assert.equal(created.length, instancesBefore, 'an oversized multibyte request reached an engine instance');
+  r = await evaluate([reply(answers(0.05, 0.9))], { input: { title: 'Kamera – gebraucht, sehr gut ✓', notes: 'é'.repeat(300000) } });
+  assert.equal(r.decision.outcome, 'allow');
+}
 
 // Credentials for slots off the profile's route are ignored, even if invalid.
 r = await evaluate([reply(answers(0.96, 0.2))], {
@@ -181,6 +255,31 @@ assert.equal(r.error.code, 'host.credential_missing');
 r = await evaluate([], { deadlineUnixMs: Date.now() - 1000 });
 assert.equal(r.error.code, 'host.deadline_exceeded');
 assert.equal(calls.length, 0);
+
+// Every call runs in a fresh instance; instances are never reused.
+{
+  const before = created.length;
+  for (let i = 0; i < 3; i += 1) await evaluate([reply(answers(0.05, 0.9))]);
+  assert.equal(created.length, before + 3, 'calls reused an engine instance');
+}
+
+// A pool of instances runs calls concurrently, each call in one instance.
+{
+  const pool = await start(wasmBytes, { maxInstances: 2 });
+  let active = 0;
+  let peak = 0;
+  calls = [];
+  script = Array.from({ length: 4 }, () => async () => {
+    active += 1;
+    peak = Math.max(peak, active);
+    await new Promise((done) => setTimeout(done, 50));
+    active -= 1;
+    return new Response(answers(0.05, 0.9), { status: 200 });
+  });
+  const results = await Promise.all(['a', 'b', 'c', 'd'].map((title) => pool.evaluate(request({ input: { title } }))));
+  assert(results.every((raw) => JSON.parse(raw).decision.outcome === 'allow'));
+  assert.equal(peak, 2, `peak concurrency ${peak} with two instances`);
+}
 
 // Parity: the shared cases produce the same Decisions as the native engine
 // (internal/host/parity_test.go), apart from the profile digest, which covers

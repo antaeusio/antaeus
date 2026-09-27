@@ -60,7 +60,7 @@ for binary in "$dist_dir"/antaeus_*; do
 done
 wasm_stage="$out_dir/stage/antaeus_${plain}_js_wasm"
 mkdir -p "$wasm_stage"
-cp "$dist_dir/antaeus_js_wasm/antaeus.wasm" "$dist_dir/antaeus_js_wasm/wasm_exec.js" "$dist_dir/antaeus_js_wasm/LICENSE-go" "$wasm_stage/"
+cp "$dist_dir/antaeus_js_wasm/antaeus.wasm" "$dist_dir/antaeus_js_wasm/wasm_exec.js" "$dist_dir/antaeus_js_wasm/antaeus.mjs" "$dist_dir/antaeus_js_wasm/LICENSE-go" "$wasm_stage/"
 cp "$repo_root/LICENSE" "$repo_root/README.md" "$repo_root/CHANGELOG.md" "$repo_root/docs/webassembly.md" "$wasm_stage/"
 (cd "$out_dir/stage" && tar -czf "$out_dir/antaeus_${plain}_js_wasm.tar.gz" "antaeus_${plain}_js_wasm")
 rm -rf "$out_dir/stage"

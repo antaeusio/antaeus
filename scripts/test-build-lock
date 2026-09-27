@@ -176,6 +176,8 @@ done <"$log"
 # for the toolchain.
 new_root wasm
 cp "$script_dir/build-wasm" "$root/scripts/build-wasm"
+mkdir -p "$root/cmd/antaeus-wasm"
+printf 'export {};' >"$root/cmd/antaeus-wasm/antaeus.mjs"
 cat >"$root/scripts/build" <<'STUB'
 #!/bin/sh
 set -eu
@@ -206,7 +208,7 @@ sleep 1
 wait "$holder"
 wait "$builder" || fail "wasm: build-wasm failed after acquiring the lock"
 [ ! -e "$out/previous" ] || fail "wasm: stale output was kept"
-for file in antaeus.wasm wasm_exec.js LICENSE-go; do
+for file in antaeus.wasm wasm_exec.js antaeus.mjs LICENSE-go; do
   [ -s "$out/$file" ] || fail "wasm: $file was not staged"
 done
 [ ! -d "$lock" ] || fail "wasm: lock was not released"

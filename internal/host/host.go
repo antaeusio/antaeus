@@ -33,6 +33,14 @@ const InterfaceVersion = 1
 // their own engine limits inside it.
 const MaxRequestBytes = 4 << 20
 
+// Limits on calls waiting in a host that runs calls one at a time, such as the
+// WebAssembly engine. They bound the memory held by waiting requests; a call
+// beyond either limit is refused with CodeBusy.
+const (
+	MaxPendingCalls = 16
+	MaxPendingBytes = 16 << 20
+)
+
 // Error codes returned before evaluation starts.
 const (
 	CodeRequestInvalid       = "host.request_invalid"
@@ -43,9 +51,13 @@ const (
 	CodeCredentialMissing    = "host.credential_missing"
 	CodeDeadlineExceeded     = "host.deadline_exceeded"
 	CodeEvaluationNotStarted = "host.evaluation_not_started"
-	// CodeInternalError reports a failure inside the engine; the call had no
-	// effect and later calls are unaffected.
+	// CodeInternalError reports an internal failure that prevented
+	// completion. No Decision is available. Provider requests may already
+	// have occurred, so the error does not imply that retrying is safe.
 	CodeInternalError = "host.internal_error"
+	// CodeBusy reports that the host already holds its limit of pending
+	// calls; the call was not started and may be retried later.
+	CodeBusy = "host.busy"
 )
 
 // Error is a configuration problem that prevented evaluation. Messages never
