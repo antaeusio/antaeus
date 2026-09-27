@@ -3,9 +3,9 @@
 The engine is also built as WebAssembly for JavaScript hosts, such as
 Cloudflare Workers, browsers, and Node.js. It is the same Go engine as the CLI:
 policy validation, evaluator profiles, retries and deadlines, confidence
-gating, deterministic reduction, and the Decision record all behave
-identically. Remote evaluators reach their providers through the host's
-`fetch`.
+gating, deterministic reduction, and the Decision record are shared code.
+Remote evaluators reach their providers through the host's `fetch`; see
+[Network behavior](#network-behavior) for the few differences that follow.
 
 > **Status: experimental.** Interface version 1 may still change in a minor
 > release before v1.0.0.
@@ -28,17 +28,40 @@ To build it yourself, run `scripts/build-wasm`, which writes the same files to
 
 Load `wasm_exec.js`, which defines `globalThis.Go`, then instantiate and run
 the module. The engine installs `globalThis.antaeus` and keeps running until
-the host discards it. Start it once per isolate or page and reuse it.
+the host discards it. Start it once and reuse it.
+
+In Cloudflare Workers, start it inside the first request handler, not at
+module scope: Go's runtime reads random values and sets timers while starting,
+which Workers do not allow during global-scope execution.
 
 ```js
 import "./wasm_exec.js";
 import module from "./antaeus.wasm"; // a compiled WebAssembly.Module, as in Workers
 
-const go = new Go();
-const instance = await WebAssembly.instantiate(module, go.importObject);
-go.run(instance); // returns a promise that settles only if the engine exits
-const engine = globalThis.antaeus;
+let engine;
+function startEngine() {
+  const go = new Go();
+  const started = WebAssembly.instantiate(module, go.importObject).then((instance) => {
+    // go.run settles only if the engine exits, for example on a fatal error
+    // such as running out of memory. Start a new engine on the next request.
+    go.run(instance).finally(() => { engine = undefined; });
+    return globalThis.antaeus;
+  });
+  started.catch(() => { engine = undefined; });
+  return started;
+}
+
+export default {
+  async fetch(request) {
+    engine ??= startEngine();
+    const antaeus = await engine;
+    // ...
+  },
+};
 ```
+
+If the engine exits while a call is pending, that call's promise never
+settles; race it against your own timeout.
 
 `engine.interfaceVersion` is `1` and `engine.version` is the build version, for
 example `v0.5.0 (abc123def456)`.
@@ -46,8 +69,17 @@ example `v0.5.0 (abc123def456)`.
 ## Calls
 
 Both calls take one JSON string and return a promise of a JSON string. The
-promise resolves for every well-formed call; it rejects only when the argument
-is not a string.
+promise resolves for every call with a string argument, including internal
+failures; it rejects only when the argument is not a string.
+
+Calls run one at a time, in the order they are made. All calls share one Go
+runtime, which resumes whichever work is ready whenever any promise settles,
+so interleaved calls would run one request's work, and start its provider
+requests, inside another request's JavaScript context. Cloudflare Workers
+cancel such work when that other request ends. A call waits for earlier calls
+to finish; pass `deadlineUnixMs` so that wait counts against the call's
+budget. Concurrency across a service comes from many isolates or pages, not
+from one engine.
 
 Every response has this shape; exactly one of `policy`, `decision`, or `error`
 is present:
@@ -88,7 +120,7 @@ Returns `policy` with the policy's `name`, `digest`, and number of `rules`.
 | `input` | a JSON object |
 | `correlationId` | the Decision's correlation ID |
 | `deadlineUnixMs` | optional absolute deadline in Unix milliseconds. The evaluation ends at the earlier of this and the profile's `totalTimeoutMs`. A host that waited before calling, for example for a concurrency slot, passes its original deadline so the wait counts against it. |
-| `credentials` | values for the profile's credential slots, matched by adapter ID and slot. Only slots on the profile's configured route are read; others are ignored. Values are used for this evaluation only and never appear in responses. |
+| `credentials` | values for the profile's credential slots, matched by adapter ID and slot. Entries for slots the profile's configured route does not use are ignored without validation. Values are used for this evaluation only and never appear in responses. |
 
 An accepted evaluation always returns a `decision`, including `failure`
 Decisions for provider errors and timeouts, exactly as the CLI does.
@@ -103,7 +135,7 @@ These are returned before evaluation starts; no provider is called.
 
 | Code | Meaning |
 | --- | --- |
-| `host.request_invalid` | Not valid JSON for the call, an unknown field, an unsupported format, a repeated credential, or a request over 4 MiB |
+| `host.request_invalid` | Not exactly one valid JSON object for the call (duplicate keys at any depth, trailing data, and a second document are rejected), an unknown field, an unsupported format, a repeated credential, or a request over 4 MiB |
 | `host.policy_invalid` | The policy failed to parse or validate |
 | `host.profile_invalid` | The evaluator profile failed to parse or validate |
 | `host.input_invalid` | The input is not a valid JSON object |
@@ -111,19 +143,33 @@ These are returned before evaluation starts; no provider is called.
 | `host.credential_missing` | A slot on the configured route has no value |
 | `host.deadline_exceeded` | `deadlineUnixMs` passed before evaluation started |
 | `host.evaluation_not_started` | Any other configuration error found when starting |
+| `host.internal_error` | The engine failed while handling the call; the call had no effect and later calls are unaffected |
 
 ## Network behavior
 
 Requests use the host's global `fetch` with `redirect: "manual"`; a redirect
 is an adapter failure and is never followed. The host is responsible for TLS.
 When a request's deadline passes, the engine aborts it with an
-`AbortController`. Response bodies are read as streams, so an adapter's
-response size limit also bounds memory.
+`AbortController`. Response bodies are read as streams, and each read copies
+only the bytes the adapter asks for, so an adapter's response size limit also
+bounds the engine's own allocations, however large the host's chunks are.
+Memory the host's `fetch` implementation allocates for those chunks is outside
+the engine's control. A `fetch` that throws, rejects, or
+returns something other than a response is a provider failure, never a crash.
+
+Two results differ from native builds:
+
+- `fetch` does not say why a connection failed, so a TLS verification failure
+  is the retryable `evaluator.unavailable` rather than the adapter's
+  non-retryable TLS code.
+- Browsers answer `redirect: "manual"` with status 0, which adapters report
+  as an unexpected status rather than a redirect. Workers and Node.js return
+  the real redirect status.
 
 ## Limits
 
-The module is about 14 MB, or about 3.6 MB compressed. Go's WebAssembly port
-runs on one thread; concurrent calls interleave while waiting on `fetch`. The
-engine's memory grows with concurrent evaluations and is not returned to the
-host. Measure memory against your host's limits, such as 128 MB per Cloudflare
-Worker isolate.
+The module is about 14 MB, or about 3.6 MB compressed: within the Workers
+Paid plan's 10 MB compressed limit but over the Free plan's 3 MB. Requests
+over 4 MiB are rejected before they are copied into the engine. The engine's
+memory is not returned to the host, so measure peak memory against your
+host's limits, such as 128 MB per Cloudflare Worker isolate.

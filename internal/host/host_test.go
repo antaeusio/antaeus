@@ -91,10 +91,14 @@ func TestValidate(t *testing.T) {
 		t.Fatalf("response = %+v error = %+v", r, r.Error)
 	}
 	for name, c := range map[string]struct{ request, code string }{
-		"unknown field":  {`{"policy":"x","policyFormat":"yaml","extra":1}`, CodeRequestInvalid},
-		"bad format":     {`{"policy":"x","policyFormat":"toml"}`, CodeRequestInvalid},
-		"trailing data":  {`{"policy":"x","policyFormat":"yaml"} {}`, CodeRequestInvalid},
-		"invalid policy": {`{"policy":"not: a policy","policyFormat":"yaml"}`, CodePolicyInvalid},
+		"unknown field":    {`{"policy":"x","policyFormat":"yaml","extra":1}`, CodeRequestInvalid},
+		"bad format":       {`{"policy":"x","policyFormat":"toml"}`, CodeRequestInvalid},
+		"trailing data":    {`{"policy":"x","policyFormat":"yaml"} {}`, CodeRequestInvalid},
+		"trailing brace":   {`{"policy":"x","policyFormat":"yaml"}}`, CodeRequestInvalid},
+		"trailing bracket": {`{"policy":"x","policyFormat":"yaml"}]`, CodeRequestInvalid},
+		"duplicate key":    {`{"policy":"x","policyFormat":"yaml","policyFormat":"json"}`, CodeRequestInvalid},
+		"not an object":    {`["policy"]`, CodeRequestInvalid},
+		"invalid policy":   {`{"policy":"not: a policy","policyFormat":"yaml"}`, CodePolicyInvalid},
 	} {
 		r := response(t, Validate([]byte(c.request)))
 		if r.OK || r.Error == nil || r.Error.Code != c.code || r.Policy != nil {
@@ -205,5 +209,51 @@ func TestEvaluateWithoutCredentialSlots(t *testing.T) {
 	}), Registry()))
 	if !r.OK || r.Decision.Outcome != decision.OutcomeAllow || calls.Load() != 1 {
 		t.Fatalf("response = %+v error = %+v", r, r.Error)
+	}
+}
+
+func TestEvaluateIgnoresInvalidCredentialsOffTheRoute(t *testing.T) {
+	var calls atomic.Int32
+	s := server(t, &calls)
+	r := response(t, Evaluate(context.Background(), request(t, s.URL, func(r map[string]any) {
+		extra := []map[string]string{
+			{"adapterId": "Not A Valid Adapter", "slot": "BAD SLOT", "value": "x"},
+			{"adapterId": "io.antaeus.openai", "slot": "openai-api-key", "value": ""},
+		}
+		r["credentials"] = append(r["credentials"].([]map[string]string), extra...)
+	}), Registry()))
+	if !r.OK || r.Decision.Outcome != decision.OutcomeDeny || calls.Load() != 1 {
+		t.Fatalf("response = %+v error = %+v", r, r.Error)
+	}
+}
+
+func TestFailureEncodesAnError(t *testing.T) {
+	r := response(t, Failure(CodeInternalError, "boom"))
+	if r.OK || r.Error == nil || r.Error.Code != CodeInternalError || r.Error.Message != "boom" {
+		t.Fatalf("response = %+v", r)
+	}
+}
+
+func TestEvaluateRejectsMalformedEnvelopesWithoutCallingTheProvider(t *testing.T) {
+	var calls atomic.Int32
+	s := server(t, &calls)
+	valid := request(t, s.URL, nil)
+	nested := strings.Replace(string(valid), `"slot":"antaeus-api-key"`, `"slot":"antaeus-api-key","slot":"antaeus-api-key"`, 1)
+	if nested == string(valid) {
+		t.Fatal("fixture did not change")
+	}
+	for name, raw := range map[string]string{
+		"trailing brace":       string(valid) + "}",
+		"trailing bracket":     string(valid) + "]",
+		"second document":      string(valid) + "{}",
+		"nested duplicate key": nested,
+	} {
+		r := response(t, Evaluate(context.Background(), []byte(raw), Registry()))
+		if r.OK || r.Error == nil || r.Error.Code != CodeRequestInvalid {
+			t.Fatalf("%s: response = %+v error = %+v", name, r, r.Error)
+		}
+	}
+	if calls.Load() != 0 {
+		t.Fatalf("server called %d times", calls.Load())
 	}
 }

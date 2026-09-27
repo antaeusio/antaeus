@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- Experimental WebAssembly build of the engine for JavaScript hosts such as Cloudflare Workers, browsers, and Node.js: `antaeus_<version>_js_wasm.tar.gz` in each release, built with `scripts/build-wasm`. It installs `globalThis.antaeus` with JSON `validate` and `evaluate` calls (interface version 1), takes credentials and an optional absolute deadline per call, and returns the same Decisions as the CLI. Remote evaluators use the host's `fetch` without following redirects and stream response bodies. See `docs/webassembly.md`.
+- Experimental WebAssembly build of the engine for JavaScript hosts such as Cloudflare Workers, browsers, and Node.js: `antaeus_<version>_js_wasm.tar.gz` in each release, built with `scripts/build-wasm`. It installs `globalThis.antaeus` with JSON `validate` and `evaluate` calls (interface version 1), takes credentials and an optional absolute deadline per call, and returns the same Decisions as the CLI. Calls run one at a time so that, in Cloudflare Workers, no request's work runs in another request's context. Remote evaluators use the host's `fetch` without following redirects and stream response bodies; unexpected host values become provider failures rather than stopping the engine. See `docs/webassembly.md`.
 
 ## [0.4.0] - 2026-09-27
 

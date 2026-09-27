@@ -67,6 +67,18 @@ jobs:
           "$bin" version | grep -F "$VERSION"
           "$bin" validate contracts/examples/v0alpha1/policy/vendor-onboarding.yaml
           (cd ".tmp/release/$VERSION" && sha256sum --check --strict SHA256SUMS)
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24.21.0'
+          check-latest: false
+      - name: Test the WebAssembly archive
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          test "$(node --version)" = 'v24.21.0'
+          dir=$(mktemp -d)
+          tar -xzf ".tmp/release/$VERSION/antaeus_${VERSION#v}_js_wasm.tar.gz" -C "$dir"
+          node scripts/check-wasm.mjs "$dir/antaeus_${VERSION#v}_js_wasm"
       - name: Extract release notes
         env:
           VERSION: ${{ github.ref_name }}

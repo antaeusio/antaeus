@@ -8,14 +8,38 @@ set -eu
 
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 repo_root=$(CDPATH='' cd -- "$script_dir/.." && pwd)
-out_dir=${ANTAEUS_WASM_DIR:-$repo_root/.tmp/dist/antaeus_js_wasm}
 
+# Hold the build lock for the whole run, including the directory reset and
+# copies; the nested scripts/build call sees the held lock and runs directly.
+if [ "${ANTAEUS_BUILD_LOCK_HELD:-}" != 1 ]; then
+  exec "$repo_root/scripts/with-build-lock" "$0" "$@"
+fi
+
+out_dir=${ANTAEUS_WASM_DIR:-$repo_root/.tmp/dist/antaeus_js_wasm}
 case "$out_dir" in
   /*) ;;
   *) out_dir="$repo_root/$out_dir" ;;
 esac
+# The directory is deleted and recreated, so it must be a dedicated
+# subdirectory of the repository's .tmp directory.
+case "$out_dir" in
+  "$repo_root"/.tmp/?*) ;;
+  *)
+    echo "build-wasm: ANTAEUS_WASM_DIR must be a subdirectory of $repo_root/.tmp" >&2
+    exit 64
+    ;;
+esac
+case "$out_dir" in
+  */..|*/../*|*/.|*/./*)
+    echo "build-wasm: ANTAEUS_WASM_DIR must not contain . or .. segments" >&2
+    exit 64
+    ;;
+esac
 
-goroot=$(go env GOROOT)
+# Resolve the toolchain from the repository, as scripts/build does, so the
+# module's toolchain directive selects the same Go for wasm_exec.js as for the
+# compiler.
+goroot=$(cd "$repo_root" && go env GOROOT)
 loader="$goroot/lib/wasm/wasm_exec.js"
 if [ ! -f "$loader" ]; then
   echo "build-wasm: $loader not found; Go 1.24 or newer is required" >&2

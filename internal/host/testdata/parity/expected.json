@@ -1,0 +1,622 @@
+{
+  "confidence at threshold": {
+    "apiVersion": "decision.antaeus.io/v0alpha1",
+    "evaluator": {
+      "adapter": "io.antaeus.systemone",
+      "adapterVersion": "0.3.0",
+      "attempts": 1,
+      "mode": "semantic",
+      "model": "parity-model",
+      "provider": "antaeus",
+      "route": [
+        "primary"
+      ],
+      "synthetic": false
+    },
+    "extensions": {
+      "io.antaeus.execution": {
+        "attempts": [
+          {
+            "adapterId": "io.antaeus.systemone",
+            "adapterVersion": "0.3.0",
+            "attempt": 1,
+            "code": "evaluation.succeeded",
+            "evaluatorId": "primary",
+            "provider": "antaeus",
+            "requestedModel": "parity-model",
+            "resolvedModel": "parity-model",
+            "revisionAvailable": false,
+            "route": "primary",
+            "ruleIndexes": [
+              0,
+              1,
+              2
+            ]
+          }
+        ],
+        "terminal": "completed",
+        "version": "v0alpha1"
+      }
+    },
+    "kind": "Decision",
+    "outcome": "allow",
+    "policy": {
+      "digest": "sha256:3b56be3a7eb0f3261fa48dcf652603f13dea3cc2de9ee32bd441e19d456c98e4",
+      "name": "parity-listing"
+    },
+    "reasonCodes": [
+      "policy.allow_rule_matched"
+    ],
+    "ruleResults": [
+      {
+        "confidence": 0.7,
+        "reasonCodes": [
+          "systemone.not_matched"
+        ],
+        "ruleId": "prohibited-item",
+        "status": "not_matched"
+      },
+      {
+        "confidence": 0.7,
+        "reasonCodes": [
+          "systemone.not_matched"
+        ],
+        "ruleId": "needs-review",
+        "status": "not_matched"
+      },
+      {
+        "confidence": 0.7,
+        "outcome": "allow",
+        "reasonCodes": [
+          "systemone.matched"
+        ],
+        "ruleId": "complete-listing",
+        "status": "matched"
+      }
+    ]
+  },
+  "confidence below threshold": {
+    "apiVersion": "decision.antaeus.io/v0alpha1",
+    "evaluator": {
+      "adapter": "io.antaeus.systemone",
+      "adapterVersion": "0.3.0",
+      "attempts": 1,
+      "mode": "semantic",
+      "model": "parity-model",
+      "provider": "antaeus",
+      "route": [
+        "primary"
+      ],
+      "synthetic": false
+    },
+    "extensions": {
+      "io.antaeus.execution": {
+        "attempts": [
+          {
+            "adapterId": "io.antaeus.systemone",
+            "adapterVersion": "0.3.0",
+            "attempt": 1,
+            "code": "evaluation.succeeded",
+            "evaluatorId": "primary",
+            "provider": "antaeus",
+            "requestedModel": "parity-model",
+            "resolvedModel": "parity-model",
+            "revisionAvailable": false,
+            "route": "primary",
+            "ruleIndexes": [
+              0,
+              1,
+              2
+            ]
+          }
+        ],
+        "terminal": "evaluation.unresolved_rule",
+        "version": "v0alpha1"
+      }
+    },
+    "failure": {
+      "code": "evaluation.unresolved_rule",
+      "retryable": false,
+      "stage": "evaluation"
+    },
+    "kind": "Decision",
+    "outcome": "failure",
+    "policy": {
+      "digest": "sha256:3b56be3a7eb0f3261fa48dcf652603f13dea3cc2de9ee32bd441e19d456c98e4",
+      "name": "parity-listing"
+    },
+    "reasonCodes": [
+      "evaluation.unresolved_rule"
+    ],
+    "ruleResults": [
+      {
+        "confidence": 0.69,
+        "reasonCodes": [
+          "evaluation.low_confidence"
+        ],
+        "ruleId": "prohibited-item",
+        "status": "indeterminate"
+      },
+      {
+        "confidence": 0.9,
+        "reasonCodes": [
+          "systemone.not_matched"
+        ],
+        "ruleId": "needs-review",
+        "status": "not_matched"
+      },
+      {
+        "confidence": 0.9,
+        "outcome": "allow",
+        "reasonCodes": [
+          "systemone.matched"
+        ],
+        "ruleId": "complete-listing",
+        "status": "matched"
+      }
+    ]
+  },
+  "conflicting deny and allow": {
+    "apiVersion": "decision.antaeus.io/v0alpha1",
+    "evaluator": {
+      "adapter": "io.antaeus.systemone",
+      "adapterVersion": "0.3.0",
+      "attempts": 1,
+      "mode": "semantic",
+      "model": "parity-model",
+      "provider": "antaeus",
+      "route": [
+        "primary"
+      ],
+      "synthetic": false
+    },
+    "extensions": {
+      "io.antaeus.execution": {
+        "attempts": [
+          {
+            "adapterId": "io.antaeus.systemone",
+            "adapterVersion": "0.3.0",
+            "attempt": 1,
+            "code": "evaluation.succeeded",
+            "evaluatorId": "primary",
+            "provider": "antaeus",
+            "requestedModel": "parity-model",
+            "resolvedModel": "parity-model",
+            "revisionAvailable": false,
+            "route": "primary",
+            "ruleIndexes": [
+              0,
+              1,
+              2
+            ]
+          }
+        ],
+        "terminal": "completed",
+        "version": "v0alpha1"
+      }
+    },
+    "kind": "Decision",
+    "outcome": "deny",
+    "policy": {
+      "digest": "sha256:3b56be3a7eb0f3261fa48dcf652603f13dea3cc2de9ee32bd441e19d456c98e4",
+      "name": "parity-listing"
+    },
+    "reasonCodes": [
+      "policy.deny_rule_matched"
+    ],
+    "ruleResults": [
+      {
+        "confidence": 0.95,
+        "outcome": "deny",
+        "reasonCodes": [
+          "systemone.matched"
+        ],
+        "ruleId": "prohibited-item",
+        "status": "matched"
+      },
+      {
+        "confidence": 0.9,
+        "reasonCodes": [
+          "systemone.not_matched"
+        ],
+        "ruleId": "needs-review",
+        "status": "not_matched"
+      },
+      {
+        "confidence": 0.9,
+        "outcome": "allow",
+        "reasonCodes": [
+          "systemone.matched"
+        ],
+        "ruleId": "complete-listing",
+        "status": "matched"
+      }
+    ]
+  },
+  "matched review and allow": {
+    "apiVersion": "decision.antaeus.io/v0alpha1",
+    "evaluator": {
+      "adapter": "io.antaeus.systemone",
+      "adapterVersion": "0.3.0",
+      "attempts": 1,
+      "mode": "semantic",
+      "model": "parity-model",
+      "provider": "antaeus",
+      "route": [
+        "primary"
+      ],
+      "synthetic": false
+    },
+    "extensions": {
+      "io.antaeus.execution": {
+        "attempts": [
+          {
+            "adapterId": "io.antaeus.systemone",
+            "adapterVersion": "0.3.0",
+            "attempt": 1,
+            "code": "evaluation.succeeded",
+            "evaluatorId": "primary",
+            "provider": "antaeus",
+            "requestedModel": "parity-model",
+            "resolvedModel": "parity-model",
+            "revisionAvailable": false,
+            "route": "primary",
+            "ruleIndexes": [
+              0,
+              1,
+              2
+            ]
+          }
+        ],
+        "terminal": "completed",
+        "version": "v0alpha1"
+      }
+    },
+    "kind": "Decision",
+    "outcome": "review",
+    "policy": {
+      "digest": "sha256:3b56be3a7eb0f3261fa48dcf652603f13dea3cc2de9ee32bd441e19d456c98e4",
+      "name": "parity-listing"
+    },
+    "reasonCodes": [
+      "policy.review_rule_matched"
+    ],
+    "ruleResults": [
+      {
+        "confidence": 0.95,
+        "reasonCodes": [
+          "systemone.not_matched"
+        ],
+        "ruleId": "prohibited-item",
+        "status": "not_matched"
+      },
+      {
+        "confidence": 0.9,
+        "outcome": "review",
+        "reasonCodes": [
+          "systemone.matched"
+        ],
+        "ruleId": "needs-review",
+        "status": "matched"
+      },
+      {
+        "confidence": 0.9,
+        "outcome": "allow",
+        "reasonCodes": [
+          "systemone.matched"
+        ],
+        "ruleId": "complete-listing",
+        "status": "matched"
+      }
+    ]
+  },
+  "matched review only": {
+    "apiVersion": "decision.antaeus.io/v0alpha1",
+    "evaluator": {
+      "adapter": "io.antaeus.systemone",
+      "adapterVersion": "0.3.0",
+      "attempts": 1,
+      "mode": "semantic",
+      "model": "parity-model",
+      "provider": "antaeus",
+      "route": [
+        "primary"
+      ],
+      "synthetic": false
+    },
+    "extensions": {
+      "io.antaeus.execution": {
+        "attempts": [
+          {
+            "adapterId": "io.antaeus.systemone",
+            "adapterVersion": "0.3.0",
+            "attempt": 1,
+            "code": "evaluation.succeeded",
+            "evaluatorId": "primary",
+            "provider": "antaeus",
+            "requestedModel": "parity-model",
+            "resolvedModel": "parity-model",
+            "revisionAvailable": false,
+            "route": "primary",
+            "ruleIndexes": [
+              0,
+              1,
+              2
+            ]
+          }
+        ],
+        "terminal": "completed",
+        "version": "v0alpha1"
+      }
+    },
+    "kind": "Decision",
+    "outcome": "review",
+    "policy": {
+      "digest": "sha256:3b56be3a7eb0f3261fa48dcf652603f13dea3cc2de9ee32bd441e19d456c98e4",
+      "name": "parity-listing"
+    },
+    "reasonCodes": [
+      "policy.review_rule_matched"
+    ],
+    "ruleResults": [
+      {
+        "confidence": 0.95,
+        "reasonCodes": [
+          "systemone.not_matched"
+        ],
+        "ruleId": "prohibited-item",
+        "status": "not_matched"
+      },
+      {
+        "confidence": 0.9,
+        "outcome": "review",
+        "reasonCodes": [
+          "systemone.matched"
+        ],
+        "ruleId": "needs-review",
+        "status": "matched"
+      },
+      {
+        "confidence": 0.8,
+        "reasonCodes": [
+          "systemone.not_matched"
+        ],
+        "ruleId": "complete-listing",
+        "status": "not_matched"
+      }
+    ]
+  },
+  "nothing matched uses default": {
+    "apiVersion": "decision.antaeus.io/v0alpha1",
+    "evaluator": {
+      "adapter": "io.antaeus.systemone",
+      "adapterVersion": "0.3.0",
+      "attempts": 1,
+      "mode": "semantic",
+      "model": "parity-model",
+      "provider": "antaeus",
+      "route": [
+        "primary"
+      ],
+      "synthetic": false
+    },
+    "extensions": {
+      "io.antaeus.execution": {
+        "attempts": [
+          {
+            "adapterId": "io.antaeus.systemone",
+            "adapterVersion": "0.3.0",
+            "attempt": 1,
+            "code": "evaluation.succeeded",
+            "evaluatorId": "primary",
+            "provider": "antaeus",
+            "requestedModel": "parity-model",
+            "resolvedModel": "parity-model",
+            "revisionAvailable": false,
+            "route": "primary",
+            "ruleIndexes": [
+              0,
+              1,
+              2
+            ]
+          }
+        ],
+        "terminal": "completed",
+        "version": "v0alpha1"
+      }
+    },
+    "kind": "Decision",
+    "outcome": "allow",
+    "policy": {
+      "digest": "sha256:3b56be3a7eb0f3261fa48dcf652603f13dea3cc2de9ee32bd441e19d456c98e4",
+      "name": "parity-listing"
+    },
+    "reasonCodes": [
+      "policy.default_outcome"
+    ],
+    "ruleResults": [
+      {
+        "confidence": 0.95,
+        "reasonCodes": [
+          "systemone.not_matched"
+        ],
+        "ruleId": "prohibited-item",
+        "status": "not_matched"
+      },
+      {
+        "confidence": 0.95,
+        "reasonCodes": [
+          "systemone.not_matched"
+        ],
+        "ruleId": "needs-review",
+        "status": "not_matched"
+      },
+      {
+        "confidence": 0.95,
+        "reasonCodes": [
+          "systemone.not_matched"
+        ],
+        "ruleId": "complete-listing",
+        "status": "not_matched"
+      }
+    ]
+  },
+  "provider unavailable": {
+    "apiVersion": "decision.antaeus.io/v0alpha1",
+    "evaluator": {
+      "adapter": "io.antaeus.systemone",
+      "adapterVersion": "0.3.0",
+      "attempts": 1,
+      "mode": "semantic",
+      "model": "parity-model",
+      "provider": "antaeus",
+      "route": [
+        "primary"
+      ],
+      "synthetic": false
+    },
+    "extensions": {
+      "io.antaeus.execution": {
+        "attempts": [
+          {
+            "adapterId": "io.antaeus.systemone",
+            "adapterVersion": "0.3.0",
+            "attempt": 1,
+            "code": "evaluator.unavailable",
+            "evaluatorId": "primary",
+            "provider": "antaeus",
+            "requestedModel": "parity-model",
+            "revisionAvailable": false,
+            "route": "primary",
+            "ruleIndexes": [
+              0,
+              1,
+              2
+            ]
+          }
+        ],
+        "terminal": "evaluator.unavailable",
+        "version": "v0alpha1"
+      }
+    },
+    "failure": {
+      "code": "evaluator.unavailable",
+      "retryable": true,
+      "stage": "evaluation"
+    },
+    "kind": "Decision",
+    "outcome": "failure",
+    "policy": {
+      "digest": "sha256:3b56be3a7eb0f3261fa48dcf652603f13dea3cc2de9ee32bd441e19d456c98e4",
+      "name": "parity-listing"
+    },
+    "reasonCodes": [
+      "evaluation.unresolved_rule",
+      "evaluator.unavailable"
+    ],
+    "ruleResults": [
+      {
+        "reasonCodes": [
+          "evaluator.unavailable"
+        ],
+        "ruleId": "prohibited-item",
+        "status": "failed"
+      },
+      {
+        "reasonCodes": [
+          "evaluator.unavailable"
+        ],
+        "ruleId": "needs-review",
+        "status": "failed"
+      },
+      {
+        "reasonCodes": [
+          "evaluator.unavailable"
+        ],
+        "ruleId": "complete-listing",
+        "status": "failed"
+      }
+    ]
+  },
+  "undecided probability": {
+    "apiVersion": "decision.antaeus.io/v0alpha1",
+    "evaluator": {
+      "adapter": "io.antaeus.systemone",
+      "adapterVersion": "0.3.0",
+      "attempts": 1,
+      "mode": "semantic",
+      "model": "parity-model",
+      "provider": "antaeus",
+      "route": [
+        "primary"
+      ],
+      "synthetic": false
+    },
+    "extensions": {
+      "io.antaeus.execution": {
+        "attempts": [
+          {
+            "adapterId": "io.antaeus.systemone",
+            "adapterVersion": "0.3.0",
+            "attempt": 1,
+            "code": "evaluation.succeeded",
+            "evaluatorId": "primary",
+            "provider": "antaeus",
+            "requestedModel": "parity-model",
+            "resolvedModel": "parity-model",
+            "revisionAvailable": false,
+            "route": "primary",
+            "ruleIndexes": [
+              0,
+              1,
+              2
+            ]
+          }
+        ],
+        "terminal": "evaluation.unresolved_rule",
+        "version": "v0alpha1"
+      }
+    },
+    "failure": {
+      "code": "evaluation.unresolved_rule",
+      "retryable": false,
+      "stage": "evaluation"
+    },
+    "kind": "Decision",
+    "outcome": "failure",
+    "policy": {
+      "digest": "sha256:3b56be3a7eb0f3261fa48dcf652603f13dea3cc2de9ee32bd441e19d456c98e4",
+      "name": "parity-listing"
+    },
+    "reasonCodes": [
+      "evaluation.unresolved_rule"
+    ],
+    "ruleResults": [
+      {
+        "confidence": 0.5,
+        "reasonCodes": [
+          "evaluation.low_confidence"
+        ],
+        "ruleId": "prohibited-item",
+        "status": "indeterminate"
+      },
+      {
+        "confidence": 0.9,
+        "reasonCodes": [
+          "systemone.not_matched"
+        ],
+        "ruleId": "needs-review",
+        "status": "not_matched"
+      },
+      {
+        "confidence": 0.9,
+        "outcome": "allow",
+        "reasonCodes": [
+          "systemone.matched"
+        ],
+        "ruleId": "complete-listing",
+        "status": "matched"
+      }
+    ]
+  }
+}

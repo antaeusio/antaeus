@@ -17,10 +17,11 @@ Maintainers push release tags; the workflow refuses tags that are not on
 3. The [release workflow](../.github/workflows/release.yml) then:
    - refuses tags that are not on `main` history;
    - runs `scripts/check`;
-   - builds archives with `scripts/release-artifacts`, including the
-     WebAssembly engine as `antaeus_X.Y.Z_js_wasm.tar.gz`, which injects the
-     version and commit and pins the documented target baselines;
-   - smoke-tests the Linux amd64 archive and verifies `SHA256SUMS`;
+   - builds archives with `scripts/release-artifacts`, which injects the
+     version and commit and pins the documented target baselines; the
+     WebAssembly engine is packaged as `antaeus_X.Y.Z_js_wasm.tar.gz`;
+   - smoke-tests the Linux amd64 archive, verifies `SHA256SUMS`, and runs
+     `scripts/check-wasm.mjs` against the unpacked WebAssembly archive;
    - records build-provenance attestations for every archive;
    - builds the linux/amd64 and linux/arm64 container image from those same
      archived binaries, pushes it to `ghcr.io/antaeusio/antaeus` by digest,

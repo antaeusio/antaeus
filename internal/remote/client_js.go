@@ -4,6 +4,7 @@ package remote
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -28,6 +29,20 @@ type fetchTransport struct{}
 // ignore is a permanent no-op callback for promises whose outcome is unused.
 var ignore = js.FuncOf(func(js.Value, []js.Value) any { return nil })
 
+// guard runs JavaScript interop and converts a panic, such as a host function
+// that throws or returns an unexpected value, into an error, so no host value
+// can stop the engine.
+func guard(f func() error) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("fetch failed: host returned an unexpected value: %v", r)
+		}
+	}()
+	return f()
+}
+
+var errFetchRejected = errors.New("fetch failed: the host rejected the request or response stream")
+
 type settled struct {
 	value js.Value
 	err   error
@@ -45,16 +60,28 @@ func await(promise js.Value, done <-chan struct{}) (js.Value, error, bool) {
 		onReject.Release()
 	}
 	onResolve = js.FuncOf(func(_ js.Value, args []js.Value) any {
-		result <- settled{value: args[0]}
+		value := js.Undefined()
+		if len(args) > 0 {
+			value = args[0]
+		}
+		result <- settled{value: value}
 		release()
 		return nil
 	})
-	onReject = js.FuncOf(func(_ js.Value, args []js.Value) any {
-		result <- settled{err: errors.New("fetch failed: " + args[0].Call("toString").String())}
+	// The rejection reason can be any value, including undefined, and may
+	// carry host details; a fixed message is enough to classify the failure.
+	onReject = js.FuncOf(func(js.Value, []js.Value) any {
+		result <- settled{err: errFetchRejected}
 		release()
 		return nil
 	})
-	promise.Call("then", onResolve, onReject)
+	if err := guard(func() error {
+		promise.Call("then", onResolve, onReject)
+		return nil
+	}); err != nil {
+		release()
+		return js.Undefined(), err, true
+	}
 	select {
 	case r := <-result:
 		return r.value, r.err, true
@@ -64,6 +91,28 @@ func await(promise js.Value, done <-chan struct{}) (js.Value, error, bool) {
 }
 
 func (fetchTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	var body []byte
+	if req.Body != nil && req.Body != http.NoBody {
+		var err error
+		body, err = io.ReadAll(req.Body)
+		_ = req.Body.Close()
+		if err != nil {
+			return nil, err
+		}
+	}
+	var response *http.Response
+	err := guard(func() error {
+		var err error
+		response, err = roundTrip(req, body)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func roundTrip(req *http.Request, body []byte) (*http.Response, error) {
 	global := js.Global()
 	fetch := global.Get("fetch")
 	if fetch.Type() != js.TypeFunction {
@@ -82,12 +131,7 @@ func (fetchTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 	}
 	init.Set("headers", headers)
-	if req.Body != nil && req.Body != http.NoBody {
-		body, err := io.ReadAll(req.Body)
-		_ = req.Body.Close()
-		if err != nil {
-			return nil, err
-		}
+	if body != nil {
 		array := global.Get("Uint8Array").New(len(body))
 		js.CopyBytesToJS(array, body)
 		init.Set("body", array)
@@ -100,6 +144,9 @@ func (fetchTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+	if response.Type() != js.TypeObject {
+		return nil, errors.New("fetch failed: the host resolved fetch without a response")
 	}
 
 	header := http.Header{}
@@ -116,9 +163,9 @@ func (fetchTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if value, err := strconv.ParseInt(header.Get("Content-Length"), 10, 64); err == nil && value >= 0 {
 		contentLength = value
 	}
-	var body io.ReadCloser = http.NoBody
+	var reader io.ReadCloser = http.NoBody
 	if stream := response.Get("body"); stream.Truthy() {
-		body = &streamBody{reader: stream.Call("getReader"), controller: controller, done: ctx.Done(), ctxErr: ctx.Err}
+		reader = &streamBody{reader: stream.Call("getReader"), controller: controller, done: ctx.Done(), ctxErr: ctx.Err}
 	}
 	status := response.Get("status").Int()
 	return &http.Response{
@@ -128,20 +175,24 @@ func (fetchTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		ProtoMajor:    1,
 		ProtoMinor:    1,
 		Header:        header,
-		Body:          body,
+		Body:          reader,
 		ContentLength: contentLength,
 		Request:       req,
 	}, nil
 }
 
-// streamBody reads the response incrementally, so a caller's size limit also
-// bounds memory: a body larger than the limit is never fully buffered.
+// streamBody reads the response incrementally and copies into Go memory only
+// the bytes each Read asks for, so a caller's size limit also bounds the
+// engine's allocations, however large the host's chunks are. Memory the host's
+// fetch implementation allocates for a chunk is outside the engine's control.
 type streamBody struct {
 	reader     js.Value
 	controller js.Value
 	done       <-chan struct{}
 	ctxErr     func() error
-	pending    []byte
+	chunk      js.Value // the current Uint8Array chunk, or undefined
+	offset     int      // bytes of chunk already read
+	length     int      // byte length of chunk
 	mu         sync.Mutex
 	closed     bool
 	err        error
@@ -153,30 +204,53 @@ func (b *streamBody) Read(p []byte) (int, error) {
 	if b.closed {
 		return 0, errors.New("read on closed response body")
 	}
-	if len(b.pending) == 0 {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	for b.offset >= b.length {
 		if b.err != nil {
 			return 0, b.err
 		}
-		chunk, err, ok := await(b.reader.Call("read"), b.done)
-		switch {
-		case !ok:
-			b.controller.Call("abort")
-			b.err = b.ctxErr()
-			return 0, b.err
-		case err != nil:
+		if err := guard(b.next); err != nil {
 			b.err = err
 			return 0, err
-		case chunk.Get("done").Bool():
-			b.err = io.EOF
-			return 0, io.EOF
 		}
-		value := chunk.Get("value")
-		b.pending = make([]byte, value.Get("byteLength").Int())
-		js.CopyBytesToGo(b.pending, value)
 	}
-	n := copy(p, b.pending)
-	b.pending = b.pending[n:]
-	return n, nil
+	n := min(len(p), b.length-b.offset)
+	var copied int
+	if err := guard(func() error {
+		copied = js.CopyBytesToGo(p[:n], b.chunk.Call("subarray", b.offset, b.offset+n))
+		return nil
+	}); err != nil {
+		b.err = err
+		return 0, err
+	}
+	b.offset += copied
+	return copied, nil
+}
+
+// next makes the next chunk current, or sets err at the end of the stream.
+func (b *streamBody) next() error {
+	chunk, err, ok := await(b.reader.Call("read"), b.done)
+	switch {
+	case !ok:
+		b.controller.Call("abort")
+		b.err = b.ctxErr()
+		return nil
+	case err != nil:
+		return err
+	case chunk.Type() != js.TypeObject:
+		return errors.New("fetch failed: the host stream returned an unexpected chunk")
+	case chunk.Get("done").Bool():
+		b.err = io.EOF
+		return nil
+	}
+	value := chunk.Get("value")
+	if !value.InstanceOf(js.Global().Get("Uint8Array")) {
+		return errors.New("fetch failed: the host stream returned an unexpected chunk")
+	}
+	b.chunk, b.offset, b.length = value, 0, value.Get("byteLength").Int()
+	return nil
 }
 
 func (b *streamBody) Close() error {
@@ -186,7 +260,10 @@ func (b *streamBody) Close() error {
 		b.closed = true
 		// Stop any unread transfer. A rejected cancel is handled so the host
 		// never reports an unhandled promise rejection.
-		b.reader.Call("cancel").Call("catch", ignore)
+		_ = guard(func() error {
+			b.reader.Call("cancel").Call("catch", ignore)
+			return nil
+		})
 	}
 	return nil
 }

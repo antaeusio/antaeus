@@ -21,6 +21,7 @@ import (
 	"github.com/antaeusio/antaeus/evaluator/profile"
 	"github.com/antaeusio/antaeus/evaluator/runner"
 	"github.com/antaeusio/antaeus/internal/jsonvalue"
+	"github.com/antaeusio/antaeus/internal/strictsource"
 	"github.com/antaeusio/antaeus/policy"
 )
 
@@ -42,6 +43,9 @@ const (
 	CodeCredentialMissing    = "host.credential_missing"
 	CodeDeadlineExceeded     = "host.deadline_exceeded"
 	CodeEvaluationNotStarted = "host.evaluation_not_started"
+	// CodeInternalError reports a failure inside the engine; the call had no
+	// effect and later calls are unaffected.
+	CodeInternalError = "host.internal_error"
 )
 
 // Error is a configuration problem that prevented evaluation. Messages never
@@ -165,7 +169,7 @@ func Evaluate(ctx context.Context, request []byte, registry runner.Registry) []b
 		if errors.As(err, &missing) {
 			return fail(CodeCredentialMissing, err.Error())
 		}
-		return fail(CodeRequestInvalid, err.Error())
+		return fail(CodeRequestInvalid, "credentials are invalid for the profile's route")
 	}
 	defer credentials.Clear()
 	if r.DeadlineUnixMS != nil {
@@ -177,26 +181,35 @@ func Evaluate(ctx context.Context, request []byte, registry runner.Registry) []b
 		Policy: artifact, Profile: p, CanonicalInput: input,
 		CorrelationID: r.CorrelationID, Credentials: credentials,
 	}, registry)
-	if errors.Is(err, context.DeadlineExceeded) {
+	var missing *localbinding.MissingCredentialError
+	switch {
+	case err == nil:
+	case errors.As(err, &missing):
+		return fail(CodeCredentialMissing, err.Error())
+	case errors.Is(ctx.Err(), context.DeadlineExceeded):
 		return fail(CodeDeadlineExceeded, "the deadline passed before evaluation started")
-	}
-	if err != nil {
+	default:
 		return fail(CodeEvaluationNotStarted, err.Error())
 	}
 	return encode(Response{OK: true, Decision: &d})
 }
 
+// decode accepts exactly one JSON object under the same strict rules as
+// policy and profile sources: valid UTF-8, no duplicate object keys at any
+// depth, bounded nesting, and nothing after the document. Unknown fields are
+// rejected.
 func decode(request []byte, target any) error {
 	if len(request) > MaxRequestBytes {
 		return fmt.Errorf("request exceeds %d bytes", MaxRequestBytes)
 	}
-	decoder := json.NewDecoder(bytes.NewReader(request))
+	normalized, err := strictsource.Decode(request, strictsource.FormatJSON, MaxRequestBytes, "request")
+	if err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(normalized))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
 		return fmt.Errorf("request is not a valid JSON object for this call: %w", err)
-	}
-	if decoder.More() {
-		return errors.New("request has trailing data")
 	}
 	return nil
 }
@@ -243,26 +256,24 @@ func checkInstalled(p profile.Artifact, registry runner.Registry) error {
 }
 
 // preflight binds the supplied values through the same checked path as local
-// environment bindings: only slots on the profile's configured route are read,
-// and a missing or empty value is a MissingCredentialError.
+// environment bindings. Values for slots the profile's configured route does
+// not use are ignored without being validated, so a host may pass a fixed
+// credential set. A routed slot without a value is reported by the runner as
+// a MissingCredentialError before evaluation starts.
 func preflight(p profile.Artifact, supplied []Credential) (*localbinding.Credentials, error) {
-	if len(supplied) == 0 {
-		// A bindings artifact needs at least one entry, so check the route
-		// directly: any routed slot is then missing.
-		evaluators := map[string]profile.Evaluator{}
-		for _, e := range p.Spec.Evaluators {
-			evaluators[e.ID] = e
+	evaluators := map[string]profile.Evaluator{}
+	for _, e := range p.Spec.Evaluators {
+		evaluators[e.ID] = e
+	}
+	route := []string{p.Spec.Routing.Primary}
+	if p.Spec.Routing.Escalation != nil {
+		route = append(route, *p.Spec.Routing.Escalation)
+	}
+	routed := map[localbinding.Key]bool{}
+	for _, id := range append(route, p.Spec.Routing.Fallbacks...) {
+		if e := evaluators[id]; e.CredentialSlot != nil {
+			routed[localbinding.Key{AdapterID: e.Adapter.ID, Slot: *e.CredentialSlot}] = true
 		}
-		route := []string{p.Spec.Routing.Primary}
-		if p.Spec.Routing.Escalation != nil {
-			route = append(route, *p.Spec.Routing.Escalation)
-		}
-		for _, id := range append(route, p.Spec.Routing.Fallbacks...) {
-			if e := evaluators[id]; e.CredentialSlot != nil {
-				return nil, &localbinding.MissingCredentialError{EvaluatorID: e.ID, AdapterID: e.Adapter.ID, Slot: *e.CredentialSlot}
-			}
-		}
-		return &localbinding.Credentials{}, nil
 	}
 	bindings := localbinding.Artifact{
 		APIVersion:     localbinding.APIVersion,
@@ -271,6 +282,9 @@ func preflight(p profile.Artifact, supplied []Credential) (*localbinding.Credent
 	}
 	values := map[string]string{}
 	for i, c := range supplied {
+		if !routed[localbinding.Key{AdapterID: c.AdapterID, Slot: c.Slot}] {
+			continue
+		}
 		slots := bindings.SecretBindings[c.AdapterID]
 		if slots == nil {
 			slots = map[string]localbinding.Reference{}
@@ -283,15 +297,21 @@ func preflight(p profile.Artifact, supplied []Credential) (*localbinding.Credent
 		slots[c.Slot] = localbinding.Reference{Source: "environment", Name: name}
 		values[name] = c.Value
 	}
+	if len(values) == 0 {
+		return &localbinding.Credentials{}, nil
+	}
 	return localbinding.Preflight(p, bindings, localbinding.EnvironmentFunc(func(name string) (string, bool) {
 		value, ok := values[name]
 		return value, ok
 	}))
 }
 
-func fail(code, message string) []byte {
+// Failure encodes an error response.
+func Failure(code, message string) []byte {
 	return encode(Response{Error: &Error{Code: code, Message: message}})
 }
+
+func fail(code, message string) []byte { return Failure(code, message) }
 
 func encode(r Response) []byte {
 	out, err := json.Marshal(r)
