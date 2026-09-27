@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-27
+
+Adds an experimental WebAssembly build of the engine, so JavaScript hosts such
+as Cloudflare Workers, browsers, and Node.js can evaluate policies with the
+same engine as the CLI, without running it in a container. Remote evaluators
+such as the hosted Drex API are called through the host's `fetch`. The build
+ships as `antaeus_0.5.0_js_wasm.tar.gz` in this release, covered by
+`SHA256SUMS` and build-provenance attestations. Its interface (version 1) may
+still change in a minor release before v1.0.0, and its CPU, startup time, and
+memory use have not yet been measured on Cloudflare's production runtime. The
+CLI, native archives, and container image behave as in v0.4.0.
+
+Install with `brew install antaeusio/tap/antaeus` (or `brew upgrade antaeus`),
+`go install github.com/antaeusio/antaeus/cmd/antaeus@v0.5.0`,
+`docker pull ghcr.io/antaeusio/antaeus:0.5`, or an archive from this release.
+See `docs/webassembly.md` for the WebAssembly build.
+
 ### Added
 
 - Experimental WebAssembly build of the engine for JavaScript hosts such as Cloudflare Workers, browsers, and Node.js: `antaeus_<version>_js_wasm.tar.gz` in each release, built with `scripts/build-wasm`. `start()` from its `antaeus.mjs` returns JSON `validate` and `evaluate` calls (interface version 1) that take credentials and an optional absolute deadline per call and return the same Decisions as the CLI. Each call runs in a fresh engine instance entered only from its own request's context, which keeps Cloudflare Workers from cancelling one request's timers and I/O on behalf of another; concurrent instances are capped, waiting calls are bounded (`host.busy` beyond 16 calls or 16 MiB) and settle at their own deadline. Remote evaluators use the host's `fetch` without following redirects and stream response bodies; unexpected host values become provider failures rather than stopping the engine. See `docs/webassembly.md`.
@@ -134,7 +151,8 @@ carry GitHub build-provenance attestations
 - `scripts/with-build-lock` keeps the lock until an interrupted command's whole process group has stopped (escalating to KILL after a bounded wait), serializes stale-lock takeover, waits for owners that have not yet written metadata, and no longer treats another user's process as dead. `scripts/test-build-lock` covers these cases ([#42](https://github.com/antaeusio/antaeus/issues/42)).
 - `scripts/cross-build` pins `GOAMD64=v1` and `GOARM64=v8.0` instead of inheriting the caller's environment.
 
-[Unreleased]: https://github.com/antaeusio/antaeus/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/antaeusio/antaeus/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/antaeusio/antaeus/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/antaeusio/antaeus/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/antaeusio/antaeus/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/antaeusio/antaeus/compare/v0.1.0...v0.2.0
