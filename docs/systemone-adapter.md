@@ -132,10 +132,10 @@ A System One evaluator must declare:
 | Field | Requirement |
 | --- | --- |
 | `mode` | `semantic` |
-| `adapter` | `{"id": "io.antaeus.systemone", "version": "0.3.0"}`, or an earlier installed version for its providers |
+| `adapter` | ID `io.antaeus.systemone` and an installed version (`0.1.0`–`0.4.0`); select `0.4.0` for usage reporting |
 | `protocol` | `{"id": "io.antaeus.rule-match", "version": "v0alpha1"}` |
 | `requiredCapabilities` | a subset of `json-input`, `structured-rule-results`, `confidence-scores` |
-| `provider` | `antaeus` (`0.2.0` and later), `contrastive-lm`, or `drex` (`0.3.0` only) |
+| `provider` | `antaeus` (`0.2.0`–`0.4.0`), `contrastive-lm`, or `drex` (`0.3.0` and `0.4.0`) |
 | `model` | the name the server serves, for example `clm-latest` or `drex-latest` |
 | `modelRevision`, `instructionTemplate` | omitted |
 | `credentialSlot` | the provider's slot from the table above; required for `drex`, otherwise omitted when the server needs no key |
@@ -177,18 +177,20 @@ Requests are limited to 4 MiB and responses to 1 MiB.
 | HTTP 408 or deadline | `evaluator.timeout` | yes |
 | HTTP 429 | `evaluator.throttled` | yes |
 | HTTP 500, 502, 503, or 504, or a connection failure | `evaluator.unavailable` | yes |
-| HTTP 529 (overloaded), version `0.3.0` | `evaluator.unavailable` | yes |
+| HTTP 529 (overloaded), versions `0.3.0` and `0.4.0` | `evaluator.unavailable` | yes |
 | TLS verification failure | `systemone.tls_failed` | no |
 | Missing, extra, or non-`noul` answers, or a probability outside 0–1 | `systemone.output_invalid` | no |
 | Malformed response or a success status other than 200 | `systemone.response_malformed` | no |
 | Response larger than 1 MiB | `systemone.response_too_large` | no |
 
-As with every adapter, the runner records only the three retryable codes in
-Decisions; the others appear as `evaluation.adapter_failed`. In versions
+The execution trace uses normalized routing codes: it preserves the three
+retryable adapter codes and records other adapter failures as
+`evaluation.adapter_failed`. The opt-in `0.4.0` usage extension additionally
+preserves bounded underlying adapter failure codes. In versions
 `0.1.0` and `0.2.0`, HTTP 529 is `systemone.unexpected_status` and not
 retryable.
 
-In version `0.3.0`, a retryable failure also carries the provider's required
+In versions `0.3.0` and `0.4.0`, a retryable failure also carries the provider's required
 wait: `Retry-After-Ms` in milliseconds when valid, otherwise `Retry-After` as
 delay-seconds or an HTTP date. Malformed or negative values are ignored. The
 runner never retries sooner than that wait, and skips a retry that cannot
@@ -205,7 +207,7 @@ start within the evaluation deadline (see
   confidence, such as OpenAI. Evaluator profile v0alpha1 requires every
   evaluator on a confidence-routed path to report confidence.
 - A measured comparison of these servers with other evaluators on policy tasks.
-- Provider request IDs in Decisions or traces. Version `0.3.0` reports
+- Provider request IDs in Decisions or traces. Versions `0.3.0` and `0.4.0` report
   `X-Request-Id` in adapter metadata, but the v0alpha1 Decision and execution
   trace have no field for it.
 - Client-side concurrency limits. Callers sharing a Drex account must keep

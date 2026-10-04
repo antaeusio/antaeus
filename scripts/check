@@ -33,8 +33,10 @@ shellcheck "$@"
 # Uses temporary copies of the wrapper; never the repository lock. Also run
 # the wrapper under dash when available, as Ubuntu's /bin/sh.
 "$repo_root/scripts/test-build-lock"
+"$repo_root/scripts/test-wasm-license"
 if command -v dash >/dev/null 2>&1; then
   TEST_SHELL=dash dash "$repo_root/scripts/test-build-lock"
+  dash "$repo_root/scripts/test-wasm-license"
 fi
 
 # The single-quoted program intentionally expands $1 in the child shell.

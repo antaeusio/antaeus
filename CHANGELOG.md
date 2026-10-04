@@ -6,6 +6,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-04
+
+Adds opt-in provider token accounting for Drex evaluations, so applications can
+reconcile consumption across retries, escalation, and fallback without treating
+unknown usage as zero. Select System One adapter `0.4.0` in an evaluator profile
+to receive the separate `io.antaeus.usage` Decision extension. Existing adapter
+versions retain their behavior, and the execution trace and version-1 JSON host
+interface keep their existing shapes. Accounting does not assign customer
+charges or change policy outcomes. Public Go APIs and CLI behavior may still
+change in minor releases before v1.0.0.
+
+Install with `brew install antaeusio/tap/antaeus` (or `brew upgrade antaeus`),
+`go install github.com/antaeusio/antaeus/cmd/antaeus@v0.6.0`,
+`docker pull ghcr.io/antaeusio/antaeus:0.6`, or an archive from this release.
+See [provider usage reporting](./docs/provider-usage.md) for the accounting
+contract and [System One setup](./docs/systemone-adapter.md) for adapter selection.
+
+### Added
+
+- Opt-in System One adapter `io.antaeus.systemone@0.4.0`, installed alongside
+  versions `0.1.0` through `0.3.0` in the CLI and WebAssembly host. It reports
+  Drex input tokens and optional output tokens per attempt. Other System One
+  providers report unavailable usage until their accounting contracts are verified.
+- Provider-neutral `io.antaeus.usage` Decision extension with a versioned schema
+  and examples. Records align with execution-trace attempts, preserve bounded
+  underlying adapter failure codes, and distinguish reported counters (including
+  zero) from unavailable or invalid accounting. Usage survives invalid answers,
+  failed attempts, and confidence routing without affecting policy reduction.
+- Go API: `evaluator.Result.Usage`, typed usage statuses, and
+  `systemone.UsageIdentity` / `UsageRegistration`. Existing `Identity` and
+  `Registration` remain on `0.3.0`; register the new identity explicitly to opt
+  in. Update unkeyed `evaluator.Result` struct literals for the added field, or
+  use keyed literals.
+- Custom Go adapters' fixed public `evaluator.Error.Code` identifiers may
+  appear as `adapterFailureCode` for any traced attempt when usage reporting is
+  enabled. Keep input, credentials, and private diagnostics out of these codes.
+
+### Fixed
+
+- `scripts/build-wasm` finds Go's license in Homebrew's package directory when
+  it is absent from `GOROOT`, and checks for the license before resetting the
+  output directory or compiling.
+
 ## [0.5.0] - 2026-09-27
 
 Adds an experimental WebAssembly build of the engine, so JavaScript hosts such
@@ -151,7 +194,8 @@ carry GitHub build-provenance attestations
 - `scripts/with-build-lock` keeps the lock until an interrupted command's whole process group has stopped (escalating to KILL after a bounded wait), serializes stale-lock takeover, waits for owners that have not yet written metadata, and no longer treats another user's process as dead. `scripts/test-build-lock` covers these cases ([#42](https://github.com/antaeusio/antaeus/issues/42)).
 - `scripts/cross-build` pins `GOAMD64=v1` and `GOARM64=v8.0` instead of inheriting the caller's environment.
 
-[Unreleased]: https://github.com/antaeusio/antaeus/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/antaeusio/antaeus/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/antaeusio/antaeus/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/antaeusio/antaeus/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/antaeusio/antaeus/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/antaeusio/antaeus/compare/v0.2.0...v0.3.0

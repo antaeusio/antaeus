@@ -1,0 +1,75 @@
+#!/bin/sh
+
+# Exercise license packaging and early rejection without compiling Go.
+set -eu
+unset ANTAEUS_WASM_DIR ANTAEUS_BUILD_LOCK_HELD
+unset ANTAEUS_BUILD_LOCK_WAIT_SECONDS ANTAEUS_BUILD_LOCK_POLL_SECONDS
+unset ANTAEUS_BUILD_LOCK_STOP_SECONDS ANTAEUS_BUILD_SESSION_ID
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+fixture=$(mktemp -d)
+trap 'rm -rf "$fixture"' 0
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+repo="$fixture/repo"
+mkdir -p "$repo/scripts" "$repo/cmd/antaeus-wasm" "$fixture/bin"
+cp "$script_dir/build-wasm" "$script_dir/with-build-lock" "$repo/scripts/"
+printf '%s\n' 'module fixture' > "$repo/cmd/antaeus-wasm/antaeus.mjs"
+cat > "$fixture/bin/go" <<'EOF'
+#!/bin/sh
+set -eu
+[ "$*" = 'env GOROOT' ] || exit 64
+printf '%s\n' "$TEST_GOROOT"
+EOF
+cat > "$repo/scripts/build" <<'EOF'
+#!/bin/sh
+set -eu
+printf '%s\n' 'wasm fixture' > "$ANTAEUS_OUTPUT"
+EOF
+chmod +x "$fixture/bin/go" "$repo/scripts/build"
+
+standard="$fixture/standard go"
+homebrew="$fixture/package/libexec"
+missing="$fixture/missing/libexec"
+unrelated="$fixture/other/libexec"
+for goroot in "$standard" "$homebrew" "$missing" "$unrelated"; do
+  mkdir -p "$goroot/lib/wasm"
+  printf '%s\n' 'loader fixture' > "$goroot/lib/wasm/wasm_exec.js"
+done
+printf '%s\n' 'standard license fixture' > "$standard/LICENSE"
+printf '%s\n' 'package license fixture' > "$fixture/package/LICENSE"
+printf '%s\n' '{}' > "$fixture/package/INSTALL_RECEIPT.json"
+printf '%s\n' '{}' > "$fixture/missing/INSTALL_RECEIPT.json"
+printf '%s\n' 'not a Go package license' > "$fixture/other/LICENSE"
+
+out="$repo/.tmp/dist/antaeus_js_wasm"
+PATH="$fixture/bin:$PATH" TEST_GOROOT="$standard" "$repo/scripts/build-wasm"
+cmp "$standard/LICENSE" "$out/LICENSE-go"
+cmp "$standard/lib/wasm/wasm_exec.js" "$out/wasm_exec.js"
+cmp "$repo/cmd/antaeus-wasm/antaeus.mjs" "$out/antaeus.mjs"
+for name in wasm_exec.js antaeus.mjs LICENSE-go; do
+  if [ -z "$(find "$out/$name" -type f -perm 0644)" ]; then
+    echo "test-wasm-license: $name must have mode 0644" >&2
+    exit 1
+  fi
+done
+PATH="$fixture/bin:$PATH" TEST_GOROOT="$homebrew" "$repo/scripts/build-wasm"
+cmp "$fixture/package/LICENSE" "$out/LICENSE-go"
+
+# GOROOT's own license takes precedence even with a libexec layout.
+printf '%s\n' 'root license fixture' > "$homebrew/LICENSE"
+PATH="$fixture/bin:$PATH" TEST_GOROOT="$homebrew" "$repo/scripts/build-wasm"
+cmp "$homebrew/LICENSE" "$out/LICENSE-go"
+
+printf '%s\n' 'keep existing output' > "$out/marker"
+for goroot in "$missing" "$unrelated"; do
+  status=0
+  PATH="$fixture/bin:$PATH" TEST_GOROOT="$goroot" "$repo/scripts/build-wasm" > "$fixture/failure.log" 2>&1 || status=$?
+  [ "$status" -eq 69 ] || { echo "test-wasm-license: expected unavailable license exit 69, got $status" >&2; exit 1; }
+  [ -f "$out/marker" ] || { echo "test-wasm-license: missing license erased existing output" >&2; exit 1; }
+  grep -F 'Go license not found' "$fixture/failure.log" >/dev/null
+  if [ "$goroot" = "$missing" ]; then
+    grep -F "$fixture/missing/LICENSE" "$fixture/failure.log" >/dev/null
+  fi
+done
+echo 'test-wasm-license: ok'
