@@ -113,17 +113,19 @@ func sleep(ctx context.Context, d time.Duration) error {
 }
 
 type execution struct {
-	input       Input
-	p           profile.Artifact
-	registry    Registry
-	entries     map[string]profile.Evaluator
-	credentials map[localbinding.Key][]byte
-	request     evaluator.Request
-	trace       Trace
-	route       []string
-	time        timing
-	last        evaluator.Metadata
-	fallback    bool
+	input        Input
+	p            profile.Artifact
+	registry     Registry
+	entries      map[string]profile.Evaluator
+	credentials  map[localbinding.Key][]byte
+	request      evaluator.Request
+	trace        Trace
+	usage        []UsageAttempt
+	usageEnabled bool
+	route        []string
+	time         timing
+	last         evaluator.Metadata
+	fallback     bool
 }
 
 func run(ctx context.Context, input Input, registry Registry, clock timing) (decision.Decision, error) {
@@ -350,7 +352,7 @@ func (x *execution) invoke(ctx context.Context, id, route string, indexes []int)
 			record.RevisionAvailable = result.Metadata.ModelRevision != ""
 			x.last = result.Metadata
 		}
-		x.trace.Attempts = append(x.trace.Attempts, record)
+		x.appendAttempt(record, result.Usage, err)
 		if failure == "" {
 			return cloneResults(result.RuleResults), ""
 		}
@@ -510,6 +512,13 @@ func (x *execution) decide(evidence []evaluator.RuleResult) (decision.Decision, 
 	m := x.last
 	synthetic := m.Synthetic
 	d := decision.Decision{APIVersion: decision.APIVersion, Kind: decision.KindDecision, Outcome: reduction.Outcome, Policy: decision.PolicyIdentity{Name: x.request.PolicyName, Digest: x.request.PolicyDigest, Version: x.input.PolicyVersion}, RuleResults: rules, ReasonCodes: reduction.ReasonCodes, Failure: reduction.Failure, Extensions: map[string]json.RawMessage{TraceExtension: trace}, Evaluator: &decision.Evaluator{ProfileDigest: x.request.ProfileDigest, ProfileVersion: x.input.ProfileVersion, Adapter: m.AdapterID, AdapterVersion: m.AdapterVersion, Mode: decision.EvaluatorMode(m.Mode), Synthetic: &synthetic, Provider: m.Provider, Model: m.Model, Route: x.route, Attempts: len(x.trace.Attempts), Fallback: x.fallback}}
+	if x.usageEnabled {
+		usage, err := x.usageJSON()
+		if err != nil {
+			return decision.Decision{}, err
+		}
+		d.Extensions[UsageExtension] = usage
+	}
 	if m.Synthetic {
 		d.Evaluator.FixtureSet = &m.FixtureSet
 		d.Evaluator.FixtureVersion = &m.FixtureVersion

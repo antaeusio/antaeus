@@ -385,7 +385,7 @@ func TestGlobalAttemptLimit(t *testing.T) {
 	calls := 0
 	d, err := run(context.Background(), in, installed(func(context.Context, evaluator.Request, Configuration) (evaluator.Result, error) {
 		calls++
-		return evaluator.Result{}, &evaluator.Error{Code: "evaluator.timeout", Retryable: true}
+		return evaluator.Result{Usage: &evaluator.Usage{Status: evaluator.UsageUnavailable}}, &evaluator.Error{Code: "evaluator.timeout", Retryable: true}
 	}), clock.timing())
 	if err != nil {
 		t.Fatal(err)
@@ -394,6 +394,10 @@ func TestGlobalAttemptLimit(t *testing.T) {
 		t.Fatalf("calls=%d trace=%+v", calls, traceOf(t, d))
 	}
 	assertDecisionFailure(t, d, "evaluation.attempt_limit", false)
+	usage := usageOf(t, d)
+	if len(usage.Attempts) != decision.MaxEvaluatorAttempts || usage.Attempts[63].TraceIndex != 63 {
+		t.Fatalf("usage limit: %+v", usage)
+	}
 }
 
 func TestRegistryFixtureCannotEnforce(t *testing.T) {

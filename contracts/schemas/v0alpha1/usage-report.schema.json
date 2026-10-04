@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://antaeus.io/contracts/v0alpha1/usage-report.schema.json",
+  "title": "Antaeus provider usage report v0alpha1",
+  "type": "object",
+  "required": ["version", "attempts"],
+  "properties": {
+    "version": {"const": "v0alpha1"},
+    "attempts": {"type": "array", "minItems": 1, "maxItems": 64, "items": {"$ref": "#/$defs/attempt"}}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "tokens": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "attempt": {
+      "type": "object",
+      "required": ["traceIndex", "status"],
+      "properties": {
+        "traceIndex": {"type": "integer", "minimum": 0, "maximum": 63},
+        "status": {"enum": ["reported", "unavailable", "invalid"]},
+        "inputTokens": {"$ref": "#/$defs/tokens"},
+        "outputTokens": {"$ref": "#/$defs/tokens"},
+        "adapterFailureCode": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{0,127}$"}
+      },
+      "additionalProperties": false,
+      "allOf": [{
+        "if": {"properties": {"status": {"const": "reported"}}},
+        "then": {"required": ["inputTokens"]},
+        "else": {"not": {"anyOf": [{"required": ["inputTokens"]}, {"required": ["outputTokens"]}]}}
+      }]
+    }
+  }
+}

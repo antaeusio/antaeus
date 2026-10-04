@@ -12,6 +12,8 @@
 // 529 and reports provider Retry-After waits to the runner. Versions 0.2.0
 // (Antaeus and CLM) and 0.1.0 (CLM only) stay installed with their original
 // behavior so existing profiles keep working.
+// Version 0.4.0 is an opt-in sibling that reports Drex token accounting;
+// Identity and Registration remain on 0.3.0 for existing Go callers.
 // Other System One providers are rejected until their wire contracts are
 // verified.
 package systemone
@@ -44,6 +46,9 @@ import (
 const (
 	AdapterID      = "io.antaeus.systemone"
 	AdapterVersion = "0.3.0"
+	// UsageAdapterVersion opts into provider token accounting. Existing
+	// identities and Registration retain their original behavior.
+	UsageAdapterVersion = "0.4.0"
 	// PreviousAdapterVersion supports the antaeus and CLM providers.
 	PreviousAdapterVersion = "0.2.0"
 	// LegacyAdapterVersion is the first version, which supports CLM only.
@@ -77,6 +82,9 @@ var Protocol = profile.ComponentIdentity{ID: "io.antaeus.rule-match", Version: "
 // Identity is the current installed adapter identity.
 var Identity = profile.ComponentIdentity{ID: AdapterID, Version: AdapterVersion}
 
+// UsageIdentity is the installed usage-reporting 0.4.0 identity.
+var UsageIdentity = profile.ComponentIdentity{ID: AdapterID, Version: UsageAdapterVersion}
+
 // PreviousIdentity is the installed 0.2.0 identity.
 var PreviousIdentity = profile.ComponentIdentity{ID: AdapterID, Version: PreviousAdapterVersion}
 
@@ -88,6 +96,7 @@ var providerSlots = map[string]map[string]string{
 	LegacyAdapterVersion:   {ProviderCLM: CredentialSlot},
 	PreviousAdapterVersion: {ProviderAntaeus: AntaeusCredentialSlot, ProviderCLM: CredentialSlot},
 	AdapterVersion:         {ProviderAntaeus: AntaeusCredentialSlot, ProviderCLM: CredentialSlot, ProviderDrex: DrexCredentialSlot},
+	UsageAdapterVersion:    {ProviderAntaeus: AntaeusCredentialSlot, ProviderCLM: CredentialSlot, ProviderDrex: DrexCredentialSlot},
 }
 
 // Capabilities includes confidence-scores: every answer carries a probability.
@@ -119,6 +128,11 @@ func LegacyDefaultReferences() map[string]localbinding.Reference {
 // Registration returns the current adapter for runner.Registry.
 func Registration() runner.Adapter {
 	return registration(remote.NewClient(), AdapterVersion)
+}
+
+// UsageRegistration returns the opt-in usage-reporting 0.4.0 adapter.
+func UsageRegistration() runner.Adapter {
+	return registration(remote.NewClient(), UsageAdapterVersion)
 }
 
 // PreviousRegistration returns the 0.2.0 adapter for runner.Registry.
@@ -218,8 +232,8 @@ var modelPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,255}$`)
 // any installed version. Run it before accepting an evaluation so a
 // misconfigured profile is rejected rather than turned into a failure Decision.
 func ValidateEvaluator(e profile.Evaluator) error {
-	if (e.Adapter != Identity && e.Adapter != PreviousIdentity && e.Adapter != LegacyIdentity) || e.Mode != profile.ModeSemantic || e.Protocol != Protocol {
-		return errors.New("evaluator is not configured for " + AdapterID + "@" + AdapterVersion + ", @" + PreviousAdapterVersion + ", or @" + LegacyAdapterVersion)
+	if (e.Adapter != UsageIdentity && e.Adapter != Identity && e.Adapter != PreviousIdentity && e.Adapter != LegacyIdentity) || e.Mode != profile.ModeSemantic || e.Protocol != Protocol {
+		return errors.New("evaluator is not configured for " + AdapterID + "@" + UsageAdapterVersion + ", @" + AdapterVersion + ", @" + PreviousAdapterVersion + ", or @" + LegacyAdapterVersion)
 	}
 	providers := providerSlots[e.Adapter.Version]
 	if e.Provider == nil {
@@ -288,7 +302,16 @@ type requestBody struct {
 	Questions map[string]question `json:"questions"`
 }
 
-func (a *adapter) evaluate(ctx context.Context, request evaluator.Request, config runner.Configuration) (evaluator.Result, error) {
+func (a *adapter) evaluate(ctx context.Context, request evaluator.Request, config runner.Configuration) (result evaluator.Result, evaluationErr error) {
+	// Unknown accounting remains visible even on transport/status failures.
+	// Earlier versions continue to ignore usage, including malformed counters.
+	if a.version == UsageAdapterVersion {
+		defer func() {
+			if result.Usage == nil {
+				result.Usage = &evaluator.Usage{Status: evaluator.UsageUnavailable}
+			}
+		}()
+	}
 	if err := ValidateEvaluator(config.Evaluator); err != nil {
 		return evaluator.Result{}, failure("systemone.configuration_invalid", false, err.Error())
 	}
@@ -356,9 +379,13 @@ func (a *adapter) evaluate(ctx context.Context, request evaluator.Request, confi
 	if tooLarge {
 		return evaluator.Result{}, failure("systemone.response_too_large", false, "provider response exceeded the size limit")
 	}
+	var usage *evaluator.Usage
+	if a.version == UsageAdapterVersion && *config.Evaluator.Provider == ProviderDrex {
+		usage = parseUsage(payload)
+	}
 	results, model, err := parseResponse(payload, request.Rules)
 	if err != nil {
-		return evaluator.Result{}, err
+		return evaluator.Result{Usage: usage}, err
 	}
 	var requestID string
 	if signals {
@@ -366,6 +393,7 @@ func (a *adapter) evaluate(ctx context.Context, request evaluator.Request, confi
 	}
 	return evaluator.Result{
 		RuleResults: results,
+		Usage:       usage,
 		Metadata: evaluator.Metadata{
 			AdapterID:      AdapterID,
 			AdapterVersion: a.version,

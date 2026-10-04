@@ -134,7 +134,9 @@ An accepted evaluation always returns a `decision`, including `failure`
 Decisions for provider errors and timeouts, exactly as the CLI does.
 
 Installed adapters are `io.antaeus.openai@0.1.0` and
-`io.antaeus.systemone@0.3.0`, `0.2.0`, and `0.1.0`. The deterministic fixture
+`io.antaeus.systemone@0.4.0`, `0.3.0`, `0.2.0`, and `0.1.0`. Version `0.4.0`
+opts into [provider usage reporting](./provider-usage.md) through the unchanged
+version-1 response envelope. The deterministic fixture
 adapter is not installed.
 
 ## Errors

@@ -51,6 +51,14 @@ type configRuntime struct {
 	systemOne         *runner.Adapter
 	previousSystemOne *runner.Adapter
 	legacySystemOne   *runner.Adapter
+	usageSystemOne    *runner.Adapter
+}
+
+func (r configRuntime) usageSystemOneAdapter() runner.Adapter {
+	if r.usageSystemOne != nil {
+		return *r.usageSystemOne
+	}
+	return systemone.UsageRegistration()
 }
 
 func (r configRuntime) systemOneAdapter() runner.Adapter {

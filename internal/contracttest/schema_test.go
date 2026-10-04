@@ -383,6 +383,12 @@ func TestContractExamplesAgainstSchemas(t *testing.T) {
 			valid:    true,
 		},
 		{
+			name:     "provider usage report",
+			schema:   "usage-report.schema.json",
+			instance: filepath.Join("examples", "v0alpha1", "usage-report", "retry.json"),
+			valid:    true,
+		},
+		{
 			name:     "local configuration example",
 			schema:   "local-configuration.schema.json",
 			instance: filepath.Join("examples", "v0alpha1", "local-configuration", "development.json"),
@@ -398,6 +404,12 @@ func TestContractExamplesAgainstSchemas(t *testing.T) {
 			name:     "allow decision",
 			schema:   "decision.schema.json",
 			instance: filepath.Join("examples", "v0alpha1", "decision", "allow.json"),
+			valid:    true,
+		},
+		{
+			name:     "allow decision with provider usage",
+			schema:   "decision.schema.json",
+			instance: filepath.Join("examples", "v0alpha1", "decision", "allow-with-usage.json"),
 			valid:    true,
 		},
 		{
@@ -681,6 +693,7 @@ func newCompiler(t *testing.T) *jsonschema.Compiler {
 		"local-secret-bindings.schema.json",
 		"local-configuration.schema.json",
 		"execution-trace.schema.json",
+		"usage-report.schema.json",
 		"regression-suite.schema.json",
 		"regression-result-set.schema.json",
 		"problem.schema.json",

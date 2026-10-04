@@ -11,7 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antaeusio/antaeus/adapters/systemone"
 	"github.com/antaeusio/antaeus/decision"
+	"github.com/antaeusio/antaeus/evaluator"
+	"github.com/antaeusio/antaeus/evaluator/runner"
 )
 
 const secret = "host-test-secret"
@@ -116,6 +119,34 @@ func TestEvaluateReturnsDecision(t *testing.T) {
 	}
 	if r.Decision.Evaluator == nil || r.Decision.Evaluator.AdapterVersion != "0.3.0" {
 		t.Fatalf("evaluator = %+v", r.Decision.Evaluator)
+	}
+}
+
+func TestEvaluatePreservesUsageExtension(t *testing.T) {
+	registry := Registry()
+	adapter := registry[systemone.UsageIdentity]
+	adapter.Evaluate = func(_ context.Context, request evaluator.Request, config runner.Configuration) (evaluator.Result, error) {
+		results := make([]evaluator.RuleResult, len(request.Rules))
+		for i, rule := range request.Rules {
+			results[i] = evaluator.RuleResult{RuleID: rule.ID, Status: decision.RuleNotMatched, Confidence: new(0.95), ReasonCodes: []string{"test.evidence"}}
+		}
+		return evaluator.Result{RuleResults: results, Metadata: evaluator.Metadata{AdapterID: systemone.AdapterID, AdapterVersion: systemone.UsageAdapterVersion, Mode: evaluator.ModeSemantic, Provider: systemone.ProviderDrex, Model: "drex-latest"}, Usage: &evaluator.Usage{Status: evaluator.UsageReported, InputTokens: new(int64(575)), OutputTokens: new(int64(48))}}, nil
+	}
+	registry[systemone.UsageIdentity] = adapter
+	raw := request(t, "https://unused.invalid", func(r map[string]any) {
+		r["profile"] = strings.Replace(read(t, "examples/drex/profile.json"), `"version": "0.3.0"`, `"version": "0.4.0"`, 1)
+		r["credentials"] = []map[string]string{{"adapterId": systemone.AdapterID, "slot": systemone.DrexCredentialSlot, "value": secret}}
+	})
+	r := response(t, Evaluate(context.Background(), raw, registry))
+	if !r.OK || r.Decision == nil {
+		t.Fatalf("response %+v error %+v", r, r.Error)
+	}
+	var usage runner.UsageReport
+	if err := json.Unmarshal(r.Decision.Extensions[runner.UsageExtension], &usage); err != nil {
+		t.Fatal(err)
+	}
+	if len(usage.Attempts) != 1 || *usage.Attempts[0].InputTokens != 575 || *usage.Attempts[0].OutputTokens != 48 {
+		t.Fatalf("usage %+v", usage)
 	}
 }
 

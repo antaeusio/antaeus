@@ -6,11 +6,17 @@ provider:
 
 | Provider | Server | Adapter versions | Credential slot | Default variable |
 | --- | --- | --- | --- | --- |
-| `antaeus` | An Antaeus System One server, such as the open-source [`antaeusio/nli-server`](https://github.com/antaeusio/nli-server) | `0.2.0`, `0.3.0` | `antaeus-api-key` | `ANTAEUS_API_KEY` |
-| `contrastive-lm` | The self-hosted [Contrastive Language Model (CLM)](https://github.com/Contrastive-LM/CLM) reference server | `0.1.0`, `0.2.0`, `0.3.0` | `clm-api-key` | `CLM_API_KEY` |
-| `drex` | The hosted [Drex](https://drex.nace.ai) API by Nace.AI | `0.3.0` | `drex-api-key` (required) | `DREX_API_KEY` |
+| `antaeus` | An Antaeus System One server, such as the open-source [`antaeusio/nli-server`](https://github.com/antaeusio/nli-server) | `0.2.0`, `0.3.0`, `0.4.0` | `antaeus-api-key` | `ANTAEUS_API_KEY` |
+| `contrastive-lm` | The self-hosted [Contrastive Language Model (CLM)](https://github.com/Contrastive-LM/CLM) reference server | `0.1.0`, `0.2.0`, `0.3.0`, `0.4.0` | `clm-api-key` | `CLM_API_KEY` |
+| `drex` | The hosted [Drex](https://drex.nace.ai) API by Nace.AI | `0.3.0`, `0.4.0` | `drex-api-key` (required) | `DREX_API_KEY` |
 
-Version `0.3.0` is current. It adds provider `drex`, retries HTTP 529, honors
+Version `0.4.0` opts into [provider usage reporting](./provider-usage.md).
+It preserves `0.3.0` evaluation and retry behavior while reporting token counts
+in a separate Decision extension. Existing examples remain pinned to `0.3.0`;
+select `0.4.0` explicitly to obtain accounting. Go `Identity` and `Registration`
+retain `0.3.0`; use `UsageIdentity` and `UsageRegistration` for `0.4.0`.
+
+Version `0.3.0` adds provider `drex`, retries HTTP 529, honors
 provider `Retry-After` waits, and records the provider's `X-Request-Id` in
 adapter metadata. Versions `0.2.0` (Antaeus and CLM) and `0.1.0` (CLM only)
 stay installed with their original behavior, so existing profiles keep their

@@ -348,3 +348,37 @@ func TestEvaluateProfileDrexProviderReadsDrexAPIKey(t *testing.T) {
 		t.Fatalf("lookups %v output %s", lookups, output)
 	}
 }
+
+func TestEvaluateProfileUsageAdapter(t *testing.T) {
+	var lookups []string
+	calls := 0
+	r := openAIRuntime(t, &lookups, &calls)
+	r.environment = localbinding.EnvironmentFunc(func(name string) (string, bool) {
+		lookups = append(lookups, name)
+		return "drex-test-key", name == systemone.DrexCredentialVariable
+	})
+	adapter := systemone.UsageRegistration()
+	adapter.Evaluate = func(_ context.Context, request evaluator.Request, config runner.Configuration) (evaluator.Result, error) {
+		if string(config.Credential) != "drex-test-key" {
+			t.Fatal("missing credential")
+		}
+		results := make([]evaluator.RuleResult, len(request.Rules))
+		for i, rule := range request.Rules {
+			results[i] = evaluator.RuleResult{RuleID: rule.ID, Status: decision.RuleNotMatched, Confidence: new(0.95), ReasonCodes: []string{"systemone.not_matched"}}
+		}
+		return evaluator.Result{RuleResults: results, Metadata: evaluator.Metadata{AdapterID: systemone.AdapterID, AdapterVersion: systemone.UsageAdapterVersion, Mode: evaluator.ModeSemantic, Provider: systemone.ProviderDrex, Model: "drex-latest"}, Usage: &evaluator.Usage{Status: "reported", InputTokens: new(int64(575))}}, nil
+	}
+	r.usageSystemOne = &adapter
+	raw, err := os.ReadFile(filepath.Join("..", "..", "examples", "drex", "profile.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "profile.json")
+	if err := os.WriteFile(path, []byte(strings.Replace(string(raw), `"version": "0.3.0"`, `"version": "0.4.0"`, 1)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	output := evaluateProfileCommand(t, r, 0, append(openAIArgs(), "--profile", path))
+	if len(lookups) != 1 || lookups[0] != systemone.DrexCredentialVariable || !strings.Contains(output, `"inputTokens":575`) || !strings.Contains(output, `"adapterVersion":"0.4.0"`) {
+		t.Fatalf("lookups %v output %s", lookups, output)
+	}
+}

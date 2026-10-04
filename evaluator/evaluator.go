@@ -58,6 +58,29 @@ type Rule struct {
 type Result struct {
 	RuleResults []RuleResult
 	Metadata    Metadata
+	// Usage is provider accounting, independent of rule validity and outcome.
+	// Adapters may return it alongside an error. Nil means no usage reporting.
+	Usage *Usage
+}
+
+// MaxUsageTokens is the largest interoperable JSON integer.
+const MaxUsageTokens int64 = 1<<53 - 1
+
+type UsageStatus string
+
+const (
+	UsageReported    UsageStatus = "reported"
+	UsageUnavailable UsageStatus = "unavailable"
+	UsageInvalid     UsageStatus = "invalid"
+)
+
+// Usage contains provider-reported token counts for one attempt, never estimates.
+// Status is reported, unavailable, or invalid. Only reported carries counters;
+// input is required, output is optional. A reported zero differs from unknown.
+type Usage struct {
+	Status       UsageStatus `json:"status"`
+	InputTokens  *int64      `json:"inputTokens,omitempty"`
+	OutputTokens *int64      `json:"outputTokens,omitempty"`
 }
 
 // RuleResult records evidence for one requested rule without a policy outcome.
@@ -85,6 +108,8 @@ type Metadata struct {
 }
 
 // Error is a stable adapter failure safe for routing and bounded diagnostics.
+// Code must be a fixed, public diagnostic identifier, never derived from input
+// or credentials. The usage extension may publish it for any traced attempt.
 type Error struct {
 	Code      string
 	Retryable bool

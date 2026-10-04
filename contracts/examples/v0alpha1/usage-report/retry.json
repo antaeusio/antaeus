@@ -1,0 +1,7 @@
+{
+  "version": "v0alpha1",
+  "attempts": [
+    {"traceIndex": 0, "status": "unavailable", "adapterFailureCode": "evaluator.throttled"},
+    {"traceIndex": 1, "status": "reported", "inputTokens": 575, "outputTokens": 48}
+  ]
+}
