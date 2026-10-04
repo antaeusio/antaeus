@@ -47,11 +47,23 @@ if [ ! -f "$loader" ]; then
   exit 69
 fi
 
+license="$goroot/LICENSE"
+# Homebrew installs GOROOT under libexec but keeps the package license beside
+# it. Other layouts retain the standard GOROOT/LICENSE path.
+if [ ! -f "$license" ] && [ "$(basename -- "$goroot")" = libexec ] &&
+  [ -f "$(dirname -- "$goroot")/INSTALL_RECEIPT.json" ]; then
+  license="$(dirname -- "$goroot")/LICENSE"
+fi
+if [ ! -f "$license" ]; then
+  echo "build-wasm: Go license not found for GOROOT $goroot (last checked $license)" >&2
+  exit 69
+fi
+
 rm -rf "$out_dir"
 mkdir -p "$out_dir"
 GOOS=js GOARCH=wasm ANTAEUS_PACKAGE=./cmd/antaeus-wasm ANTAEUS_OUTPUT="$out_dir/antaeus.wasm" \
   "$repo_root/scripts/build"
 cp "$loader" "$out_dir/wasm_exec.js"
 cp "$repo_root/cmd/antaeus-wasm/antaeus.mjs" "$out_dir/antaeus.mjs"
-cp "$goroot/LICENSE" "$out_dir/LICENSE-go"
+cp "$license" "$out_dir/LICENSE-go"
 chmod 0644 "$out_dir/wasm_exec.js" "$out_dir/antaeus.mjs" "$out_dir/LICENSE-go"
