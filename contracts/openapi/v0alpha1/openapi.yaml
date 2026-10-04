@@ -5,7 +5,9 @@ info:
   description: >-
     Provider-neutral synchronous decision contract. A typed failure Decision is
     an HTTP 200 response; requests rejected before evaluation use RFC 9457
-    Problem Details.
+    Problem Details. Decisions may carry an optional io.antaeus.usage extension
+    conforming to usage-report.schema.json for per-attempt provider accounting;
+    usage is independent of policy outcomes and customer charges.
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 paths:
   /v0alpha1/decisions:

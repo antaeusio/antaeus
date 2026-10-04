@@ -120,6 +120,12 @@ and adds `io.antaeus.execution` Decision extensions conforming to
 `execution-trace.schema.json`. It caps the complete evaluation at 64 attempts,
 matching the existing Decision envelope.
 
+`usage-report.schema.json` defines the optional `io.antaeus.usage` Decision
+extension for per-attempt provider token accounting. It joins the existing
+execution trace by zero-based attempt index without changing that trace's
+closed schema. See [provider usage reporting](../docs/provider-usage.md) for
+required cross-extension relationships and unknown-accounting semantics.
+
 Local runners select profiles and credential references using the
 [local configuration precedence rules](../docs/local-configuration.md).
 The Go resolver operates on validated artifacts. The CLI `config` commands load

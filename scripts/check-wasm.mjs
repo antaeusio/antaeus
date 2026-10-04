@@ -109,6 +109,33 @@ assert.equal(calls[0].init.redirect, 'manual');
 const sent = JSON.parse(new TextDecoder().decode(calls[0].init.body));
 assert.deepEqual(Object.keys(sent.questions).sort(), ['complete-listing', 'prohibited-item']);
 
+// Usage is opt-in, survives the unchanged version-1 host interface, and does
+// not imply that the caller should charge for failed decisions or retries.
+assert.equal(r.decision.extensions['io.antaeus.usage'], undefined);
+const usageProfile = JSON.parse(profile);
+usageProfile.spec.evaluators[0].adapter.version = '0.4.0';
+const usageExtra = { profile: JSON.stringify(usageProfile) };
+const reportedBody = JSON.parse(answers(0.05, 0.9));
+reportedBody.usage = { input_tokens: 575, output_tokens: 48 };
+r = await evaluate([reply('{}', 429), reply(JSON.stringify(reportedBody))], usageExtra);
+assert.equal(r.decision.outcome, 'allow');
+assert.equal(r.decision.evaluator.adapterVersion, '0.4.0');
+assert.deepEqual(r.decision.extensions['io.antaeus.usage'], {
+  version: 'v0alpha1', attempts: [
+    { traceIndex: 0, status: 'unavailable', adapterFailureCode: 'evaluator.throttled' },
+    { traceIndex: 1, status: 'reported', inputTokens: 575, outputTokens: 48 },
+  ],
+});
+r = await evaluate([reply('{"answers":{},"usage":{"input_tokens":41}}')], usageExtra);
+assert.equal(r.decision.outcome, 'failure');
+assert.equal(r.decision.extensions['io.antaeus.usage'].attempts[0].inputTokens, 41);
+r = await evaluate([reply(answers(0.05, 0.9))], usageExtra);
+assert.equal(r.decision.extensions['io.antaeus.usage'].attempts[0].status, 'unavailable');
+reportedBody.usage.input_tokens = -1;
+r = await evaluate([reply(JSON.stringify(reportedBody))], usageExtra);
+assert.equal(r.decision.outcome, 'allow');
+assert.deepEqual(r.decision.extensions['io.antaeus.usage'].attempts, [{ traceIndex: 0, status: 'invalid' }]);
+
 // A provider wait longer than the profile backoff is honored.
 r = await evaluate([reply('{}', 429, { 'retry-after-ms': '300' }), reply(answers(0.05, 0.9))]);
 assert.equal(r.decision.outcome, 'allow');
