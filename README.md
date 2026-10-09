@@ -21,7 +21,8 @@
 
 <p align="center">
   <a href="https://antaeus.io">Website</a> ·
-  <a href="./docs/quickstart.md">Quickstart</a> ·
+  <a href="./docs/quickstart.md">Local quickstart</a> ·
+  <a href="https://antaeus.io/docs">Hosted API</a> ·
   <a href="./docs/policy-authoring.md">Writing policies</a> ·
   <a href="./docs/decisions.md">Reading decisions</a> ·
   <a href="https://github.com/antaeusio/antaeus/releases">Releases</a>
@@ -42,9 +43,24 @@ outcomes deterministically and returns a typed Decision (`allow`, `review`,
 and every attempt.
 
 > [!NOTE]
-> Antaeus is early and pre-v1; see the [releases](https://github.com/antaeusio/antaeus/releases).
+> The open-source engine is early and pre-v1; see the [releases](https://github.com/antaeusio/antaeus/releases).
 > The OpenAI and CLM evaluators are **experimental**: they have not yet been
 > measured for accuracy and are not suitable for enforcement on their own.
+
+## Choose your starting point
+
+- **Open-source engine and CLI:** run locally, embed the Go packages, or use
+  the WebAssembly engine. This repository is Apache-2.0 licensed and remains
+  useful without a hosted account. Start with the
+  [credential-free local quickstart](./docs/quickstart.md).
+- **Hosted beta:** use [app.antaeus.io](https://app.antaeus.io) for workspace
+  API keys, managed policies, and prepaid usage. Integrate from your backend
+  using the [hosted API docs](https://antaeus.io/docs). The service is an
+  experimental beta with shared capacity and no production SLA.
+
+See [local core and hosted beta](./docs/hosted-beta.md) for the boundary between
+these paths. Your application owns enforcement, authorization, and side effects
+in both cases.
 
 ## Highlights
 
@@ -63,7 +79,8 @@ and every attempt.
   profile.
 - **Testable.** Named regression cases run offline and credential-free, so
   policy changes can be reviewed like code.
-- **Local-first.** A single Go binary with no account, service, or database.
+- **Local-first core.** A single Go binary with no hosted account or database
+  required. Semantic adapters use the selected evaluator service and credentials.
 
 ## Install
 
@@ -184,6 +201,7 @@ code.
 
 | Guide | What it covers |
 | --- | --- |
+| [Local core and hosted beta](./docs/hosted-beta.md) | Choose a local or hosted path, with beta limits and integration links |
 | [Quickstart](./docs/quickstart.md) | Validate, evaluate, and test locally without credentials |
 | [Writing policies](./docs/policy-authoring.md) | Policy fields, syntax, and digest identity |
 | [Reading a Decision](./docs/decisions.md) | Outcomes, failures, and fallback boundaries |
