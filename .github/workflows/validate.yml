@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ['1.26.8', '1.27.1']
+        go: ['1.26.9', '1.27.2']
     env:
       GOTOOLCHAIN: local
       CGO_ENABLED: '0'
@@ -78,35 +78,35 @@ jobs:
             -format text -scan symbol -test -show verbose,version \
             -db https://vuln.go.dev ./...
       - name: Race tests on Linux amd64
-        if: matrix.go == '1.27.1'
+        if: matrix.go == '1.27.2'
         env:
           CGO_ENABLED: '1' # Validation only; release builds stay pure Go.
           GOPROXY: 'off'
           GOFLAGS: '-mod=readonly'
         run: scripts/with-build-lock go test -race -count=1 ./...
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        if: matrix.go == '1.27.1'
+        if: matrix.go == '1.27.2'
         with:
           node-version: '24.21.0'
           check-latest: false
       - name: Native JavaScript execution-text conformance
-        if: matrix.go == '1.27.1'
+        if: matrix.go == '1.27.2'
         run: |
           test "$(node --version)" = 'v24.21.0'
           node scripts/check-text-conformance.mjs
       - name: Pure-Go cross-builds for all planned release targets
-        if: matrix.go == '1.27.1'
+        if: matrix.go == '1.27.2'
         env:
           GOPROXY: 'off'
           GOFLAGS: '-mod=readonly'
         run: scripts/cross-build
       - name: WebAssembly engine interface
-        if: matrix.go == '1.27.1'
+        if: matrix.go == '1.27.2'
         run: |
           test "$(node --version)" = 'v24.21.0'
           node scripts/check-wasm.mjs
       - name: Injected version reaches the built command
-        if: matrix.go == '1.27.1'
+        if: matrix.go == '1.27.2'
         env:
           GOPROXY: 'off'
           GOFLAGS: '-mod=readonly'
@@ -114,7 +114,7 @@ jobs:
           ANTAEUS_VERSION=v0.0.0-ci ANTAEUS_COMMIT=ci123 scripts/build
           test "$(.tmp/bin/antaeus version)" = 'antaeus v0.0.0-ci (ci123)'
       - name: Container image builds and runs
-        if: matrix.go == '1.27.1'
+        if: matrix.go == '1.27.2'
         env:
           GOPROXY: 'off'
           GOFLAGS: '-mod=readonly'

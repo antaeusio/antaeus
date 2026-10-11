@@ -2,7 +2,7 @@ module github.com/antaeusio/antaeus
 
 go 1.26.0
 
-toolchain go1.27.1
+toolchain go1.27.2
 
 require (
 	github.com/gowebpki/jcs v1.0.1
@@ -10,4 +10,4 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5
 )
 
-require golang.org/x/text v0.39.0 // indirect
+require golang.org/x/text v0.41.0 // indirect
