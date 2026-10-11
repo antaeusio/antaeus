@@ -64,7 +64,7 @@ func TestDecideAttachesPolicyOutcomeAfterEvaluation(t *testing.T) {
 	}
 }
 
-func TestDecidePreservesUnresolvedEvidenceAsFailure(t *testing.T) {
+func TestDecidePreservesIndeterminateEvidenceAsReview(t *testing.T) {
 	artifact, set := loadContracts(t)
 	set.Cases[0].RuleResults[1].Status = decision.RuleIndeterminate
 	adapter, err := fixture.New(set, "aggregate-analytics")
@@ -76,8 +76,8 @@ func TestDecidePreservesUnresolvedEvidenceAsFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Decide() error = %v", err)
 	}
-	if got.Outcome != decision.OutcomeFailure || got.Failure == nil || got.Failure.Code != "evaluation.unresolved_rule" {
-		t.Fatalf("Decision = %#v, want unresolved failure", got)
+	if got.Outcome != decision.OutcomeReview || got.Failure != nil || got.ReasonCodes[0] != "evaluation.indeterminate_rule" || got.RuleResults[1].Status != decision.RuleIndeterminate {
+		t.Fatalf("Decision = %#v, want uncertainty review", got)
 	}
 }
 

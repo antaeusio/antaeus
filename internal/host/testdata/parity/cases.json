@@ -1,7 +1,7 @@
 {
   "policy": "apiVersion: policy.antaeus.io/v0alpha1\nkind: Policy\nmetadata:\n  name: parity-listing\n  description: Shared native and WebAssembly parity policy.\nspec:\n  defaultOutcome: allow\n  rules:\n    - id: prohibited-item\n      description: Deny prohibited items.\n      when: The listing offers weapons, counterfeit goods, or prescription drugs.\n      outcome: deny\n    - id: needs-review\n      description: Review listings that mention bulk quantities.\n      when: The listing offers items in bulk quantities.\n      outcome: review\n    - id: complete-listing\n      description: Allow complete listings.\n      when: The item is described in detail, including its condition.\n      outcome: allow\n",
   "profile": {
-    "apiVersion": "evaluator.antaeus.io/v0alpha1",
+    "apiVersion": "evaluator.antaeus.io/v0alpha2",
     "kind": "EvaluatorProfile",
     "metadata": {
       "name": "parity-profile",
@@ -48,7 +48,7 @@
           "onLowConfidence": "indeterminate"
         },
         "terminal": {
-          "onIndeterminate": "failure",
+          "onIndeterminate": "review",
           "onFailure": "failure"
         }
       }

@@ -5,9 +5,9 @@ status: canonical
 scope: evaluator/profile-contract
 confidence: high
 source_refs:
-  - contracts/schemas/v0alpha1/evaluator-profile.schema.json
-  - contracts/examples/v0alpha1/evaluator-profile/quickstart-fixture.json
-  - contracts/examples/v0alpha1/evaluator-profile/semantic-routing.json
+  - contracts/schemas/v0alpha2/evaluator-profile.schema.json
+  - contracts/examples/v0alpha2/evaluator-profile/quickstart-fixture.json
+  - contracts/examples/v0alpha2/evaluator-profile/semantic-routing.json
   - contracts/README.md
   - evaluator/profile
 ---
@@ -18,14 +18,15 @@ Keep all non-secret evaluator mechanics in an immutable versioned
 `EvaluatorProfile`, separate from policy meaning, deployment selection, runtime
 secret bindings, and secret values. Profiles declare bounded deadlines,
 evaluator adapter and protocol identities, capabilities, retry behavior,
-confidence routing, escalation, operational fallbacks, failure-only terminal
-behavior, and logical credential slots. Confidence affects routing only and
+confidence routing, escalation, operational fallbacks, terminal review for indeterminate evidence and failure
+for failed evidence, and logical credential slots. Confidence affects routing only and
 never synthesizes or replaces allow, review, or deny.
 
 V0 routing is acyclic: one primary, at most one escalation evaluator, then an
-ordered bounded fallback list. Preserve unresolved evidence after routing is
-exhausted so the deterministic reducer produces failure unless a matched deny
-has higher precedence. Deterministic fixtures are visibly synthetic,
+ordered bounded fallback list. Current profiles use evaluator v0alpha2. Preserve
+indeterminate evidence after routing is exhausted so the deterministic reducer
+produces review. Failed evidence produces failure; matched deny has highest
+precedence. Published v0alpha1 contracts remain immutable. Deterministic fixtures are visibly synthetic,
 credential-free, and prohibited from enforcement routes. A v0 profile cannot
 mix semantic and deterministic-fixture evaluators. Eligible operational
 failures from either a primary or an invoked escalation continue into the

@@ -1,9 +1,9 @@
 {
-  "apiVersion": "evaluator.antaeus.io/v0alpha1",
+  "apiVersion": "evaluator.antaeus.io/v0alpha2",
   "kind": "EvaluatorProfile",
   "metadata": {
     "name": "clm-confidence-gated",
-    "description": "Experimental self-hosted CLM evaluator. Rules answered with less than 0.8 confidence become indeterminate, so the Decision is failure unless a matched deny applies."
+    "description": "Experimental self-hosted CLM evaluator. Rules answered with less than 0.8 confidence become indeterminate, so the Decision is review unless matched deny or failed evidence takes precedence."
   },
   "spec": {
     "totalTimeoutMs": 10000,
@@ -26,7 +26,7 @@
       "primary": "clm-primary",
       "fallbacks": [],
       "confidence": {"enabled": true, "minimumAccepted": 0.8, "onLowConfidence": "indeterminate"},
-      "terminal": {"onIndeterminate": "failure", "onFailure": "failure"}
+      "terminal": {"onIndeterminate": "review", "onFailure": "failure"}
     }
   }
 }

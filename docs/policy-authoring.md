@@ -56,9 +56,10 @@ identifiers, not array positions or generated names; changing one changes the
 artifact and any corresponding fixture or regression identity.
 
 Rules are not a first-match program. After evaluator routing completes, the
-reducer checks matched deny first, then unresolved evidence, matched review,
-matched allow, and finally the default when all rules are not matched.
-Unresolved evidence produces `failure` unless a matched deny takes precedence;
+v0alpha2 reducer checks matched deny first, then failed evidence, indeterminate
+evidence, matched review, matched allow, and finally the default.
+Failed evidence produces `failure`; indeterminate evidence produces `review`
+unless a matched deny or failed evidence takes precedence;
 it does not use `defaultOutcome`. `failure` is an execution result, not an allowed
 policy-authored outcome. See the [exact reduction rules](../contracts/README.md#deterministic-reduction).
 

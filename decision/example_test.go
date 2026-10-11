@@ -21,7 +21,7 @@ func ExampleReduce() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(reduced.Outcome, reduced.Failure.Code, reduced.Failure.Retryable)
+	fmt.Println(reduced.Outcome, reduced.ReasonCodes[0], reduced.Failure == nil)
 
 	// A matched policy-authored deny takes precedence; the other rule stays
 	// unresolved. No application action is performed by the reducer.
@@ -36,7 +36,7 @@ func ExampleReduce() {
 	fmt.Println(reduced.Outcome, reduced.ReasonCodes[0], reduced.Failure == nil)
 	fmt.Println(results[1].Status)
 	// Output:
-	// failure evaluation.unresolved_rule false
+	// review evaluation.indeterminate_rule true
 	// deny policy.deny_rule_matched true
 	// indeterminate
 }

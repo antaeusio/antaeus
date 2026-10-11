@@ -1,5 +1,5 @@
 {
-  "apiVersion": "evaluator.antaeus.io/v0alpha1",
+  "apiVersion": "evaluator.antaeus.io/v0alpha2",
   "kind": "EvaluatorProfile",
   "metadata": {
     "name": "clm-openai-fallback",
@@ -93,7 +93,7 @@
         "enabled": false
       },
       "terminal": {
-        "onIndeterminate": "failure",
+        "onIndeterminate": "review",
         "onFailure": "failure"
       }
     }

@@ -34,7 +34,7 @@ func TestGeneratedRegressionResultsConformToSchemaAndExample(t *testing.T) {
 	}
 	validateGeneratedResult(t, passed)
 
-	exampleData, err := os.ReadFile(contractsPath(filepath.Join("examples", "v0alpha1", "regression-result-set", "quickstart-passed.json")))
+	exampleData, err := os.ReadFile(contractsPath(filepath.Join("examples", "v0alpha2", "regression-result-set", "quickstart-passed.json")))
 	if err != nil {
 		t.Fatalf("ReadFile(example) error = %v", err)
 	}
@@ -59,7 +59,7 @@ func TestGeneratedRegressionResultsConformToSchemaAndExample(t *testing.T) {
 
 func validateGeneratedResult(t *testing.T, result regression.ResultSet) {
 	t.Helper()
-	schema, err := newCompiler(t).Compile(schemaBase + "regression-result-set.schema.json")
+	schema, err := newCompiler(t).Compile("https://antaeus.io/contracts/v0alpha2/regression-result-set.schema.json")
 	if err != nil {
 		t.Fatalf("compile result schema: %v", err)
 	}

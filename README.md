@@ -52,8 +52,8 @@ and every attempt.
   SHA-256 digest, so every Decision names the exact policy version it used.
 - **Outcomes stay yours.** Evaluators never see `allow` / `review` / `deny`;
   they only judge conditions. A matched `deny` always wins.
-- **Failure is a real outcome.** Timeouts, refusals, malformed model output,
-  and unresolved rules become an explicit `failure`, never a silent `allow`.
+- **Failure is a real outcome.** Completed uncertainty returns `review`. Timeouts, refusals, malformed model
+  output, and execution errors return `failure`.
 - **Provider-neutral.** Evaluators plug in behind one interface: a
   credential-free deterministic fixture, OpenAI with your own key, and
   [System One servers](./docs/systemone-adapter.md) that return confidence
@@ -173,8 +173,8 @@ flowchart LR
 3. The evaluator receives only the rule conditions and the input, and answers
    each condition.
 4. Antaeus attaches your outcomes to the matched rules and reduces them
-   deterministically, with `deny` taking precedence and `failure` for unresolved
-   evidence.
+   deterministically, with `deny` taking precedence, `review` for uncertainty,
+   and `failure` for failed evaluation.
 
 Antaeus does not replace authentication, authorization, or deterministic
 business rules. If a rule can be written safely as ordinary code, keep it in

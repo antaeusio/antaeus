@@ -1,5 +1,5 @@
 {
-  "apiVersion": "evaluator.antaeus.io/v0alpha1",
+  "apiVersion": "evaluator.antaeus.io/v0alpha2",
   "kind": "EvaluatorProfile",
   "metadata": {
     "name": "openai-rule-match",
@@ -28,7 +28,7 @@
       "primary": "openai-primary",
       "fallbacks": [],
       "confidence": {"enabled": false},
-      "terminal": {"onIndeterminate": "failure", "onFailure": "failure"}
+      "terminal": {"onIndeterminate": "review", "onFailure": "failure"}
     }
   }
 }

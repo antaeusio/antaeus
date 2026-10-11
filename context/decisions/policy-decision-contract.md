@@ -7,9 +7,9 @@ confidence: high
 source_refs:
   - contracts/README.md
   - contracts/schemas/v0alpha1/policy.schema.json
-  - contracts/schemas/v0alpha1/decision-request.schema.json
-  - contracts/schemas/v0alpha1/decision.schema.json
-  - contracts/openapi/v0alpha1/openapi.yaml
+  - contracts/schemas/v0alpha2/decision-request.schema.json
+  - contracts/schemas/v0alpha2/decision.schema.json
+  - contracts/openapi/v0alpha2/openapi.yaml
   - policy/policy.go
   - decision/decision.go
 ---
@@ -26,8 +26,10 @@ artifacts.
 Return exactly one provider-neutral Decision outcome: allow, review, deny, or
 failure. Failure means evaluation was accepted but did not produce a policy
 judgment; never rewrite it implicitly. Keep rule results in policy order and
-reduce completed results deterministically: matched deny, unresolved, matched
-review, matched allow, then the policy default. Use RFC 9457 Problem Details
+reduce completed results under decision v0alpha2 deterministically: matched deny,
+failed evidence as failure, indeterminate evidence as review, matched review,
+matched allow, then the policy default. Preserve published v0alpha1 contracts;
+the current runtime emits v0alpha2 and rejects v0alpha1 DecisionRequests. Use RFC 9457 Problem Details
 only when a request is rejected before evaluation.
 
 ## Rationale

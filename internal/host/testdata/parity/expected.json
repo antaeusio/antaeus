@@ -1,6 +1,6 @@
 {
   "confidence at threshold": {
-    "apiVersion": "decision.antaeus.io/v0alpha1",
+    "apiVersion": "decision.antaeus.io/v0alpha2",
     "evaluator": {
       "adapter": "io.antaeus.systemone",
       "adapterVersion": "0.3.0",
@@ -76,7 +76,7 @@
     ]
   },
   "confidence below threshold": {
-    "apiVersion": "decision.antaeus.io/v0alpha1",
+    "apiVersion": "decision.antaeus.io/v0alpha2",
     "evaluator": {
       "adapter": "io.antaeus.systemone",
       "adapterVersion": "0.3.0",
@@ -114,19 +114,14 @@
         "version": "v0alpha1"
       }
     },
-    "failure": {
-      "code": "evaluation.unresolved_rule",
-      "retryable": false,
-      "stage": "evaluation"
-    },
     "kind": "Decision",
-    "outcome": "failure",
+    "outcome": "review",
     "policy": {
       "digest": "sha256:3b56be3a7eb0f3261fa48dcf652603f13dea3cc2de9ee32bd441e19d456c98e4",
       "name": "parity-listing"
     },
     "reasonCodes": [
-      "evaluation.unresolved_rule"
+      "evaluation.indeterminate_rule"
     ],
     "ruleResults": [
       {
@@ -157,7 +152,7 @@
     ]
   },
   "conflicting deny and allow": {
-    "apiVersion": "decision.antaeus.io/v0alpha1",
+    "apiVersion": "decision.antaeus.io/v0alpha2",
     "evaluator": {
       "adapter": "io.antaeus.systemone",
       "adapterVersion": "0.3.0",
@@ -234,7 +229,7 @@
     ]
   },
   "matched review and allow": {
-    "apiVersion": "decision.antaeus.io/v0alpha1",
+    "apiVersion": "decision.antaeus.io/v0alpha2",
     "evaluator": {
       "adapter": "io.antaeus.systemone",
       "adapterVersion": "0.3.0",
@@ -311,7 +306,7 @@
     ]
   },
   "matched review only": {
-    "apiVersion": "decision.antaeus.io/v0alpha1",
+    "apiVersion": "decision.antaeus.io/v0alpha2",
     "evaluator": {
       "adapter": "io.antaeus.systemone",
       "adapterVersion": "0.3.0",
@@ -387,7 +382,7 @@
     ]
   },
   "nothing matched uses default": {
-    "apiVersion": "decision.antaeus.io/v0alpha1",
+    "apiVersion": "decision.antaeus.io/v0alpha2",
     "evaluator": {
       "adapter": "io.antaeus.systemone",
       "adapterVersion": "0.3.0",
@@ -462,7 +457,7 @@
     ]
   },
   "provider unavailable": {
-    "apiVersion": "decision.antaeus.io/v0alpha1",
+    "apiVersion": "decision.antaeus.io/v0alpha2",
     "evaluator": {
       "adapter": "io.antaeus.systemone",
       "adapterVersion": "0.3.0",
@@ -539,7 +534,7 @@
     ]
   },
   "undecided probability": {
-    "apiVersion": "decision.antaeus.io/v0alpha1",
+    "apiVersion": "decision.antaeus.io/v0alpha2",
     "evaluator": {
       "adapter": "io.antaeus.systemone",
       "adapterVersion": "0.3.0",
@@ -577,19 +572,14 @@
         "version": "v0alpha1"
       }
     },
-    "failure": {
-      "code": "evaluation.unresolved_rule",
-      "retryable": false,
-      "stage": "evaluation"
-    },
     "kind": "Decision",
-    "outcome": "failure",
+    "outcome": "review",
     "policy": {
       "digest": "sha256:3b56be3a7eb0f3261fa48dcf652603f13dea3cc2de9ee32bd441e19d456c98e4",
       "name": "parity-listing"
     },
     "reasonCodes": [
-      "evaluation.unresolved_rule"
+      "evaluation.indeterminate_rule"
     ],
     "ruleResults": [
       {

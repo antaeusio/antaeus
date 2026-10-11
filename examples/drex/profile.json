@@ -1,9 +1,9 @@
 {
-  "apiVersion": "evaluator.antaeus.io/v0alpha1",
+  "apiVersion": "evaluator.antaeus.io/v0alpha2",
   "kind": "EvaluatorProfile",
   "metadata": {
     "name": "drex-confidence-gated",
-    "description": "Experimental System One evaluator using the hosted Drex API by Nace.AI. Sends the policy conditions and input to https://drex.nace.ai and reads the key from DREX_API_KEY. Rules answered with less than 0.7 confidence become indeterminate, so the Decision is failure unless a matched deny applies."
+    "description": "Experimental System One evaluator using the hosted Drex API by Nace.AI. Sends the policy conditions and input to https://drex.nace.ai and reads the key from DREX_API_KEY. Rules answered with less than 0.7 confidence become indeterminate, so the Decision is review unless matched deny or failed evidence takes precedence."
   },
   "spec": {
     "totalTimeoutMs": 10000,
@@ -27,7 +27,7 @@
       "primary": "drex-primary",
       "fallbacks": [],
       "confidence": {"enabled": true, "minimumAccepted": 0.7, "onLowConfidence": "indeterminate"},
-      "terminal": {"onIndeterminate": "failure", "onFailure": "failure"}
+      "terminal": {"onIndeterminate": "review", "onFailure": "failure"}
     }
   }
 }

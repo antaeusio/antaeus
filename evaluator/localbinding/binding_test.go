@@ -181,7 +181,7 @@ func TestLoadFileRequiresExplicitSupportedPath(t *testing.T) {
 
 func readProfile(t *testing.T) profile.Artifact {
 	t.Helper()
-	artifact, err := profile.Parse(readContract(t, "examples", "v0alpha1", "evaluator-profile", "semantic-routing.json"), profile.FormatJSON)
+	artifact, err := profile.Parse(readContract(t, "examples", "v0alpha2", "evaluator-profile", "semantic-routing.json"), profile.FormatJSON)
 	if err != nil {
 		t.Fatal(err)
 	}

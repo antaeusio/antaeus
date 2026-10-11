@@ -40,7 +40,7 @@ func Run(ctx context.Context, artifact policy.Artifact, set fixture.Set, suite S
 	}
 
 	result := ResultSet{
-		APIVersion: APIVersion,
+		APIVersion: ResultAPIVersion,
 		Kind:       KindResultSet,
 		Suite:      suite.Metadata,
 		Policy:     decision.PolicyIdentity{Name: artifact.Metadata.Name, Digest: policyDigest},

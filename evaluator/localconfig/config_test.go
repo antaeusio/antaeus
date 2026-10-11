@@ -14,7 +14,7 @@ import (
 
 func semantic(t *testing.T) profile.Artifact {
 	t.Helper()
-	p, err := profile.LoadFile("../../contracts/examples/v0alpha1/evaluator-profile/semantic-routing.json")
+	p, err := profile.LoadFile("../../contracts/examples/v0alpha2/evaluator-profile/semantic-routing.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ func TestProfilePrecedence(t *testing.T) {
 	if _, err := localconfig.Resolve(localconfig.Options{Builtin: &p}); err == nil {
 		t.Fatal("semantic built-in accepted")
 	}
-	fixture, err := profile.LoadFile("../../contracts/examples/v0alpha1/evaluator-profile/quickstart-fixture.json")
+	fixture, err := profile.LoadFile("../../contracts/examples/v0alpha2/evaluator-profile/quickstart-fixture.json")
 	if err != nil {
 		t.Fatal(err)
 	}

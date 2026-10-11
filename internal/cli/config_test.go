@@ -23,7 +23,11 @@ func configFixture(t *testing.T) configRuntime {
 
 func copyConfigFixture(t *testing.T, source, target string) {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join("..", "..", "contracts", "examples", "v0alpha1", source))
+	version := "v0alpha1"
+	if strings.HasPrefix(source, "evaluator-profile/") {
+		version = "v0alpha2"
+	}
+	data, err := os.ReadFile(filepath.Join("..", "..", "contracts", "examples", version, source))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -427,7 +427,7 @@ func TestRunnerConfidenceGating(t *testing.T) {
 	}{
 		"confident deny":          {0.95, 0.05, decision.OutcomeDeny},
 		"confident allow":         {0.05, 0.9, decision.OutcomeAllow},
-		"unsure becomes failure":  {0.3, 0.6, decision.OutcomeFailure},
+		"unsure becomes review":   {0.3, 0.6, decision.OutcomeReview},
 		"matched deny still wins": {0.9, 0.55, decision.OutcomeDeny},
 		"confident none matched":  {0.05, 0.1, decision.OutcomeReview},
 	}

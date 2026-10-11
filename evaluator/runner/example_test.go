@@ -17,7 +17,7 @@ func ExampleRun() {
 	if err != nil {
 		panic(err)
 	}
-	configuration, err := profile.LoadFile("../../contracts/examples/v0alpha1/evaluator-profile/quickstart-fixture.json")
+	configuration, err := profile.LoadFile("../../contracts/examples/v0alpha2/evaluator-profile/quickstart-fixture.json")
 	if err != nil {
 		panic(err)
 	}

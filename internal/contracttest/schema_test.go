@@ -704,6 +704,12 @@ func newCompiler(t *testing.T) *jsonschema.Compiler {
 			t.Fatalf("add schema %s: %v", name, err)
 		}
 	}
+	for _, name := range []string{"decision.schema.json", "decision-request.schema.json", "evaluator-profile.schema.json", "regression-result-set.schema.json"} {
+		document := loadJSON(t, contractsPath(filepath.Join("schemas", "v0alpha2", name)))
+		if err := compiler.AddResource("https://antaeus.io/contracts/v0alpha2/"+name, document); err != nil {
+			t.Fatal(err)
+		}
+	}
 	return compiler
 }
 

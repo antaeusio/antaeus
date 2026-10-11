@@ -306,5 +306,9 @@ func writeCLIFile(t *testing.T, name, content string) string {
 }
 
 func contractPath(kind, name string) string {
-	return filepath.Join("..", "..", "contracts", "examples", "v0alpha1", kind, name)
+	version := "v0alpha1"
+	if kind == "evaluator-profile" || kind == "decision" || kind == "request" || kind == "regression-result-set" {
+		version = "v0alpha2"
+	}
+	return filepath.Join("..", "..", "contracts", "examples", version, kind, name)
 }

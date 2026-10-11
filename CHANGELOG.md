@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Introduce Decision and EvaluatorProfile v0alpha2. Completed indeterminate
+  evidence returns review with `evaluation.indeterminate_rule`; failed evidence
+  remains failure and matched deny retains highest precedence. Published
+  v0alpha1 contracts remain immutable. The new runtime rejects legacy profiles
+  and requests; generated regression result sets use v0alpha2. See the
+  [migration guide](./docs/uncertainty-review-migration.md) for profile digest,
+  trust, validator, regression, native/WASM, and coordinated consumer changes.
+
 ## [0.6.0] - 2026-10-04
 
 Adds opt-in provider token accounting for Drex evaluations, so applications can

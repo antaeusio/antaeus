@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	APIVersion           = "decision.antaeus.io/v0alpha1"
+	APIVersion           = "decision.antaeus.io/v0alpha2"
 	KindRequest          = "DecisionRequest"
 	KindDecision         = "Decision"
 	MaxRuleResults       = policy.MaxRules

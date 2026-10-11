@@ -93,7 +93,7 @@ Every response has this shape; exactly one of `policy`, `decision`, or `error`
 is present:
 
 ```json
-{"ok": true, "decision": { "apiVersion": "decision.antaeus.io/v0alpha1", "...": "..." }}
+{"ok": true, "decision": { "apiVersion": "decision.antaeus.io/v0alpha2", "...": "..." }}
 {"ok": false, "error": {"code": "host.credential_missing", "message": "..."}}
 ```
 
