@@ -4,7 +4,7 @@ Antaeus is pre-release software. This document defines the compatibility boundar
 
 ## Go module
 
-The module path is `github.com/antaeusio/antaeus`. It requires Go 1.26.0 or newer and currently prefers Go 1.27.1 for development and release builds.
+The module path is `github.com/antaeusio/antaeus`. It requires Go 1.26.0 or newer and currently prefers Go 1.27.2 for development and release builds.
 
 Before v1.0.0, documented public Go APIs and CLI behavior may change in a minor release with migration notes. Patch releases do not intentionally break compiling callers or documented behavior. From v1.0.0 onward, packages at the same import path will follow semantic versioning and Go's import compatibility rule.
 

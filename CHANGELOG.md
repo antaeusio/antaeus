@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Security
+
+- Update the pinned validation toolchains to Go 1.26.9 and 1.27.2 and the
+  preferred development/release toolchain to Go 1.27.2 for upstream
+  standard-library security fixes. Keep the Go 1.26.0 module language floor.
+  See the [advisory record](./docs/vulnerability-scanning.md#security-patch-update--2026-10-11)
+  for the ten reported GO-IDs and fixed-in versions.
+- Update indirect `golang.org/x/text` to v0.41.0 for GO-2026-6629. The reported
+  affected package was not imported in the scanned build configuration.
+
 ## [0.6.0] - 2026-10-04
 
 Adds opt-in provider token accounting for Drex evaluations, so applications can

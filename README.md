@@ -199,7 +199,7 @@ code.
 ## Development
 
 Antaeus is a Go module (`github.com/antaeusio/antaeus`) that requires Go 1.26 or
-newer; Go 1.27.1 is preferred. Build and test through the repository scripts,
+newer; Go 1.27.2 is preferred. Build and test through the repository scripts,
 which serialize builds with a shared lock:
 
 ```sh

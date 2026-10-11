@@ -12,7 +12,7 @@ Antaeus is in early implementation, with policy validation, deterministic fixtur
 ## Development expectations
 
 - Follow the repository instructions in `AGENTS.md`.
-- Use Go 1.26.0 or newer; Go 1.27.1 is the preferred development toolchain.
+- Use Go 1.26.0 or newer; Go 1.27.2 is the preferred development toolchain.
 - Keep the open-source core useful without an Antaeus account.
 - Keep public contracts evaluator- and provider-neutral.
 - Add tests with behavior changes.
@@ -75,7 +75,7 @@ do not edit a published schema version to make a failing test pass.
 ## Automated validation
 
 Pull requests and pushes to `main` run the [Go validation workflow](./.github/workflows/validate.yml).
-It asserts exact Go 1.26.8 and 1.27.1 toolchains and the unchanged Go 1.26.0
+It asserts exact Go 1.26.9 and 1.27.2 toolchains and the unchanged Go 1.26.0
 language floor, verifies downloaded modules and `go mod tidy` cleanliness, and
 runs formatting, pinned ShellCheck, vet, unit and offline contract tests under
 both toolchains. The preferred-toolchain job also runs Linux amd64 race tests,
