@@ -106,7 +106,7 @@ func TestRun(t *testing.T) {
 }
 
 func TestLocalFixtureProfileDigestHasDocumentedPreimage(t *testing.T) {
-	const want = "sha256:0956d00418fadb9d1dd95aed13f5e0499093d47ae9d2550ac1cb8da611c0545f"
+	const want = "sha256:d406f0f3755b6b8abc4ef67fbc207f6248a79a586e3e2f2b7580bafdafaec220"
 	if got := fixtureprofile.Digest(); got != want {
 		t.Fatalf("fixtureprofile.Digest() = %q, want %q", got, want)
 	}

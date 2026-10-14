@@ -264,7 +264,7 @@ Decision for every case. Expectation mismatches set the case status to `failed`
 and the aggregate `passed` field to `false`; configuration and evaluation errors
 do not produce a partial result set. These fixtures remain synthetic and
 credential-free. Regression and single-case local evaluation share the fixture
-profile whose exact UTF-8 preimage is `antaeus.local.fixture/v0alpha1`.
+profile whose exact UTF-8 preimage is `antaeus.local.fixture/v0alpha2`.
 
 Requests rejected before evaluation use a non-2xx status with RFC 9457 Problem Details (`application/problem+json`). Policy `deny` and `review` outcomes are not transport errors.
 
@@ -284,6 +284,7 @@ matched review, matched allow, then default. The new engine implements
 - `examples/v0alpha1/` contains readable valid examples.
 - `examples/v0alpha1/input/` contains canonical local-evaluation inputs bound by fixture digests.
 - `examples/v0alpha1/regression-suite/` and `regression-result-set/` contain a complete offline regression example.
-- `examples/v0alpha2/evaluator-profile/` contains a credential-free deterministic profile.
+- `examples/v0alpha2/` contains current Decision, request, evaluator-profile, and result-set examples.
+- `conformance/v0alpha2/` contains current reduction and runner cases.
 - `examples/v0alpha1/local-secret-bindings/` contains non-secret environment-variable references.
 - `conformance/v0alpha1/` contains machine-oriented valid, invalid, and canonicalization fixtures.

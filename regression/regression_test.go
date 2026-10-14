@@ -38,7 +38,7 @@ func TestRunQuickstartSuite(t *testing.T) {
 	if result.Results[0].Decision.Evaluator == nil || result.Results[0].Decision.Evaluator.Synthetic == nil || !*result.Results[0].Decision.Evaluator.Synthetic {
 		t.Fatalf("Decision.Evaluator = %#v, want synthetic fixture", result.Results[0].Decision.Evaluator)
 	}
-	if got := fixtureprofile.Digest(); got != "sha256:0956d00418fadb9d1dd95aed13f5e0499093d47ae9d2550ac1cb8da611c0545f" {
+	if got := fixtureprofile.Digest(); got != "sha256:d406f0f3755b6b8abc4ef67fbc207f6248a79a586e3e2f2b7580bafdafaec220" {
 		t.Fatalf("fixtureprofile.Digest() = %q", got)
 	}
 }

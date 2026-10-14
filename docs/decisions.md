@@ -8,8 +8,8 @@ as permission to proceed.
 
 The [Decision schema](../contracts/schemas/v0alpha2/decision.schema.json) and
 [portable contract](../contracts/README.md) are authoritative. This guide explains
-the existing contract and Go implementation, not a new API version or deployed
-HTTP service. No released semantic evaluator is claimed.
+the v0alpha2 contract and Go implementation. It does not describe a deployed
+HTTP service or establish semantic evaluator accuracy.
 
 ## Four outcomes
 

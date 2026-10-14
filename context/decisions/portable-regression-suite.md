@@ -26,7 +26,7 @@ input object's root; the suite envelope does not consume the input budget.
 
 Run every case through the same provider-neutral single-attempt evaluator path
 and shared fixture profile as local evaluation. The exact UTF-8 profile
-preimage is `antaeus.local.fixture/v0alpha1`. Emit a complete
+preimage is `antaeus.local.fixture/v0alpha2`. Emit a complete
 `RegressionResultSet` containing the
 expected value and actual validated Decision for every case. Expectation
 mismatches are data: mark the case and aggregate result failed while preserving

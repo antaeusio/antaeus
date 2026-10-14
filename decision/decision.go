@@ -136,7 +136,7 @@ func (s RuleStatus) Valid() bool {
 	}
 }
 
-// Valid reports whether the evaluator mode is part of v0alpha1.
+// Valid reports whether the evaluator mode is part of the current contract.
 func (m EvaluatorMode) Valid() bool {
 	return m == EvaluatorModeSemantic || m == EvaluatorModeDeterministicFixture
 }

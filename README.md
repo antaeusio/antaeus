@@ -52,7 +52,8 @@ and every attempt.
   SHA-256 digest, so every Decision names the exact policy version it used.
 - **Outcomes stay yours.** Evaluators never see `allow` / `review` / `deny`;
   they only judge conditions. A matched `deny` always wins.
-- **Failure is a real outcome.** Completed uncertainty returns `review`. Timeouts, refusals, malformed model
+- **Explicit outcomes.** Completed uncertainty returns `review`. Timeouts,
+  refusals, malformed model
   output, and execution errors return `failure`.
 - **Provider-neutral.** Evaluators plug in behind one interface: a
   credential-free deterministic fixture, OpenAI with your own key, and
@@ -199,7 +200,7 @@ code.
 ## Development
 
 Antaeus is a Go module (`github.com/antaeusio/antaeus`) that requires Go 1.26 or
-newer; Go 1.27.1 is preferred. Build and test through the repository scripts,
+newer; Go 1.27.2 is preferred. Build and test through the repository scripts,
 which serialize builds with a shared lock:
 
 ```sh

@@ -1,6 +1,6 @@
 # Migrating uncertainty to review
 
-This is an unreleased minor-version change. It introduces
+Antaeus v0.7.0 introduces
 `decision.antaeus.io/v0alpha2`, `evaluator.antaeus.io/v0alpha2`, and
 `regression.antaeus.io/v0alpha2` result sets. Published v0alpha1 schemas,
 examples, OpenAPI, and conformance fixtures remain immutable. Existing released
@@ -43,6 +43,11 @@ supported. The new runtime rejects v0alpha1 requests and profiles before
 execution; it does not silently reinterpret them. The public Go APIs and CLI
 use the new versions. Recompute profile digests and renew explicit trust for
 changed profiles; do not reuse old immutable registry labels or trust grants.
+
+The built-in local fixture profile now uses registry version `v0alpha2` and
+the exact digest preimage `antaeus.local.fixture/v0alpha2`. Its previous
+v0alpha1 identity remains historical; fixture set format and adapter versions
+are unchanged.
 
 Policy v0alpha1, rule-match protocol v0alpha1, fixture sets, local configuration,
 credential bindings, execution traces, and usage reports retain their versions.

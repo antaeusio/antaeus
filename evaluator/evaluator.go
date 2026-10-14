@@ -127,7 +127,7 @@ func (e *Error) Error() string {
 	return e.Code + ": " + e.Message
 }
 
-// Valid reports whether the evaluator mode is part of v0alpha1.
+// Valid reports whether the evaluator mode is part of the current contract.
 func (m Mode) Valid() bool {
 	return m == ModeSemantic || m == ModeDeterministicFixture
 }

@@ -22,7 +22,7 @@ fixture identity.
 
 The evaluate command selects only the explicit named case, uses the built-in
 profile identity whose exact UTF-8 preimage is
-`antaeus.local.fixture/v0alpha1`, invokes the same
+`antaeus.local.fixture/v0alpha2`, invokes the same
 provider-neutral evaluator runner as embedders, and emits the complete validated
 Decision as one JSON object on stdout. All Decision outcomes, including deny,
 review, and typed failure, are successful command execution. Usage errors exit
