@@ -16,7 +16,7 @@ func TestSyntheticPermissionAndEnforcementMatrix(t *testing.T) {
 			for _, enforcement := range []bool{false, true} {
 				t.Run(fmt.Sprintf("fallback=%t/allow=%t/enforcement=%t", fallback, allow, enforcement), func(t *testing.T) {
 					in := inputFixture(t)
-					p, err := profile.LoadFile("../../contracts/examples/v0alpha1/evaluator-profile/quickstart-fixture.json")
+					p, err := profile.LoadFile("../../contracts/examples/v0alpha2/evaluator-profile/quickstart-fixture.json")
 					if err != nil {
 						t.Fatal(err)
 					}

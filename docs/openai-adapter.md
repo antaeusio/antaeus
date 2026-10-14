@@ -31,8 +31,8 @@ reports. The execution trace records each attempt's latency and outcome code.
 Every Decision outcome exits 0, so inspect `outcome`.
 
 An input that lacks the information a condition needs produces an
-`indeterminate` rule. Under v0alpha1 profiles, unresolved rules end in a
-`failure` Decision unless a matched deny takes precedence. The quickstart's
+`indeterminate` rule. Under v0alpha2 profiles, indeterminate rules end in a
+`review` Decision unless matched deny or failed evidence takes precedence. The quickstart's
 `aggregate-analytics.json` input, for example, does not state whether analytics
 is a prohibited category, so a model may reasonably answer `indeterminate`.
 

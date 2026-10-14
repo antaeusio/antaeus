@@ -49,8 +49,8 @@ normalizes it as follows:
 
 Because every rule carries a confidence, profiles can enable confidence routing.
 With `onLowConfidence: indeterminate`, rules below the threshold become
-indeterminate, and the Decision is `failure` (unless a matched `deny` applies)
-so your application can send it to a person.
+indeterminate, and the v0alpha2 Decision is `review` unless a matched deny or
+failed evidence takes precedence. Your application can send it to a person.
 
 ## Running an Antaeus server
 
@@ -204,11 +204,11 @@ start within the evaluation deadline (see
 - `nli-server` answers only yes/no questions and rejects `choice` and `score`
   questions; this adapter sends only yes/no questions.
 - Confidence escalation from CLM to an evaluator that does not report
-  confidence, such as OpenAI. Evaluator profile v0alpha1 requires every
+  confidence, such as OpenAI. Evaluator profile v0alpha2 requires every
   evaluator on a confidence-routed path to report confidence.
 - A measured comparison of these servers with other evaluators on policy tasks.
 - Provider request IDs in Decisions or traces. Versions `0.3.0` and `0.4.0` report
-  `X-Request-Id` in adapter metadata, but the v0alpha1 Decision and execution
+  `X-Request-Id` in adapter metadata, but the Decision and v0alpha1 execution
   trace have no field for it.
 - Client-side concurrency limits. Callers sharing a Drex account must keep
   their combined in-flight requests within its limit.

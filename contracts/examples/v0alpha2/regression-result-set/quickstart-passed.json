@@ -1,0 +1,62 @@
+{
+  "apiVersion": "regression.antaeus.io/v0alpha2",
+  "kind": "RegressionResultSet",
+  "suite": {
+    "name": "quickstart",
+    "version": "v1"
+  },
+  "policy": {
+    "name": "vendor-onboarding",
+    "digest": "sha256:2378b5a1806bb11c618bd3a78122e773ec93bdfc45b751a18887d40f4ea536a2"
+  },
+  "fixtureSet": {
+    "name": "quickstart",
+    "version": "v1"
+  },
+  "passed": true,
+  "results": [
+    {
+      "name": "aggregate-analytics-default-review",
+      "fixtureCase": "aggregate-analytics",
+      "status": "passed",
+      "expected": {
+        "outcome": "review",
+        "reasonCodes": ["policy.default_outcome"]
+      },
+      "decision": {
+        "apiVersion": "decision.antaeus.io/v0alpha2",
+        "kind": "Decision",
+        "outcome": "review",
+        "policy": {
+          "name": "vendor-onboarding",
+          "digest": "sha256:2378b5a1806bb11c618bd3a78122e773ec93bdfc45b751a18887d40f4ea536a2"
+        },
+        "ruleResults": [
+          {
+            "ruleId": "prohibited-service",
+            "status": "not_matched",
+            "reasonCodes": ["fixture.exact_result"]
+          },
+          {
+            "ruleId": "complete-low-risk-submission",
+            "status": "not_matched",
+            "reasonCodes": ["fixture.exact_result"]
+          }
+        ],
+        "reasonCodes": ["policy.default_outcome"],
+        "evaluator": {
+          "profileDigest": "sha256:d406f0f3755b6b8abc4ef67fbc207f6248a79a586e3e2f2b7580bafdafaec220",
+          "profileVersion": "v0alpha2",
+          "adapter": "io.antaeus.fixture",
+          "adapterVersion": "0.1.0",
+          "mode": "deterministic-fixture",
+          "synthetic": true,
+          "fixtureSet": "quickstart",
+          "fixtureVersion": "v1",
+          "route": ["io.antaeus.fixture"],
+          "attempts": 1
+        }
+      }
+    }
+  ]
+}

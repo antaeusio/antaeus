@@ -196,7 +196,7 @@ func TestRegistryRequiresExactAdapterVersion(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			in := inputFixture(t)
-			p, err := profile.LoadFile("../../contracts/examples/v0alpha1/evaluator-profile/quickstart-fixture.json")
+			p, err := profile.LoadFile("../../contracts/examples/v0alpha2/evaluator-profile/quickstart-fixture.json")
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -1,31 +1,36 @@
 # Reading a Decision
 
-A `decision.antaeus.io/v0alpha1` Decision records the result of an accepted
+A `decision.antaeus.io/v0alpha2` Decision records the result of an accepted
 evaluation. It does not authenticate a caller, authorize an operation, perform a
 transaction or execute application side effects. Consumers must inspect the
 outcome and retain the policy identity, rather than treating successful transport
 as permission to proceed.
 
-The [Decision schema](../contracts/schemas/v0alpha1/decision.schema.json) and
+The [Decision schema](../contracts/schemas/v0alpha2/decision.schema.json) and
 [portable contract](../contracts/README.md) are authoritative. This guide explains
-the existing contract and Go implementation, not a new API version or deployed
-HTTP service. No released semantic evaluator is claimed.
+the v0alpha2 contract and Go implementation. It does not describe a deployed
+HTTP service or establish semantic evaluator accuracy.
 
 ## Four outcomes
 
 | Outcome | Meaning | Complete example |
 | --- | --- | --- |
-| `allow` | A policy judgment permitting the evaluated case | [allow.json](../contracts/examples/v0alpha1/decision/allow.json) |
-| `review` | A policy judgment explicitly selecting review | [review.json](../contracts/examples/v0alpha1/decision/review.json) |
-| `deny` | A policy judgment rejecting the evaluated case | [deny.json](../contracts/examples/v0alpha1/decision/deny.json) |
-| `failure` | Evaluation was accepted but did not produce a policy judgment | [failure.json](../contracts/examples/v0alpha1/decision/failure.json) |
+| `allow` | A policy judgment permitting the evaluated case | [allow.json](../contracts/examples/v0alpha2/decision/allow.json) |
+| `review` | A matched review rule, policy default, or completed evaluation requiring human judgment | [review.json](../contracts/examples/v0alpha2/decision/review.json) |
+| `deny` | A policy judgment rejecting the evaluated case | [deny.json](../contracts/examples/v0alpha2/decision/deny.json) |
+| `failure` | Evaluation was accepted but did not produce a policy judgment | [failure.json](../contracts/examples/v0alpha2/decision/failure.json) |
 
 These files are contract examples, not evidence of model accuracy. The executable
 [fixture quickstart](./quickstart.md) emits a visibly synthetic
-[fixture Decision](../contracts/examples/v0alpha1/decision/fixture-review.json).
+[fixture Decision](../contracts/examples/v0alpha2/decision/fixture-review.json).
 Do not relabel `failure` as `allow`, `deny` or `review`. An application can choose
 an explicit handling workflow, such as human attention, while preserving the
 original failure record. That application choice is outside the evaluator.
+
+Uncertainty reviews carry `evaluation.indeterminate_rule` and no `failure` object;
+per-rule reasons and confidence remain available, including `evaluation.low_confidence`.
+See [uncertain-review.json](../contracts/examples/v0alpha2/decision/uncertain-review.json)
+and the [migration boundary](./uncertainty-review-migration.md).
 
 ## Identity, rules and reasons
 
@@ -43,11 +48,11 @@ change profile routing but cannot create a policy judgment by itself.
 After routing, the reducer applies this precedence, not first-match order:
 
 1. Any matched deny yields `deny` with `policy.deny_rule_matched`.
-2. Otherwise, any indeterminate or failed rule yields `failure` with
-   `evaluation.unresolved_rule`.
-3. Otherwise, matched review yields `review` with `policy.review_rule_matched`.
-4. Otherwise, matched allow yields `allow` with `policy.allow_rule_matched`.
-5. Otherwise, use the policy default with `policy.default_outcome`.
+2. Otherwise, any failed rule yields `failure` with `evaluation.unresolved_rule`.
+3. Otherwise, any indeterminate rule yields `review` with `evaluation.indeterminate_rule`.
+4. Otherwise, matched review yields `review` with `policy.review_rule_matched`.
+5. Otherwise, matched allow yields `allow` with `policy.allow_rule_matched`.
+6. Otherwise, use the policy default with `policy.default_outcome`.
 
 The corresponding reduction reason must appear at the top level. Thus accepted
 deny evidence can coexist with another failed rule: the outcome remains deny,
@@ -63,7 +68,7 @@ scripts/with-build-lock go test -count=1 -run '^ExampleReduce$' ./decision
 
 `decision.Reduce` returns a `Reduction`, not a complete Decision or execution
 trace. It does not call an evaluator or perform routing. The full
-[conformance cases](../contracts/conformance/v0alpha1/reduction/cases.json) cover
+[conformance cases](../contracts/conformance/v0alpha2/reduction/cases.json) cover
 the portable precedence rules.
 
 ## Failure details and retryability
@@ -74,7 +79,7 @@ bounded message. Supported stages are `configuration`, `policy_resolution`,
 `evaluation`, `reduction` and `internal`. Top-level reasons must include its code
 as well as the reduction reason; a single code can satisfy both requirements.
 
-The standalone reducer's generic unresolved result uses
+The standalone reducer's generic failed-evidence result uses
 `evaluation.unresolved_rule`, stage `evaluation`, and `retryable: false`.
 The [profile runner](./profile-execution.md#acceptance-and-execution) can enrich
 that failure with an operational terminal code. In that case, its top-level
@@ -85,8 +90,8 @@ schema, not a promise that all producers use the same failure enrichment.
 For that runner, only timeout, unavailable and throttled terminals can be
 retryable, and only when every unresolved rule is failed with exactly the same
 terminal code as its sole reason. Indeterminate evidence or mixed causes makes
-it non-retryable. A deny outcome never gains a failure object. Ordinary per-rule
-failed evidence is not by itself an operational error or a trigger for a retry.
+it non-retryable. A deny outcome never gains a failure object. Per-rule failed evidence always preserves failure unless deny takes precedence;
+it is not by itself a trigger for automatic retry.
 
 `retryable: true` classifies the final evidence; it does not authorize an automatic
 caller retry. The caller still owns deadlines, idempotency, attempt/cost limits
@@ -138,7 +143,7 @@ records; consumers of a known extension must validate its own schema and meaning
 Portable Decision JSON is bounded to 1 MiB; that byte limit is not enforced by
 calling `Validate` on an already constructed Go value.
 
-The [OpenAPI contract](../contracts/openapi/v0alpha1/openapi.yaml) specifies HTTP
+The [OpenAPI contract](../contracts/openapi/v0alpha2/openapi.yaml) specifies HTTP
 200 for all four accepted outcomes and Problem Details for requests rejected
 before evaluation. It is a contract, not an implemented server in this repo.
 The CLI evaluation commands likewise exit zero for any emitted Decision, including failure. Loading

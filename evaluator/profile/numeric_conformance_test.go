@@ -11,7 +11,7 @@ import (
 
 func TestNumericConformance(t *testing.T) {
 	read := func(name string) []byte {
-		return readContract(t, "conformance", "v0alpha1", "evaluator-profile", name)
+		return readContract(t, "conformance", "v0alpha2", "evaluator-profile", name)
 	}
 	var cases struct {
 		Valid             []string
@@ -124,7 +124,7 @@ func TestProgrammaticParameterNumbers(t *testing.T) {
 }
 
 func TestYAMLNumericBasePortability(t *testing.T) {
-	source := readContract(t, "conformance", "v0alpha1", "evaluator-profile", "valid-number-decimal.yaml")
+	source := readContract(t, "conformance", "v0alpha2", "evaluator-profile", "valid-number-decimal.yaml")
 	for _, tc := range []struct{ number, want string }{
 		{"0x3e8", "1000"}, {"0o1750", "1000"}, {"010", "10"}, {".5", "0.5"}, {"1.", "1"},
 		{"0x20000000000001", ""}, {"0o400000000000000001", ""},

@@ -4,13 +4,13 @@ This directory is the language-neutral source of truth for Antaeus policy and de
 
 ## Contract version
 
-The initial version is `v0alpha1`:
+The current engine uses decision and evaluator-profile `v0alpha2`; unchanged contracts retain `v0alpha1`:
 
 - policies use `apiVersion: policy.antaeus.io/v0alpha1` and `kind: Policy`;
-- decision requests use `apiVersion: decision.antaeus.io/v0alpha1` and `kind: DecisionRequest`;
-- decisions use `apiVersion: decision.antaeus.io/v0alpha1` and `kind: Decision`;
-- regression suites and result sets use `apiVersion: regression.antaeus.io/v0alpha1`; and
-- evaluator profiles use `apiVersion: evaluator.antaeus.io/v0alpha1` and `kind: EvaluatorProfile`; and
+- decision requests use `apiVersion: decision.antaeus.io/v0alpha2` and `kind: DecisionRequest`;
+- decisions use `apiVersion: decision.antaeus.io/v0alpha2` and `kind: Decision`;
+- regression suites use `apiVersion: regression.antaeus.io/v0alpha1`, while result sets containing current Decisions use `regression.antaeus.io/v0alpha2`; and
+- evaluator profiles use `apiVersion: evaluator.antaeus.io/v0alpha2` and `kind: EvaluatorProfile`; and
 - local secret bindings use `apiVersion: config.antaeus.io/v0alpha1` and `kind: LocalSecretBindings`; and
 - local configuration manifests use `apiVersion: config.antaeus.io/v0alpha1` and `kind: LocalConfiguration`.
 
@@ -62,7 +62,7 @@ A valid policy is serialized with RFC 8785 JSON Canonicalization Scheme (JCS), e
 
 ## HTTP semantics
 
-`POST /v0alpha1/decisions` returns HTTP 200 with a Decision for `allow`, `review`, `deny`, and `failure`. A `failure` Decision means evaluation was accepted but did not produce a policy judgment.
+`POST /v0alpha2/decisions` returns HTTP 200 with a Decision for `allow`, `review`, `deny`, and `failure`. A `failure` Decision means evaluation was accepted but did not produce a policy judgment.
 
 Every Decision and rule result carries at least one stable reason code. A failure Decision's top-level reason codes include its structured failure code. Results appear exactly once in policy order, and semantic validation recomputes the deterministic reduction rather than trusting the claimed outcome.
 
@@ -73,16 +73,17 @@ After evaluator routing is complete, every policy rule has exactly one result in
 Implementations reduce the complete result list in this exact precedence order:
 
 1. any matched `deny` rule yields `deny` with required top-level reason code `policy.deny_rule_matched`;
-2. otherwise, any `indeterminate` or `failed` result yields `failure` with required top-level reason code `evaluation.unresolved_rule`;
-3. otherwise, any matched `review` rule yields `review` with required top-level reason code `policy.review_rule_matched`;
-4. otherwise, any matched `allow` rule yields `allow` with required top-level reason code `policy.allow_rule_matched`; and
-5. otherwise, the policy's `defaultOutcome` applies with required top-level reason code `policy.default_outcome`.
+2. otherwise, any `failed` result yields `failure` with required top-level reason code `evaluation.unresolved_rule`;
+3. otherwise, any `indeterminate` result yields `review` with required top-level reason code `evaluation.indeterminate_rule`;
+4. otherwise, any matched `review` rule yields `review` with required top-level reason code `policy.review_rule_matched`;
+5. otherwise, any matched `allow` rule yields `allow` with required top-level reason code `policy.allow_rule_matched`; and
+6. otherwise, the policy's `defaultOutcome` applies with required top-level reason code `policy.default_outcome`.
 
 The required reduction code must appear in the Decision's top-level `reasonCodes`; implementations may add other bounded reason codes. A `failure` Decision must also include its structured `failure.code` in the top-level reason codes. One code can satisfy both requirements when the structured code is `evaluation.unresolved_rule`.
 
-An accepted evaluation produces one rule result per policy rule even when a configuration, evaluator, reduction, or internal failure prevents a judgment. Such rules use `indeterminate` or `failed`, so the reducer can reproduce `failure`; a matched `deny` still takes precedence. The reducer determines only the terminal outcome, its required reason code, and the standard unresolved-rule failure. Other structured failure details describe the execution failure and remain subject to schema and semantic validation.
+An accepted evaluation produces one rule result per policy rule even when a configuration, evaluator, reduction, or internal failure prevents a judgment. Such rules use `failed`, so the reducer can reproduce `failure`; a matched `deny` still takes precedence. The reducer determines only the terminal outcome, its required reason code, and the standard unresolved-rule failure. Other structured failure details describe the execution failure and remain subject to schema and semantic validation.
 
-The language-neutral cases in `conformance/v0alpha1/reduction/cases.json` are normative input-to-output fixtures for this behavior.
+The language-neutral cases in `conformance/v0alpha2/reduction/cases.json` are normative input-to-output fixtures for this behavior.
 
 ## Evaluator fixtures
 
@@ -136,8 +137,9 @@ check selected environment references without executing evaluators.
 obtaining evaluator evidence. A profile declares bounded total and per-attempt
 timeouts, credential slot names, evaluator adapter and protocol identities,
 capability requirements, retry behavior, confidence routing, escalation,
-operational fallbacks, and failure-only terminal behavior. Confidence can
-change routing only; it never creates or replaces a policy outcome.
+operational fallbacks, and terminal behavior fixed to `onIndeterminate: review`
+and `onFailure: failure`. Confidence changes evidence routing; the reducer
+selects review for indeterminate evidence without synthesizing a matched rule.
 
 Retries and fallbacks name only `timeout`, `unavailable`, and `throttled` as
 eligible transient classes. `maxAttempts` includes the first attempt; one
@@ -262,17 +264,27 @@ Decision for every case. Expectation mismatches set the case status to `failed`
 and the aggregate `passed` field to `false`; configuration and evaluation errors
 do not produce a partial result set. These fixtures remain synthetic and
 credential-free. Regression and single-case local evaluation share the fixture
-profile whose exact UTF-8 preimage is `antaeus.local.fixture/v0alpha1`.
+profile whose exact UTF-8 preimage is `antaeus.local.fixture/v0alpha2`.
 
 Requests rejected before evaluation use a non-2xx status with RFC 9457 Problem Details (`application/problem+json`). Policy `deny` and `review` outcomes are not transport errors.
 
+## Version migration
+
+See [v0alpha2 migration](../docs/uncertainty-review-migration.md). Published
+`v0alpha1` schemas, examples, OpenAPI, and conformance fixtures remain unchanged.
+Its reduction is matched deny, any indeterminate or failed evidence as failure,
+matched review, matched allow, then default. The new engine implements
+`v0alpha2` and does not accept legacy decision requests or evaluator profiles.
+
 ## Layout
 
-- `schemas/v0alpha1/` contains authoritative JSON Schemas.
-- `openapi/v0alpha1/openapi.yaml` describes the portable synchronous HTTP operation.
+- `schemas/v0alpha2/` contains current Decision, DecisionRequest, EvaluatorProfile, and RegressionResultSet schemas, referencing unchanged `v0alpha1` definitions.
+- `schemas/v0alpha1/` preserves the published contracts.
+- `openapi/v0alpha2/openapi.yaml` describes the portable synchronous HTTP operation.
 - `examples/v0alpha1/` contains readable valid examples.
 - `examples/v0alpha1/input/` contains canonical local-evaluation inputs bound by fixture digests.
 - `examples/v0alpha1/regression-suite/` and `regression-result-set/` contain a complete offline regression example.
-- `examples/v0alpha1/evaluator-profile/` contains a credential-free deterministic profile.
+- `examples/v0alpha2/` contains current Decision, request, evaluator-profile, and result-set examples.
+- `conformance/v0alpha2/` contains current reduction and runner cases.
 - `examples/v0alpha1/local-secret-bindings/` contains non-secret environment-variable references.
 - `conformance/v0alpha1/` contains machine-oriented valid, invalid, and canonicalization fixtures.

@@ -37,7 +37,7 @@ func TestDecisionExecutionTextBoundaries(t *testing.T) {
 		} {
 			t.Run(field.name+"/"+tt.name, func(t *testing.T) {
 				var d Decision
-				decodeFixture(t, filepath.Join("examples", "v0alpha1", "decision", "fixture-review.json"), &d)
+				decodeFixture(t, filepath.Join("examples", "v0alpha2", "decision", "fixture-review.json"), &d)
 				if err := d.Validate(); err != nil {
 					t.Fatalf("invalid control: %v", err)
 				}
@@ -64,7 +64,7 @@ func TestDecisionExecutionTextConformance(t *testing.T) {
 		for _, field := range []string{"adapterVersion", "fixtureVersion", "provider", "model"} {
 			t.Run(tt.Name+"/"+field, func(t *testing.T) {
 				var d Decision
-				decodeFixture(t, filepath.Join("examples", "v0alpha1", "decision", "fixture-review.json"), &d)
+				decodeFixture(t, filepath.Join("examples", "v0alpha2", "decision", "fixture-review.json"), &d)
 				switch field {
 				case "adapterVersion":
 					d.Evaluator.AdapterVersion = tt.Value

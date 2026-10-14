@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://antaeus.io/contracts/v0alpha2/decision-request.schema.json",
+  "title": "Antaeus DecisionRequest v0alpha2",
+  "type": "object",
+  "required": [
+    "apiVersion",
+    "kind",
+    "policy",
+    "input"
+  ],
+  "properties": {
+    "apiVersion": {
+      "const": "decision.antaeus.io/v0alpha2"
+    },
+    "kind": {
+      "const": "DecisionRequest"
+    },
+    "policy": {
+      "type": "object",
+      "oneOf": [
+        {
+          "required": [
+            "inline"
+          ],
+          "properties": {
+            "inline": {
+              "$ref": "../v0alpha1/policy.schema.json"
+            }
+          },
+          "unevaluatedProperties": false
+        },
+        {
+          "required": [
+            "reference"
+          ],
+          "properties": {
+            "reference": {
+              "$ref": "../v0alpha1/common.schema.json#/$defs/policyIdentity"
+            }
+          },
+          "unevaluatedProperties": false
+        }
+      ]
+    },
+    "input": {
+      "type": "object"
+    }
+  },
+  "unevaluatedProperties": false
+}

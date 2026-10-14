@@ -60,7 +60,7 @@ func TestBlankExecutionVersionFailsBeforeAcceptance(t *testing.T) {
 			return evaluator.Result{}, nil
 		})
 		if fixture {
-			p, err := profile.LoadFile("../../contracts/examples/v0alpha1/evaluator-profile/quickstart-fixture.json")
+			p, err := profile.LoadFile("../../contracts/examples/v0alpha2/evaluator-profile/quickstart-fixture.json")
 			if err != nil {
 				t.Fatal(err)
 			}

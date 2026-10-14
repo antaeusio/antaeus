@@ -19,7 +19,7 @@ import (
 func TestParseExamples(t *testing.T) {
 	for _, name := range []string{"quickstart-fixture.json", "semantic-routing.json"} {
 		t.Run(name, func(t *testing.T) {
-			source := readContract(t, "examples", "v0alpha1", "evaluator-profile", name)
+			source := readContract(t, "examples", "v0alpha2", "evaluator-profile", name)
 			artifact, err := Parse(source, FormatJSON)
 			if err != nil {
 				t.Fatalf("Parse() error = %v", err)
@@ -32,7 +32,7 @@ func TestParseExamples(t *testing.T) {
 }
 
 func TestJSONAndYAMLProduceSameIdentity(t *testing.T) {
-	jsonArtifact, err := Parse(readContract(t, "examples", "v0alpha1", "evaluator-profile", "quickstart-fixture.json"), FormatJSON)
+	jsonArtifact, err := Parse(readContract(t, "examples", "v0alpha2", "evaluator-profile", "quickstart-fixture.json"), FormatJSON)
 	if err != nil {
 		t.Fatalf("Parse(JSON) error = %v", err)
 	}
@@ -56,7 +56,7 @@ func TestJSONAndYAMLProduceSameIdentity(t *testing.T) {
 	if jsonDigest != yamlDigest || !strings.HasPrefix(jsonDigest, "sha256:") {
 		t.Fatalf("digests = %q and %q", jsonDigest, yamlDigest)
 	}
-	const wantDigest = "sha256:6ba2d4b73fae619e064b77d1799e29fd1057c6ffdfb7715151d912a5b057d929"
+	const wantDigest = "sha256:150fbc0d77194f8ea9bbd5be106a91f06369591be4c0434e0bd21344d689e93b"
 	if jsonDigest != wantDigest {
 		t.Fatalf("digest = %q, want %q", jsonDigest, wantDigest)
 	}
@@ -76,7 +76,7 @@ func TestParseRejectsConformanceProfiles(t *testing.T) {
 		"invalid-unknown-property.json":         "source.schema",
 		"invalid-unsafe-integer.json":           "source.number",
 	}
-	entries, err := os.ReadDir(contractsPath("conformance", "v0alpha1", "evaluator-profile"))
+	entries, err := os.ReadDir(contractsPath("conformance", "v0alpha2", "evaluator-profile"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestParseRejectsConformanceProfiles(t *testing.T) {
 		}
 		seen++
 		t.Run(entry.Name(), func(t *testing.T) {
-			_, err := Parse(readContract(t, "conformance", "v0alpha1", "evaluator-profile", entry.Name()), FormatJSON)
+			_, err := Parse(readContract(t, "conformance", "v0alpha2", "evaluator-profile", entry.Name()), FormatJSON)
 			if got := contractErrorCode(err); got != want {
 				t.Fatalf("error = %v (code %q), want code %q", err, got, want)
 			}
@@ -270,7 +270,7 @@ func TestValidateParameters(t *testing.T) {
 }
 
 func TestSemanticJSONAndYAMLProduceSameIdentity(t *testing.T) {
-	source := readContract(t, "examples", "v0alpha1", "evaluator-profile", "semantic-routing.json")
+	source := readContract(t, "examples", "v0alpha2", "evaluator-profile", "semantic-routing.json")
 	var document map[string]any
 	if err := json.Unmarshal(source, &document); err != nil {
 		t.Fatal(err)
@@ -360,7 +360,7 @@ func TestHTMLHeavyProfileUsesCanonicalSize(t *testing.T) {
 }
 
 func TestIntegerSpellingsHaveParity(t *testing.T) {
-	source := string(readContract(t, "examples", "v0alpha1", "evaluator-profile", "quickstart-fixture.json"))
+	source := string(readContract(t, "examples", "v0alpha2", "evaluator-profile", "quickstart-fixture.json"))
 	jsonSource := strings.Replace(source, `"totalTimeoutMs": 2000`, `"totalTimeoutMs": 2e3`, 1)
 	yamlSource := strings.Replace(quickstartYAML, "totalTimeoutMs: 2000", "totalTimeoutMs: 2000.0", 1)
 	jsonArtifact, err := Parse([]byte(jsonSource), FormatJSON)
@@ -384,7 +384,11 @@ func profileSchema(t *testing.T) *jsonschema.Schema {
 	compiler.UseRegexpEngine(schematest.CompilePattern)
 	compiler.AssertFormat()
 	for _, name := range []string{"common.schema.json", "evaluator-profile.schema.json"} {
-		file, err := os.Open(contractsPath("schemas", "v0alpha1", name))
+		version := "v0alpha1"
+		if name == "evaluator-profile.schema.json" {
+			version = "v0alpha2"
+		}
+		file, err := os.Open(contractsPath("schemas", version, name))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -393,11 +397,11 @@ func profileSchema(t *testing.T) *jsonschema.Schema {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := compiler.AddResource("https://antaeus.io/contracts/v0alpha1/"+name, document); err != nil {
+		if err := compiler.AddResource("https://antaeus.io/contracts/"+version+"/"+name, document); err != nil {
 			t.Fatal(err)
 		}
 	}
-	schema, err := compiler.Compile("https://antaeus.io/contracts/v0alpha1/evaluator-profile.schema.json")
+	schema, err := compiler.Compile("https://antaeus.io/contracts/v0alpha2/evaluator-profile.schema.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -407,7 +411,7 @@ func profileSchema(t *testing.T) *jsonschema.Schema {
 func TestParserAndSchemaAgreeOnPublishedFixtures(t *testing.T) {
 	schema := profileSchema(t)
 	for _, name := range []string{"quickstart-fixture.json", "semantic-routing.json"} {
-		source := readContract(t, "examples", "v0alpha1", "evaluator-profile", name)
+		source := readContract(t, "examples", "v0alpha2", "evaluator-profile", name)
 		if err := schema.Validate(decodeSchemaInstance(t, source)); err != nil {
 			t.Fatalf("schema rejected valid %s: %v", name, err)
 		}
@@ -427,7 +431,7 @@ func TestParserAndSchemaAgreeOnPublishedFixtures(t *testing.T) {
 		"invalid-terminal-outcome.json",
 		"invalid-unknown-property.json",
 	} {
-		source := readContract(t, "conformance", "v0alpha1", "evaluator-profile", name)
+		source := readContract(t, "conformance", "v0alpha2", "evaluator-profile", name)
 		if err := schema.Validate(decodeSchemaInstance(t, source)); err == nil {
 			t.Fatalf("schema accepted invalid %s", name)
 		}
@@ -438,7 +442,7 @@ func TestParserAndSchemaAgreeOnPublishedFixtures(t *testing.T) {
 }
 
 func TestParseSourceSafety(t *testing.T) {
-	valid := readContract(t, "examples", "v0alpha1", "evaluator-profile", "quickstart-fixture.json")
+	valid := readContract(t, "examples", "v0alpha2", "evaluator-profile", "quickstart-fixture.json")
 	var nullDocument map[string]any
 	if err := json.Unmarshal(valid, &nullDocument); err != nil {
 		t.Fatal(err)
@@ -454,7 +458,7 @@ func TestParseSourceSafety(t *testing.T) {
 	}{
 		{name: "null", source: nullSource, code: "source.schema"},
 		{name: "case variant", source: caseVariant, code: "source.schema"},
-		{name: "duplicate JSON key", source: []byte(`{"apiVersion":"evaluator.antaeus.io/v0alpha1","apiVersion":"evaluator.antaeus.io/v0alpha1"}`), code: "source.duplicate_key"},
+		{name: "duplicate JSON key", source: []byte(`{"apiVersion":"evaluator.antaeus.io/v0alpha2","apiVersion":"evaluator.antaeus.io/v0alpha2"}`), code: "source.duplicate_key"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			_, err := Parse(test.source, FormatJSON)
@@ -506,13 +510,13 @@ func TestLoadFileAndLimits(t *testing.T) {
 }
 
 func TestParseRejectsDuplicateYAMLKey(t *testing.T) {
-	_, err := Parse([]byte("apiVersion: evaluator.antaeus.io/v0alpha1\nkind: EvaluatorProfile\nkind: EvaluatorProfile\n"), FormatYAML)
+	_, err := Parse([]byte("apiVersion: evaluator.antaeus.io/v0alpha2\nkind: EvaluatorProfile\nkind: EvaluatorProfile\n"), FormatYAML)
 	assertParseCode(t, err, "source.duplicate_key")
 }
 
 func TestParseRejectsMissingRequiredNestedField(t *testing.T) {
 	var document map[string]any
-	if err := json.Unmarshal(readContract(t, "examples", "v0alpha1", "evaluator-profile", "quickstart-fixture.json"), &document); err != nil {
+	if err := json.Unmarshal(readContract(t, "examples", "v0alpha2", "evaluator-profile", "quickstart-fixture.json"), &document); err != nil {
 		t.Fatal(err)
 	}
 	routing := document["spec"].(map[string]any)["routing"].(map[string]any)
@@ -539,7 +543,7 @@ func (nilValidatorRegistry) ValidatorFor(ComponentIdentity) (ParameterValidator,
 
 func mustParseExample(t *testing.T, name string) Artifact {
 	t.Helper()
-	artifact, err := Parse(readContract(t, "examples", "v0alpha1", "evaluator-profile", name), FormatJSON)
+	artifact, err := Parse(readContract(t, "examples", "v0alpha2", "evaluator-profile", name), FormatJSON)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -601,7 +605,7 @@ func contractsPath(elements ...string) string {
 	return filepath.Join(append([]string{"..", "..", "contracts"}, elements...)...)
 }
 
-const quickstartYAML = `apiVersion: evaluator.antaeus.io/v0alpha1
+const quickstartYAML = `apiVersion: evaluator.antaeus.io/v0alpha2
 kind: EvaluatorProfile
 metadata:
   name: quickstart-fixture
@@ -634,6 +638,6 @@ spec:
     confidence:
       enabled: false
     terminal:
-      onIndeterminate: failure
+      onIndeterminate: review
       onFailure: failure
 `

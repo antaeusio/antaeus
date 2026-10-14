@@ -14,7 +14,7 @@ type Reduction struct {
 	Failure     *Failure
 }
 
-// Reduce applies the v0alpha1 precedence rules to one result per policy rule.
+// Reduce applies the v0alpha2 precedence rules to one result per policy rule.
 func Reduce(artifact policy.Artifact, results []RuleResult) (Reduction, error) {
 	if err := artifact.Validate(); err != nil {
 		return Reduction{}, fmt.Errorf("validate policy: %w", err)
@@ -39,13 +39,16 @@ func Reduce(artifact policy.Artifact, results []RuleResult) (Reduction, error) {
 	if anyMatched(results, policy.OutcomeDeny) {
 		return Reduction{Outcome: OutcomeDeny, ReasonCodes: []string{"policy.deny_rule_matched"}}, nil
 	}
-	if anyUnresolved(results) {
+	if anyStatus(results, RuleFailed) {
 		failure := &Failure{
 			Code:      "evaluation.unresolved_rule",
 			Stage:     "evaluation",
 			Retryable: false,
 		}
 		return Reduction{Outcome: OutcomeFailure, ReasonCodes: []string{failure.Code}, Failure: failure}, nil
+	}
+	if anyStatus(results, RuleIndeterminate) {
+		return Reduction{Outcome: OutcomeReview, ReasonCodes: []string{"evaluation.indeterminate_rule"}}, nil
 	}
 	if anyMatched(results, policy.OutcomeReview) {
 		return Reduction{Outcome: OutcomeReview, ReasonCodes: []string{"policy.review_rule_matched"}}, nil
@@ -68,9 +71,9 @@ func anyMatched(results []RuleResult, outcome policy.Outcome) bool {
 	return false
 }
 
-func anyUnresolved(results []RuleResult) bool {
+func anyStatus(results []RuleResult, status RuleStatus) bool {
 	for _, result := range results {
-		if result.Status == RuleIndeterminate || result.Status == RuleFailed {
+		if result.Status == status {
 			return true
 		}
 	}

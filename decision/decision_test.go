@@ -14,10 +14,10 @@ import (
 
 func TestDecisionExamplesValidate(t *testing.T) {
 	artifact := loadPolicyExample(t)
-	for _, name := range []string{"allow.json", "review.json", "deny.json", "failure.json", "fixture-review.json"} {
+	for _, name := range []string{"allow.json", "review.json", "deny.json", "failure.json", "fixture-review.json", "uncertain-review.json"} {
 		t.Run(name, func(t *testing.T) {
 			var decision Decision
-			decodeFixture(t, filepath.Join("examples", "v0alpha1", "decision", name), &decision)
+			decodeFixture(t, filepath.Join("examples", "v0alpha2", "decision", name), &decision)
 			if err := decision.Validate(); err != nil {
 				t.Fatalf("Validate() error = %v", err)
 			}
@@ -30,7 +30,7 @@ func TestDecisionExamplesValidate(t *testing.T) {
 
 func TestDecisionRequestExampleValidates(t *testing.T) {
 	var request DecisionRequest
-	decodeFixture(t, filepath.Join("examples", "v0alpha1", "request", "reference.json"), &request)
+	decodeFixture(t, filepath.Join("examples", "v0alpha2", "request", "reference.json"), &request)
 	if err := request.Validate(); err != nil {
 		t.Fatalf("Validate() error = %v", err)
 	}
@@ -59,7 +59,7 @@ func TestDecisionRequestRequiresExactlyOnePolicySource(t *testing.T) {
 
 func TestDecisionRejectsFailureMismatch(t *testing.T) {
 	var decision Decision
-	decodeFixture(t, filepath.Join("examples", "v0alpha1", "decision", "failure.json"), &decision)
+	decodeFixture(t, filepath.Join("examples", "v0alpha2", "decision", "failure.json"), &decision)
 	decision.Failure = nil
 
 	var validationError *ValidationError
@@ -73,7 +73,7 @@ func TestDecisionRejectsFailureMismatch(t *testing.T) {
 
 func TestDecisionRejectsMissingFailureReasonCode(t *testing.T) {
 	var decision Decision
-	decodeFixture(t, filepath.Join("examples", "v0alpha1", "decision", "failure.json"), &decision)
+	decodeFixture(t, filepath.Join("examples", "v0alpha2", "decision", "failure.json"), &decision)
 	decision.ReasonCodes = []string{"evaluation.failed"}
 
 	var validationError *ValidationError
@@ -163,7 +163,7 @@ func TestDecisionRejectsInvalidEvaluatorMetadata(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var candidate Decision
-			decodeFixture(t, filepath.Join("examples", "v0alpha1", "decision", "fixture-review.json"), &candidate)
+			decodeFixture(t, filepath.Join("examples", "v0alpha2", "decision", "fixture-review.json"), &candidate)
 			test.mutate(candidate.Evaluator)
 			var validationError *ValidationError
 			if err := candidate.Validate(); !errors.As(err, &validationError) {
@@ -267,7 +267,7 @@ func TestReductionConformanceFixtures(t *testing.T) {
 			Expected    Reduction    `json:"expected"`
 		} `json:"cases"`
 	}
-	decodeFixture(t, filepath.Join("conformance", "v0alpha1", "reduction", "cases.json"), &fixture)
+	decodeFixture(t, filepath.Join("conformance", "v0alpha2", "reduction", "cases.json"), &fixture)
 
 	for _, test := range fixture.Cases {
 		t.Run(test.Name, func(t *testing.T) {
@@ -297,7 +297,7 @@ func TestReduceRejectsMismatchedRuleIdentity(t *testing.T) {
 func TestValidateAgainstRejectsTamperedPolicyDigest(t *testing.T) {
 	artifact := loadPolicyExample(t)
 	var decision Decision
-	decodeFixture(t, filepath.Join("examples", "v0alpha1", "decision", "review.json"), &decision)
+	decodeFixture(t, filepath.Join("examples", "v0alpha2", "decision", "review.json"), &decision)
 	decision.Policy.Digest = "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 	if err := decision.ValidateAgainst(artifact); err == nil {

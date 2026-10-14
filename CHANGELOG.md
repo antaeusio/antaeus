@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-14
+
+Completed semantic uncertainty now returns review; evaluation and provider errors
+remain failures. This minor release introduces Decision/Profile v0alpha2 and
+regression ResultSet v0alpha2 while preserving published v0alpha1 contracts.
+Upgrade validators, profiles and native/WASM consumers together; see the
+[migration guide](./docs/uncertainty-review-migration.md).
+
+### Changed
+
+- Breaking: introduce Decision and EvaluatorProfile v0alpha2. Completed indeterminate
+  evidence returns review with `evaluation.indeterminate_rule`; failed evidence
+  remains failure and matched deny retains highest precedence. Published
+  v0alpha1 contracts remain immutable. The new runtime rejects legacy profiles
+  and requests; generated regression result sets use v0alpha2. See the
+  [migration guide](./docs/uncertainty-review-migration.md) for profile digest,
+  trust, validator, regression, native/WASM, and coordinated consumer changes.
+
+- Give the built-in local fixture profile a new v0alpha2 identity and digest.
+
 ### Security
 
 - Update the pinned validation toolchains to Go 1.26.9 and 1.27.2 and the
@@ -204,7 +224,8 @@ carry GitHub build-provenance attestations
 - `scripts/with-build-lock` keeps the lock until an interrupted command's whole process group has stopped (escalating to KILL after a bounded wait), serializes stale-lock takeover, waits for owners that have not yet written metadata, and no longer treats another user's process as dead. `scripts/test-build-lock` covers these cases ([#42](https://github.com/antaeusio/antaeus/issues/42)).
 - `scripts/cross-build` pins `GOAMD64=v1` and `GOARM64=v8.0` instead of inheriting the caller's environment.
 
-[Unreleased]: https://github.com/antaeusio/antaeus/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/antaeusio/antaeus/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/antaeusio/antaeus/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/antaeusio/antaeus/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/antaeusio/antaeus/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/antaeusio/antaeus/compare/v0.3.0...v0.4.0

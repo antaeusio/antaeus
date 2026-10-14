@@ -46,10 +46,9 @@ func TestConfidenceWithoutEscalation(t *testing.T) {
 			wantDecisionReasons := []string{"policy.default_outcome"}
 			var wantFailure *decision.Failure
 			if tt.unresolved {
-				wantStatus, wantTerminal, wantOutcome = decision.RuleIndeterminate, "evaluation.unresolved_rule", decision.OutcomeFailure
+				wantStatus, wantTerminal, wantOutcome = decision.RuleIndeterminate, "evaluation.unresolved_rule", decision.OutcomeReview
 				wantReasons = []string{"evaluation.low_confidence"}
-				wantDecisionReasons = []string{"evaluation.unresolved_rule"}
-				wantFailure = &decision.Failure{Code: "evaluation.unresolved_rule", Stage: "evaluation", Retryable: false}
+				wantDecisionReasons = []string{"evaluation.indeterminate_rule"}
 			}
 			if d.RuleResults[0].Status != decision.RuleNotMatched || d.RuleResults[1].Status != wantStatus || d.Outcome != wantOutcome || trace.Terminal != wantTerminal || !reflect.DeepEqual(d.RuleResults[1].ReasonCodes, wantReasons) || !reflect.DeepEqual(d.RuleResults[1].Confidence, tt.confidence) {
 				t.Fatalf("decision=%+v trace=%+v", d, trace)
@@ -166,5 +165,40 @@ func TestAdapterPanicCancelsAttemptAndTotalContexts(t *testing.T) {
 	}
 	if caller.Err() != nil {
 		t.Fatalf("runner cancelled caller context: %v", caller.Err())
+	}
+}
+
+func TestCompletedUncertaintyAndFailedEvidenceRemainDistinct(t *testing.T) {
+	for _, failed := range []bool{false, true} {
+		name := "high confidence indeterminate"
+		if failed {
+			name = "indeterminate with failed rule"
+		}
+		t.Run(name, func(t *testing.T) {
+			in := inputFixture(t)
+			d, err := Run(context.Background(), in, installed(func(_ context.Context, r evaluator.Request, c Configuration) (evaluator.Result, error) {
+				out := evidence(r, c, 1)
+				out.RuleResults[0].Status = decision.RuleIndeterminate
+				out.RuleResults[0].ReasonCodes = []string{"test.ambiguous"}
+				if failed {
+					out.RuleResults[1].Status = decision.RuleFailed
+					out.RuleResults[1].ReasonCodes = []string{"test.execution_failed"}
+				}
+				return out, nil
+			}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if d.RuleResults[0].Status != decision.RuleIndeterminate || *d.RuleResults[0].Confidence != 1 || !reflect.DeepEqual(d.RuleResults[0].ReasonCodes, []string{"test.ambiguous"}) || d.Evaluator.Attempts != 1 {
+				t.Fatalf("evidence changed or rerouted: %+v", d)
+			}
+			wantOutcome, wantReason := decision.OutcomeReview, "evaluation.indeterminate_rule"
+			if failed {
+				wantOutcome, wantReason = decision.OutcomeFailure, "evaluation.unresolved_rule"
+			}
+			if d.Outcome != wantOutcome || !reflect.DeepEqual(d.ReasonCodes, []string{wantReason}) || (d.Failure != nil) != failed {
+				t.Fatalf("outcome=%s reasons=%v failure=%+v", d.Outcome, d.ReasonCodes, d.Failure)
+			}
+		})
 	}
 }

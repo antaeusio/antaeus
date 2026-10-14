@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	Preimage = "antaeus.local.fixture/v0alpha1"
-	Version  = "v0alpha1"
+	Preimage = "antaeus.local.fixture/v0alpha2"
+	Version  = "v0alpha2"
 )
 
 // Digest returns the SHA-256 identity of the exact profile preimage.

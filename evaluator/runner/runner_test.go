@@ -47,7 +47,7 @@ func inputFixture(t *testing.T) Input {
 	if err != nil {
 		t.Fatal(err)
 	}
-	profileArtifact, err := profile.LoadFile("../../contracts/examples/v0alpha1/evaluator-profile/semantic-routing.json")
+	profileArtifact, err := profile.LoadFile("../../contracts/examples/v0alpha2/evaluator-profile/semantic-routing.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,7 +250,7 @@ func TestFallbackAfterPrimaryFailureUsesAllRules(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(seen) != 3 || d.Outcome != decision.OutcomeFailure || d.RuleResults[0].Status != decision.RuleIndeterminate {
+	if len(seen) != 3 || d.Outcome != decision.OutcomeReview || d.Failure != nil || d.RuleResults[0].Status != decision.RuleIndeterminate {
 		t.Fatalf("seen=%v decision=%+v", seen, d)
 	}
 	if traceOf(t, d).Terminal != "evaluation.unresolved_rule" {
@@ -265,7 +265,7 @@ func TestLowEscalationConfidenceDoesNotRecurse(t *testing.T) {
 		calls++
 		return evidence(r, c, 0), nil
 	}))
-	if err != nil || calls != 2 || d.Outcome != decision.OutcomeFailure {
+	if err != nil || calls != 2 || d.Outcome != decision.OutcomeReview || d.Failure != nil {
 		t.Fatalf("calls=%d outcome=%s err=%v", calls, d.Outcome, err)
 	}
 }
@@ -402,7 +402,7 @@ func TestGlobalAttemptLimit(t *testing.T) {
 
 func TestRegistryFixtureCannotEnforce(t *testing.T) {
 	in := inputFixture(t)
-	p, err := profile.LoadFile("../../contracts/examples/v0alpha1/evaluator-profile/quickstart-fixture.json")
+	p, err := profile.LoadFile("../../contracts/examples/v0alpha2/evaluator-profile/quickstart-fixture.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -429,7 +429,7 @@ func TestFixtureVersionMustMatchEveryRoutedProfileEntry(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			in := inputFixture(t)
-			p, err := profile.LoadFile("../../contracts/examples/v0alpha1/evaluator-profile/quickstart-fixture.json")
+			p, err := profile.LoadFile("../../contracts/examples/v0alpha2/evaluator-profile/quickstart-fixture.json")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -525,7 +525,7 @@ func TestParentDeadlineAndFixtureLabeling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, err := profile.LoadFile("../../contracts/examples/v0alpha1/evaluator-profile/quickstart-fixture.json")
+	p, err := profile.LoadFile("../../contracts/examples/v0alpha2/evaluator-profile/quickstart-fixture.json")
 	if err != nil {
 		t.Fatal(err)
 	}

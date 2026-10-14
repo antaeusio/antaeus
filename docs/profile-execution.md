@@ -17,7 +17,7 @@ repository root:
 
 ```sh
 .tmp/bin/antaeus evaluate-profile \
-  --profile contracts/examples/v0alpha1/evaluator-profile/quickstart-fixture.json \
+  --profile contracts/examples/v0alpha2/evaluator-profile/quickstart-fixture.json \
   --policy contracts/examples/v0alpha1/policy/vendor-onboarding.yaml \
   --input contracts/examples/v0alpha1/input/aggregate-analytics.json \
   --fixture-set contracts/examples/v0alpha1/fixture-set/quickstart.json \
@@ -67,6 +67,14 @@ preflighted credential set. The runner copies required credentials and clears
 its copies on completion, passing only the invoked adapter's credential to each
 attempt and clearing that attempt's buffer immediately on return.
 
+Current profiles use `evaluator.antaeus.io/v0alpha2` with fixed
+`onIndeterminate: review` and `onFailure: failure`. After confidence routing is
+exhausted, indeterminate evidence produces review with
+`evaluation.indeterminate_rule`, while failed evidence still produces failure.
+The trace terminal `evaluation.unresolved_rule` describes remaining evidence,
+including uncertainty reviews and matched denies with unresolved rules; it is
+not a synonym for the Decision outcome. See [migration](./uncertainty-review-migration.md).
+
 ## Acceptance and execution
 
 Before accepting evaluation, the runner snapshots and validates policy/profile
@@ -106,7 +114,7 @@ Only the first three transient codes can be retryable, and only when every
 unresolved rule is `failed` with exactly that same code as its sole reason.
 Any indeterminate rule, different failed cause or additional failed reason makes
 the overall failure non-retryable. Resolved rules do not disqualify it. Ordinary
-unresolved evidence without an operational terminal keeps the generic failure
+failed evidence without an operational terminal keeps the generic failure
 and single `evaluation.unresolved_rule` top-level reason. Deny retains precedence
 and never gains a failure object; per-rule evidence and the trace preserve the
 details of mixed failures.
@@ -159,8 +167,10 @@ example, an accepted fixture input-identity mismatch now returns
 `failure.code: evaluation.adapter_failed` with both reasons and remains
 non-retryable. Consumers matching only the old generic code or exact reason
 array must migrate; do not infer automatic retry permission from the new flag.
-Non-operational unresolved failures, policy judgments, the standalone reducer,
-legacy `evaluate`/`test`, and regression execution are unchanged. This uses the
+At that release boundary, non-operational unresolved failures, policy judgments,
+the standalone reducer, legacy `evaluate`/`test`, and regression execution were
+unchanged. The later [v0alpha2 migration](./uncertainty-review-migration.md) changes
+uncertainty handling across these execution paths. This uses the
 portable Decision contract's existing allowance for operational failure details;
 no published schema, trace version or extension-key binding changes.
 

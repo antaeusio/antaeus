@@ -40,7 +40,7 @@ func (e *ValidationError) Error() string {
 	return fmt.Sprintf("%s: %s", e.Path, e.Message)
 }
 
-// Validate checks the closed v0alpha1 structure and relational invariants.
+// Validate checks the closed v0alpha2 structure and relational invariants.
 // Adapter-specific semantic parameters require ValidateParameters before use.
 func (a Artifact) Validate() error {
 	if a.APIVersion != APIVersion {
@@ -310,8 +310,8 @@ func validateRouting(routing Routing, evaluators map[string]Evaluator) error {
 	if err := validateConfidence(routing, evaluators); err != nil {
 		return err
 	}
-	if routing.Terminal.OnIndeterminate != "failure" || routing.Terminal.OnFailure != "failure" {
-		return invalid("$.spec.routing.terminal", "terminal.invalid", "v0alpha1 requires failure for indeterminate and failed evidence")
+	if routing.Terminal.OnIndeterminate != "review" || routing.Terminal.OnFailure != "failure" {
+		return invalid("$.spec.routing.terminal", "terminal.invalid", "v0alpha2 requires review for indeterminate evidence and failure for failed evidence")
 	}
 	return nil
 }

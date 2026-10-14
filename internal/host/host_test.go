@@ -173,7 +173,7 @@ func TestEvaluateRejectsConfigurationBeforeEvaluation(t *testing.T) {
 			r["credentials"] = []map[string]string{c, c}
 		}, CodeRequestInvalid},
 		{"fixture adapter", func(r map[string]any) {
-			r["profile"] = read(t, "contracts/examples/v0alpha1/evaluator-profile/quickstart-fixture.json")
+			r["profile"] = read(t, "contracts/examples/v0alpha2/evaluator-profile/quickstart-fixture.json")
 		}, CodeAdapterNotInstalled},
 		{"adapter rejects evaluator", func(r map[string]any) {
 			r["profile"] = strings.Replace(antaeusProfile(t, s.URL), `"provider":"antaeus"`, `"provider":"drex"`, 1)

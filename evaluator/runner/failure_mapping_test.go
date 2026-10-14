@@ -40,7 +40,7 @@ func assertDecisionFailure(t *testing.T, d decision.Decision, code string, retry
 }
 
 func TestFailureMappingConformance(t *testing.T) {
-	const path = "../../contracts/conformance/v0alpha1/runner/failure-mapping.json"
+	const path = "../../contracts/conformance/v0alpha2/runner/failure-mapping.json"
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)

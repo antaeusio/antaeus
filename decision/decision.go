@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	APIVersion           = "decision.antaeus.io/v0alpha1"
+	APIVersion           = "decision.antaeus.io/v0alpha2"
 	KindRequest          = "DecisionRequest"
 	KindDecision         = "Decision"
 	MaxRuleResults       = policy.MaxRules
@@ -136,7 +136,7 @@ func (s RuleStatus) Valid() bool {
 	}
 }
 
-// Valid reports whether the evaluator mode is part of v0alpha1.
+// Valid reports whether the evaluator mode is part of the current contract.
 func (m EvaluatorMode) Valid() bool {
 	return m == EvaluatorModeSemantic || m == EvaluatorModeDeterministicFixture
 }

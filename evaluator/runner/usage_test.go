@@ -157,8 +157,12 @@ func TestUsageIndependentOfSemanticAndResultFailures(t *testing.T) {
 				t.Fatal(err)
 			}
 			u := usageOf(t, d)
-			if d.Outcome != decision.OutcomeFailure {
-				t.Fatalf("outcome %s", d.Outcome)
+			want := decision.OutcomeFailure
+			if kind == "low confidence" {
+				want = decision.OutcomeReview
+			}
+			if d.Outcome != want {
+				t.Fatalf("outcome %s, want %s", d.Outcome, want)
 			}
 			for _, attempt := range u.Attempts {
 				if attempt.Status != "reported" || *attempt.InputTokens != 575 {

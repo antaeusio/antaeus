@@ -4,7 +4,7 @@ package profile
 import "encoding/json"
 
 const (
-	APIVersion = "evaluator.antaeus.io/v0alpha1"
+	APIVersion = "evaluator.antaeus.io/v0alpha2"
 	Kind       = "EvaluatorProfile"
 
 	MaxSourceBytes       = 1 << 20
