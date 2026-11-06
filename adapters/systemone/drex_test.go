@@ -40,7 +40,7 @@ func drexProfile(t *testing.T) profile.Artifact {
 
 // serveDrex answers requests addressed to DrexEndpoint from a local TLS
 // server, so the adapter runs against the real Drex URL and validation.
-func serveDrex(t *testing.T, handler http.HandlerFunc) (runner.Adapter, runner.Configuration) {
+func serveDrex(t *testing.T, handler http.HandlerFunc, versions ...string) (runner.Adapter, runner.Configuration) {
 	t.Helper()
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Host != "drex.nace.ai" || r.URL.Path != "/v1/systemone" {
@@ -60,7 +60,13 @@ func serveDrex(t *testing.T, handler http.HandlerFunc) (runner.Adapter, runner.C
 	})
 	// Pinned to 0.3.0 so these tests keep covering that installed version
 	// after AdapterVersion moves on.
-	return registration(client, "0.3.0"), runner.Configuration{Evaluator: drexProfile(t).Spec.Evaluators[0], Credential: []byte(drexTestKey)}
+	version := "0.3.0"
+	if len(versions) > 0 {
+		version = versions[0]
+	}
+	config := runner.Configuration{Evaluator: drexProfile(t).Spec.Evaluators[0], Credential: []byte(drexTestKey)}
+	config.Evaluator.Adapter.Version = version
+	return registration(client, version), config
 }
 
 type roundTripFunc func(*http.Request) (*http.Response, error)

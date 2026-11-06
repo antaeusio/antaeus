@@ -136,6 +136,67 @@ r = await evaluate([reply(JSON.stringify(reportedBody))], usageExtra);
 assert.equal(r.decision.outcome, 'allow');
 assert.deepEqual(r.decision.extensions['io.antaeus.usage'].attempts, [{ traceIndex: 0, status: 'invalid' }]);
 
+// Opt-in Drex confidence metadata must work through the packaged host, while
+// the same body still fails under the immutable 0.4.0 adapter identity.
+const compatibilityProfile = structuredClone(usageProfile);
+compatibilityProfile.spec.evaluators[0].adapter.version = '0.5.0';
+const compatibilityExtra = { profile: JSON.stringify(compatibilityProfile) };
+const compatibilityBody = JSON.parse(answers(0.05, 0.9));
+compatibilityBody.answers['prohibited-item'].confidence = 0.95;
+compatibilityBody.answers['complete-listing'].confidence = 0.9;
+compatibilityBody.usage = { input_tokens: 75, output_tokens: 24 };
+r = await evaluate([reply(JSON.stringify(compatibilityBody))], usageExtra);
+assert.equal(r.decision.outcome, 'failure');
+assert.equal(r.decision.extensions['io.antaeus.usage'].attempts[0].adapterFailureCode, 'systemone.output_invalid');
+const historicalDigest = r.decision.evaluator.profileDigest;
+r = await evaluate([reply(JSON.stringify(compatibilityBody))], compatibilityExtra);
+assert.equal(r.ok, true);
+assert.equal(r.decision.outcome, 'allow');
+assert.equal(r.decision.evaluator.adapterVersion, '0.5.0');
+assert.notEqual(r.decision.evaluator.profileDigest, historicalDigest);
+assert.equal(r.decision.extensions['io.antaeus.usage'].attempts[0].inputTokens, 75);
+assert.equal(calls.length, 1);
+
+// Replay the sanitized live synthetic-input response through the packaged host.
+const capturedPolicy = JSON.stringify({
+  apiVersion: 'policy.antaeus.io/v0alpha1', kind: 'Policy',
+  metadata: { name: 'synthetic-drex-response' },
+  spec: { defaultOutcome: 'review', rules: [{ id: 'described_item',
+    when: 'The item is described in detail, including its condition.', outcome: 'allow' }] },
+});
+const capturedResponse = read('adapters/systemone/testdata/drex/success-confidence-200.json');
+const capturedProfile = structuredClone(compatibilityProfile);
+capturedProfile.spec.evaluators[0].model = 'drex-v1.5';
+let capturedPolicyDigest;
+for (const version of ['0.4.0', '0.5.0']) {
+  capturedProfile.spec.evaluators[0].adapter.version = version;
+  r = await evaluate([reply(capturedResponse)], {
+    profile: JSON.stringify(capturedProfile), policy: capturedPolicy, policyFormat: 'json',
+    input: { description: 'A used wooden chair in good condition.' },
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.decision.outcome, version === '0.4.0' ? 'failure' : 'allow');
+  assert.equal(r.decision.evaluator.adapterVersion, version);
+  const accounting = r.decision.extensions['io.antaeus.usage'].attempts[0];
+  assert.equal(accounting.inputTokens, 30);
+  assert.equal(accounting.outputTokens, 23);
+  if (version === '0.4.0') {
+    assert.equal(accounting.adapterFailureCode, 'systemone.output_invalid');
+    capturedPolicyDigest = r.decision.policy.digest;
+  } else {
+    assert.equal(accounting.adapterFailureCode, undefined);
+    assert.equal(r.decision.policy.digest, capturedPolicyDigest);
+    assert.equal(r.decision.ruleResults[0].confidence, 0.959);
+  }
+  assert.equal(calls.length, 1);
+}
+compatibilityBody.answers['complete-listing'].confidence = 'invalid';
+r = await evaluate([reply(JSON.stringify(compatibilityBody))], compatibilityExtra);
+assert.equal(r.decision.outcome, 'failure');
+assert.equal(r.decision.extensions['io.antaeus.usage'].attempts[0].adapterFailureCode, 'systemone.output_invalid');
+assert.equal(r.decision.extensions['io.antaeus.usage'].attempts[0].inputTokens, 75);
+assert.equal(calls.length, 1);
+
 // A provider wait longer than the profile backoff is honored.
 r = await evaluate([reply('{}', 429, { 'retry-after-ms': '300' }), reply(answers(0.05, 0.9))]);
 assert.equal(r.decision.outcome, 'allow');

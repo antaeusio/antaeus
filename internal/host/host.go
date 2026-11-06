@@ -116,11 +116,12 @@ type EvaluateRequest struct {
 // installed System One version. The deterministic fixture is not installed.
 func Registry() runner.Registry {
 	return runner.Registry{
-		systemone.UsageIdentity:    systemone.UsageRegistration(),
-		openai.Identity:            openai.Registration(),
-		systemone.Identity:         systemone.Registration(),
-		systemone.PreviousIdentity: systemone.PreviousRegistration(),
-		systemone.LegacyIdentity:   systemone.LegacyRegistration(),
+		systemone.DrexCompatibilityIdentity: systemone.DrexCompatibilityRegistration(),
+		systemone.UsageIdentity:             systemone.UsageRegistration(),
+		openai.Identity:                     openai.Registration(),
+		systemone.Identity:                  systemone.Registration(),
+		systemone.PreviousIdentity:          systemone.PreviousRegistration(),
+		systemone.LegacyIdentity:            systemone.LegacyRegistration(),
 	}
 }
 
