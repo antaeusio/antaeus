@@ -8,7 +8,9 @@ provider:
 | --- | --- | --- | --- | --- |
 | `antaeus` | An Antaeus System One server, such as the open-source [`antaeusio/nli-server`](https://github.com/antaeusio/nli-server) | `0.2.0`, `0.3.0`, `0.4.0` | `antaeus-api-key` | `ANTAEUS_API_KEY` |
 | `contrastive-lm` | The self-hosted [Contrastive Language Model (CLM)](https://github.com/Contrastive-LM/CLM) reference server | `0.1.0`, `0.2.0`, `0.3.0`, `0.4.0` | `clm-api-key` | `CLM_API_KEY` |
-| `drex` | The hosted [Drex](https://drex.nace.ai) API by Nace.AI | `0.3.0`, `0.4.0` | `drex-api-key` (required) | `DREX_API_KEY` |
+| `drex` | The hosted [Drex](https://drex.nace.ai) API by Nace.AI | `0.3.0`, `0.4.0`, `0.5.0` | `drex-api-key` (required) | `DREX_API_KEY` |
+
+Version `0.5.0` adds [Drex answer compatibility](#drex-answer-compatibility) and also reports usage.
 
 Version `0.4.0` opts into [provider usage reporting](./provider-usage.md).
 It preserves `0.3.0` evaluation and retry behavior while reporting token counts
@@ -132,10 +134,10 @@ A System One evaluator must declare:
 | Field | Requirement |
 | --- | --- |
 | `mode` | `semantic` |
-| `adapter` | ID `io.antaeus.systemone` and an installed version (`0.1.0`–`0.4.0`); select `0.4.0` for usage reporting |
+| `adapter` | ID `io.antaeus.systemone` and an installed version (`0.1.0`–`0.5.0`); `0.4.0` reports usage; `0.5.0` adds Drex compatibility |
 | `protocol` | `{"id": "io.antaeus.rule-match", "version": "v0alpha1"}` |
 | `requiredCapabilities` | a subset of `json-input`, `structured-rule-results`, `confidence-scores` |
-| `provider` | `antaeus` (`0.2.0`–`0.4.0`), `contrastive-lm`, or `drex` (`0.3.0` and `0.4.0`) |
+| `provider` | `antaeus` (`0.2.0`–`0.4.0`), `contrastive-lm` (`0.1.0`–`0.4.0`), or `drex` (`0.3.0`–`0.5.0`) |
 | `model` | the name the server serves, for example `clm-latest` or `drex-latest` |
 | `modelRevision`, `instructionTemplate` | omitted |
 | `credentialSlot` | the provider's slot from the table above; required for `drex`, otherwise omitted when the server needs no key |
@@ -152,6 +154,28 @@ The CLM server hot-reloads model heads under the same name, so results for a
 name such as `clm-latest` are not exactly reproducible across head updates. The
 Decision records the provider and the model name the server reports, so an
 Antaeus server should serve a new name whenever its model changes.
+
+## Drex answer compatibility
+
+The opt-in `0.5.0` adapter supports only provider `drex`. It retains the pinned
+endpoint, required credential slot, usage reporting, status classification,
+retry waits, size limits, and probability normalization of `0.4.0`.
+
+Drex's [API reference](https://console.nace.ai/docs/drex/api-reference/systemone)
+shows a `confidence` field alongside `type` and `noul`. Version `0.5.0` accepts
+this optional field only as a finite JSON number between 0 and 1. Null, strings,
+duplicate fields, unknown fields, invalid probabilities, and missing or extra
+rule answers remain invalid. The field is metadata: rule evidence and routing
+confidence still derive from `noul` using the table above. It cannot replace
+or override the probability.
+
+Versions `0.1.0`–`0.4.0` keep their original two-field answer contract. Existing
+profiles do not silently opt in. Selecting `0.5.0` creates a different profile
+digest; it does not change policy identity or choose a different model.
+The regression cases include a [sanitized live response](../adapters/systemone/testdata/drex/README.md)
+from a synthetic `drex-v1.5` request on 2026-11-06, plus synthetic malformed
+responses. The capture verifies the extra field on that date; it does not
+establish when the provider introduced it.
 
 ## Credentials
 
@@ -177,7 +201,7 @@ Requests are limited to 4 MiB and responses to 1 MiB.
 | HTTP 408 or deadline | `evaluator.timeout` | yes |
 | HTTP 429 | `evaluator.throttled` | yes |
 | HTTP 500, 502, 503, or 504, or a connection failure | `evaluator.unavailable` | yes |
-| HTTP 529 (overloaded), versions `0.3.0` and `0.4.0` | `evaluator.unavailable` | yes |
+| HTTP 529 (overloaded), versions `0.3.0`–`0.5.0` | `evaluator.unavailable` | yes |
 | TLS verification failure | `systemone.tls_failed` | no |
 | Missing, extra, or non-`noul` answers, or a probability outside 0–1 | `systemone.output_invalid` | no |
 | Malformed response or a success status other than 200 | `systemone.response_malformed` | no |
@@ -185,12 +209,12 @@ Requests are limited to 4 MiB and responses to 1 MiB.
 
 The execution trace uses normalized routing codes: it preserves the three
 retryable adapter codes and records other adapter failures as
-`evaluation.adapter_failed`. The opt-in `0.4.0` usage extension additionally
+`evaluation.adapter_failed`. The opt-in `0.4.0` and `0.5.0` adapters additionally
 preserves bounded underlying adapter failure codes. In versions
 `0.1.0` and `0.2.0`, HTTP 529 is `systemone.unexpected_status` and not
 retryable.
 
-In versions `0.3.0` and `0.4.0`, a retryable failure also carries the provider's required
+In versions `0.3.0`–`0.5.0`, a retryable failure also carries the provider's required
 wait: `Retry-After-Ms` in milliseconds when valid, otherwise `Retry-After` as
 delay-seconds or an HTTP date. Malformed or negative values are ignored. The
 runner never retries sooner than that wait, and skips a retry that cannot
@@ -207,7 +231,7 @@ start within the evaluation deadline (see
   confidence, such as OpenAI. Evaluator profile v0alpha2 requires every
   evaluator on a confidence-routed path to report confidence.
 - A measured comparison of these servers with other evaluators on policy tasks.
-- Provider request IDs in Decisions or traces. Versions `0.3.0` and `0.4.0` report
+- Provider request IDs in Decisions or traces. Versions `0.3.0`–`0.5.0` report
   `X-Request-Id` in adapter metadata, but the Decision and v0alpha1 execution
   trace have no field for it.
 - Client-side concurrency limits. Callers sharing a Drex account must keep

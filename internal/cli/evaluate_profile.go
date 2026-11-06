@@ -51,6 +51,10 @@ Installed adapters:
   io.antaeus.systemone@0.4.0 opt-in provider token accounting in a separate Decision
                             extension; otherwise retains 0.3.0 evaluation behavior
                             (see docs/provider-usage.md).
+  io.antaeus.systemone@0.5.0 opt-in Drex-only compatibility adapter. Accepts optional
+                            bounded confidence metadata and reports usage like 0.4.0.
+                            Sends policy conditions and input to https://drex.nace.ai
+                            and requires the slot drex-api-key.
   io.antaeus.systemone@0.2.0 the earlier antaeus and CLM version, kept for existing
                             profiles.
   io.antaeus.systemone@0.1.0 the earlier CLM-only version, kept for existing profiles.
@@ -157,11 +161,12 @@ func runEvaluateProfileWith(args []string, stdout, stderr io.Writer, runtime con
 		correlationID = "cli-fixture-" + caseName
 	} else {
 		registry = runner.Registry{
-			systemone.UsageIdentity:    runtime.usageSystemOneAdapter(),
-			openai.Identity:            runtime.openAIAdapter(),
-			systemone.Identity:         runtime.systemOneAdapter(),
-			systemone.PreviousIdentity: runtime.previousSystemOneAdapter(),
-			systemone.LegacyIdentity:   runtime.legacySystemOneAdapter(),
+			systemone.UsageIdentity:             runtime.usageSystemOneAdapter(),
+			systemone.DrexCompatibilityIdentity: runtime.drexCompatibilityAdapter(),
+			openai.Identity:                     runtime.openAIAdapter(),
+			systemone.Identity:                  runtime.systemOneAdapter(),
+			systemone.PreviousIdentity:          runtime.previousSystemOneAdapter(),
+			systemone.LegacyIdentity:            runtime.legacySystemOneAdapter(),
 		}
 		correlationID, err = randomCorrelationID()
 		if err != nil {
@@ -198,7 +203,7 @@ const (
 
 var errAdapterNotInstalled = errors.New("the selected profile uses an evaluator adapter that is not installed; installed adapters are " +
 	fixture.AdapterID + "@" + fixture.AdapterVersion + ", " + openai.AdapterID + "@" + openai.AdapterVersion + ", and " +
-	systemone.AdapterID + "@" + systemone.AdapterVersion + " (and opt-in " + systemone.UsageAdapterVersion + ", " + systemone.PreviousAdapterVersion + " and " + systemone.LegacyAdapterVersion + ")")
+	systemone.AdapterID + "@" + systemone.AdapterVersion + " (and opt-in " + systemone.DrexCompatibilityVersion + ", " + systemone.UsageAdapterVersion + ", " + systemone.PreviousAdapterVersion + " and " + systemone.LegacyAdapterVersion + ")")
 
 // classifyProfile accepts a fixture-only profile or a semantic profile whose
 // evaluators all use installed semantic adapters with valid required fields.
@@ -215,7 +220,7 @@ func classifyProfile(p profile.Artifact) (profileKind, error) {
 				return unsupportedProfile, fmt.Errorf("evaluator %q: %w", entry.ID, err)
 			}
 			next = semanticProfile
-		case entry.Mode == profile.ModeSemantic && (entry.Adapter == systemone.UsageIdentity || entry.Adapter == systemone.Identity || entry.Adapter == systemone.PreviousIdentity || entry.Adapter == systemone.LegacyIdentity):
+		case entry.Mode == profile.ModeSemantic && (entry.Adapter == systemone.DrexCompatibilityIdentity || entry.Adapter == systemone.UsageIdentity || entry.Adapter == systemone.Identity || entry.Adapter == systemone.PreviousIdentity || entry.Adapter == systemone.LegacyIdentity):
 			if err := systemone.ValidateEvaluator(entry); err != nil {
 				return unsupportedProfile, fmt.Errorf("evaluator %q: %w", entry.ID, err)
 			}
@@ -328,11 +333,12 @@ func randomCorrelationID() (string, error) {
 // adapters, keyed by exact adapter identity. Explicit bindings still win.
 func installedDefaults() map[profile.ComponentIdentity]map[string]localbinding.Reference {
 	return map[profile.ComponentIdentity]map[string]localbinding.Reference{
-		systemone.UsageIdentity:    systemone.DefaultReferences(),
-		openai.Identity:            openai.DefaultReferences(),
-		systemone.Identity:         systemone.DefaultReferences(),
-		systemone.PreviousIdentity: systemone.PreviousDefaultReferences(),
-		systemone.LegacyIdentity:   systemone.LegacyDefaultReferences(),
+		systemone.DrexCompatibilityIdentity: {systemone.DrexCredentialSlot: {Source: "environment", Name: systemone.DrexCredentialVariable}},
+		systemone.UsageIdentity:             systemone.DefaultReferences(),
+		openai.Identity:                     openai.DefaultReferences(),
+		systemone.Identity:                  systemone.DefaultReferences(),
+		systemone.PreviousIdentity:          systemone.PreviousDefaultReferences(),
+		systemone.LegacyIdentity:            systemone.LegacyDefaultReferences(),
 	}
 }
 

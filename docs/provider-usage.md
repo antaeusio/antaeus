@@ -1,6 +1,6 @@
 # Provider usage reporting
 
-System One adapter `0.4.0` reports Drex input-token counts and optional
+System One adapters `0.4.0` and the Drex-only `0.5.0` report Drex input-token counts and optional
 output-token counts through `Decision.extensions["io.antaeus.usage"]`.
 Other System One providers report `unavailable` until their token-accounting
 contracts are verified.
@@ -9,6 +9,10 @@ changes the profile digest. Versions `0.1.0` through `0.3.0` keep their
 original behavior and do not report usage. Go callers register
 `systemone.UsageIdentity: systemone.UsageRegistration()`; the CLI and JSON
 WebAssembly host install it alongside the earlier versions.
+Go callers selecting `0.5.0` instead register
+`systemone.DrexCompatibilityIdentity: systemone.DrexCompatibilityRegistration()`.
+Both versions preserve usage on invalid evaluator evidence; `0.5.0` adds the
+optional answer metadata described in [System One compatibility](./systemone-adapter.md#drex-answer-compatibility).
 
 ```json
 {

@@ -1,0 +1,14 @@
+{
+  "model": "drex-v1.5",
+  "answers": {
+    "described_item": {
+      "type": "noul",
+      "noul": 0.959,
+      "confidence": 0.959
+    }
+  },
+  "usage": {
+    "input_tokens": 30,
+    "output_tokens": 23
+  }
+}

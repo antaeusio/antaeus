@@ -52,6 +52,14 @@ type configRuntime struct {
 	previousSystemOne *runner.Adapter
 	legacySystemOne   *runner.Adapter
 	usageSystemOne    *runner.Adapter
+	drexCompatibility *runner.Adapter
+}
+
+func (r configRuntime) drexCompatibilityAdapter() runner.Adapter {
+	if r.drexCompatibility != nil {
+		return *r.drexCompatibility
+	}
+	return systemone.DrexCompatibilityRegistration()
 }
 
 func (r configRuntime) usageSystemOneAdapter() runner.Adapter {

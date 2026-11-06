@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-06
+
+Add opt-in compatibility with Drex responses carrying optional confidence metadata,
+and refresh Go security patches.
+
+### Fixed
+
+- Add opt-in System One adapter `0.5.0` for Drex responses with optional numeric
+  `confidence` metadata in the range [0, 1]. Validate the metadata strictly while
+  continuing to derive evidence and routing confidence from `noul`. Existing
+  adapter versions, policy identities and published schemas retain their behavior.
+  Select the new adapter in an evaluator profile to opt in; the profile digest
+  changes. Native CLI and WebAssembly hosts both register the new version.
+
+### Security
+
+- Pin validation to Go 1.26.10/1.27.3 and development/release builds to Go 1.27.3
+  for [GO-2026-6809](https://pkg.go.dev/vuln/GO-2026-6809), retaining the
+  Go 1.26.0 language floor and the existing vulnerability gate. See the
+  [advisory record](./docs/vulnerability-scanning.md#security-patch-update--2026-11-06).
+
 ## [0.7.0] - 2026-10-14
 
 Completed semantic uncertainty now returns review; evaluation and provider errors
@@ -224,7 +245,8 @@ carry GitHub build-provenance attestations
 - `scripts/with-build-lock` keeps the lock until an interrupted command's whole process group has stopped (escalating to KILL after a bounded wait), serializes stale-lock takeover, waits for owners that have not yet written metadata, and no longer treats another user's process as dead. `scripts/test-build-lock` covers these cases ([#42](https://github.com/antaeusio/antaeus/issues/42)).
 - `scripts/cross-build` pins `GOAMD64=v1` and `GOARM64=v8.0` instead of inheriting the caller's environment.
 
-[Unreleased]: https://github.com/antaeusio/antaeus/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/antaeusio/antaeus/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/antaeusio/antaeus/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/antaeusio/antaeus/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/antaeusio/antaeus/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/antaeusio/antaeus/compare/v0.4.0...v0.5.0

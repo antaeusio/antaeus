@@ -18,7 +18,7 @@ import (
 )
 
 func TestUsageReportingIsVersioned(t *testing.T) {
-	for _, version := range []string{LegacyAdapterVersion, PreviousAdapterVersion, AdapterVersion, UsageAdapterVersion} {
+	for _, version := range []string{LegacyAdapterVersion, PreviousAdapterVersion, AdapterVersion, UsageAdapterVersion, DrexCompatibilityVersion} {
 		t.Run(version, func(t *testing.T) {
 			config := runner.Configuration{Evaluator: drexProfile(t).Spec.Evaluators[0], Credential: []byte(drexTestKey)}
 			// Use the same transport with each version; legacy versions use CLM.
@@ -32,7 +32,7 @@ func TestUsageReportingIsVersioned(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if version != UsageAdapterVersion {
+			if version != UsageAdapterVersion && version != DrexCompatibilityVersion {
 				if result.Usage != nil {
 					t.Fatalf("old version emitted usage: %+v", result.Usage)
 				}

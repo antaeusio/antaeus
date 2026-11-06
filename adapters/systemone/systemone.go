@@ -14,6 +14,8 @@
 // behavior so existing profiles keep working.
 // Version 0.4.0 is an opt-in sibling that reports Drex token accounting;
 // Identity and Registration remain on 0.3.0 for existing Go callers.
+// Version 0.5.0 is Drex-only and accepts optional bounded confidence metadata
+// on noul answers, without changing probability normalization or old versions.
 // Other System One providers are rejected until their wire contracts are
 // verified.
 package systemone
@@ -49,6 +51,9 @@ const (
 	// UsageAdapterVersion opts into provider token accounting. Existing
 	// identities and Registration retain their original behavior.
 	UsageAdapterVersion = "0.4.0"
+	// DrexCompatibilityVersion accepts Drex's optional noul confidence metadata
+	// and reports usage. Historical identities retain their wire contract.
+	DrexCompatibilityVersion = "0.5.0"
 	// PreviousAdapterVersion supports the antaeus and CLM providers.
 	PreviousAdapterVersion = "0.2.0"
 	// LegacyAdapterVersion is the first version, which supports CLM only.
@@ -85,6 +90,9 @@ var Identity = profile.ComponentIdentity{ID: AdapterID, Version: AdapterVersion}
 // UsageIdentity is the installed usage-reporting 0.4.0 identity.
 var UsageIdentity = profile.ComponentIdentity{ID: AdapterID, Version: UsageAdapterVersion}
 
+// DrexCompatibilityIdentity is the opt-in Drex wire-compatibility identity.
+var DrexCompatibilityIdentity = profile.ComponentIdentity{ID: AdapterID, Version: DrexCompatibilityVersion}
+
 // PreviousIdentity is the installed 0.2.0 identity.
 var PreviousIdentity = profile.ComponentIdentity{ID: AdapterID, Version: PreviousAdapterVersion}
 
@@ -93,10 +101,11 @@ var LegacyIdentity = profile.ComponentIdentity{ID: AdapterID, Version: LegacyAda
 
 // providerSlots maps each adapter version's providers to their credential slot.
 var providerSlots = map[string]map[string]string{
-	LegacyAdapterVersion:   {ProviderCLM: CredentialSlot},
-	PreviousAdapterVersion: {ProviderAntaeus: AntaeusCredentialSlot, ProviderCLM: CredentialSlot},
-	AdapterVersion:         {ProviderAntaeus: AntaeusCredentialSlot, ProviderCLM: CredentialSlot, ProviderDrex: DrexCredentialSlot},
-	UsageAdapterVersion:    {ProviderAntaeus: AntaeusCredentialSlot, ProviderCLM: CredentialSlot, ProviderDrex: DrexCredentialSlot},
+	LegacyAdapterVersion:     {ProviderCLM: CredentialSlot},
+	PreviousAdapterVersion:   {ProviderAntaeus: AntaeusCredentialSlot, ProviderCLM: CredentialSlot},
+	AdapterVersion:           {ProviderAntaeus: AntaeusCredentialSlot, ProviderCLM: CredentialSlot, ProviderDrex: DrexCredentialSlot},
+	UsageAdapterVersion:      {ProviderAntaeus: AntaeusCredentialSlot, ProviderCLM: CredentialSlot, ProviderDrex: DrexCredentialSlot},
+	DrexCompatibilityVersion: {ProviderDrex: DrexCredentialSlot},
 }
 
 // Capabilities includes confidence-scores: every answer carries a probability.
@@ -133,6 +142,11 @@ func Registration() runner.Adapter {
 // UsageRegistration returns the opt-in usage-reporting 0.4.0 adapter.
 func UsageRegistration() runner.Adapter {
 	return registration(remote.NewClient(), UsageAdapterVersion)
+}
+
+// DrexCompatibilityRegistration returns the opt-in Drex 0.5.0 adapter.
+func DrexCompatibilityRegistration() runner.Adapter {
+	return registration(remote.NewClient(), DrexCompatibilityVersion)
 }
 
 // PreviousRegistration returns the 0.2.0 adapter for runner.Registry.
@@ -232,8 +246,8 @@ var modelPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,255}$`)
 // any installed version. Run it before accepting an evaluation so a
 // misconfigured profile is rejected rather than turned into a failure Decision.
 func ValidateEvaluator(e profile.Evaluator) error {
-	if (e.Adapter != UsageIdentity && e.Adapter != Identity && e.Adapter != PreviousIdentity && e.Adapter != LegacyIdentity) || e.Mode != profile.ModeSemantic || e.Protocol != Protocol {
-		return errors.New("evaluator is not configured for " + AdapterID + "@" + UsageAdapterVersion + ", @" + AdapterVersion + ", @" + PreviousAdapterVersion + ", or @" + LegacyAdapterVersion)
+	if (e.Adapter != DrexCompatibilityIdentity && e.Adapter != UsageIdentity && e.Adapter != Identity && e.Adapter != PreviousIdentity && e.Adapter != LegacyIdentity) || e.Mode != profile.ModeSemantic || e.Protocol != Protocol {
+		return errors.New("evaluator is not configured for " + AdapterID + "@" + DrexCompatibilityVersion + ", @" + UsageAdapterVersion + ", @" + AdapterVersion + ", @" + PreviousAdapterVersion + ", or @" + LegacyAdapterVersion)
 	}
 	providers := providerSlots[e.Adapter.Version]
 	if e.Provider == nil {
@@ -242,6 +256,8 @@ func ValidateEvaluator(e profile.Evaluator) error {
 	slot, ok := providers[*e.Provider]
 	if !ok {
 		switch e.Adapter.Version {
+		case DrexCompatibilityVersion:
+			return errors.New(AdapterID + "@" + DrexCompatibilityVersion + ` supports only provider "` + ProviderDrex + `"`)
 		case LegacyAdapterVersion:
 			return errors.New(AdapterID + "@" + LegacyAdapterVersion + ` supports only provider "` + ProviderCLM + `"`)
 		case PreviousAdapterVersion:
@@ -305,7 +321,7 @@ type requestBody struct {
 func (a *adapter) evaluate(ctx context.Context, request evaluator.Request, config runner.Configuration) (result evaluator.Result, evaluationErr error) {
 	// Unknown accounting remains visible even on transport/status failures.
 	// Earlier versions continue to ignore usage, including malformed counters.
-	if a.version == UsageAdapterVersion {
+	if a.version == UsageAdapterVersion || a.version == DrexCompatibilityVersion {
 		defer func() {
 			if result.Usage == nil {
 				result.Usage = &evaluator.Usage{Status: evaluator.UsageUnavailable}
@@ -380,10 +396,10 @@ func (a *adapter) evaluate(ctx context.Context, request evaluator.Request, confi
 		return evaluator.Result{}, failure("systemone.response_too_large", false, "provider response exceeded the size limit")
 	}
 	var usage *evaluator.Usage
-	if a.version == UsageAdapterVersion && *config.Evaluator.Provider == ProviderDrex {
+	if (a.version == UsageAdapterVersion || a.version == DrexCompatibilityVersion) && *config.Evaluator.Provider == ProviderDrex {
 		usage = parseUsage(payload)
 	}
-	results, model, err := parseResponse(payload, request.Rules)
+	results, model, err := parseVersionedResponse(payload, request.Rules, a.version == DrexCompatibilityVersion)
 	if err != nil {
 		return evaluator.Result{Usage: usage}, err
 	}
@@ -443,6 +459,10 @@ func objectFields(raw []byte) (map[string]json.RawMessage, error) {
 }
 
 func parseResponse(payload []byte, rules []evaluator.Rule) ([]evaluator.RuleResult, string, error) {
+	return parseVersionedResponse(payload, rules, false)
+}
+
+func parseVersionedResponse(payload []byte, rules []evaluator.Rule, allowConfidence bool) ([]evaluator.RuleResult, string, error) {
 	envelope, err := objectFields(payload)
 	if err != nil {
 		return nil, "", failure("systemone.response_malformed", false, "provider response is not a System One answer object")
@@ -461,6 +481,17 @@ func parseResponse(payload []byte, rules []evaluator.Rule) ([]evaluator.RuleResu
 			return nil, "", failure("systemone.output_invalid", false, "provider response does not answer every requested rule exactly once")
 		}
 		answer, err := objectFields(raw)
+		// The new contract adds only this named, bounded numeric metadata field.
+		// Decisions and confidence routing still derive from noul, as before.
+		if allowConfidence && err == nil {
+			if value, present := answer["confidence"]; present {
+				var confidence float64
+				if string(value) == "null" || json.Unmarshal(value, &confidence) != nil || math.IsNaN(confidence) || math.IsInf(confidence, 0) || confidence < 0 || confidence > 1 {
+					return nil, "", failure("systemone.output_invalid", false, "provider confidence metadata is not a number between 0 and 1")
+				}
+				delete(answer, "confidence")
+			}
+		}
 		var kind string
 		var p float64
 		if err != nil || len(answer) != 2 || json.Unmarshal(answer["type"], &kind) != nil || kind != "noul" ||
