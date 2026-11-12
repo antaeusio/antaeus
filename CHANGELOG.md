@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Security
+
+- Pin validation to Go 1.26.11/1.27.4 and preferred/release builds to Go 1.27.4
+  for [GO-2026-6859](https://pkg.go.dev/vuln/GO-2026-6859), preserving the Go
+  1.26.0 language floor and existing validation gates.
+
 ## [0.7.1] - 2026-11-06
 
 Add opt-in compatibility with Drex responses carrying optional confidence metadata,
