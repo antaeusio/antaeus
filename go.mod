@@ -2,7 +2,7 @@ module github.com/antaeusio/antaeus
 
 go 1.26.0
 
-toolchain go1.27.3
+toolchain go1.27.4
 
 require (
 	github.com/gowebpki/jcs v1.0.1
