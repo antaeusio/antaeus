@@ -29,17 +29,22 @@
 
 ---
 
+Authentication asks who you are. Authorization asks what you may do.
+**Antaeus** checks whether specific content or a proposed action follows your
+written policy, returning an `allow`, `review`, `deny`, or `failure` Decision
+tied to the exact policy version used. Your application decides what happens
+next.
+
 Some rules can't be written as `if` statements: *"no counterfeit goods"*,
 *"no medical claims"*, *"flag anything that looks like harassment"*. Teams
 usually bury these in a prompt and hope for consistent answers.
 
-**Antaeus** makes that judgment an explicit, inspectable decision. You write
-the policy as named rules with plain-language conditions and a fixed outcome
-for each. An evaluator (a language model, or a deterministic fixture for tests)
-only reports **whether each condition applies**. Antaeus then applies *your*
-outcomes deterministically and returns a typed Decision (`allow`, `review`,
-`deny`, or `failure`) that records the policy digest, the evaluator, the model,
-and every attempt.
+With Antaeus you write the policy as named rules, each with a natural-language
+condition and an outcome you choose. An evaluator (a language model, or a
+deterministic fixture for tests) only reports **whether each condition
+applies**. Your policy, not the model, sets the outcome: Antaeus combines the
+rule results by a fixed precedence and records the policy digest, the
+evaluator, the model, and every attempt.
 
 > [!NOTE]
 > Antaeus is early and pre-v1; see the [releases](https://github.com/antaeusio/antaeus/releases).
@@ -150,8 +155,9 @@ $ antaeus evaluate-profile --policy listing-policy.yaml --input replica-watch.js
 ```
 
 A complete, ordinary listing, such as `{"title": "Canon AE-1 film camera", …}`,
-matches `complete-listing` and returns `"outcome": "allow"`. Anything the model
-can't decide becomes `failure`, so your application can route it to a person.
+matches `complete-listing` and returns `"outcome": "allow"`. Anything the
+evaluator is unsure about becomes `review`, and an evaluation that fails becomes
+`failure`, so your application can route either to a person.
 Both inputs are in [`examples/marketplace`](./examples/marketplace).
 
 > [!TIP]
