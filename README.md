@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/antaeusio/antaeus/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/antaeusio/antaeus?color=B85C3B"></a>
+  <a href="https://github.com/antaeusio/antaeus/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/antaeusio/antaeus?color=244BC5"></a>
   <a href="https://github.com/antaeusio/antaeus/actions/workflows/validate.yml"><img alt="Go validation" src="https://github.com/antaeusio/antaeus/actions/workflows/validate.yml/badge.svg?branch=main"></a>
   <a href="https://pkg.go.dev/github.com/antaeusio/antaeus"><img alt="Go Reference" src="https://pkg.go.dev/badge/github.com/antaeusio/antaeus.svg"></a>
   <a href="./LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-171715"></a>
