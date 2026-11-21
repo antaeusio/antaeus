@@ -7,6 +7,10 @@ This quickstart validates and executes one policy entirely on your machine. It
 uses committed synthetic fixture evidence, performs no network access, reads no
 credentials, and does not represent semantic model inference.
 
+For workspace API keys, managed policies, and prepaid hosted usage, use the
+separate [hosted API quickstart](https://antaeus.io/docs). See
+[local core and hosted beta](./hosted-beta.md) for how the two paths differ.
+
 Build the development command through the repository build lock:
 
 ```sh
